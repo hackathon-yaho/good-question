@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx.cmd tsc *)",
+      "Bash(npx vitest run *)",
+      "Bash(npx.cmd vitest run *)",
+      "Bash(npx eslint *)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run test:browser)",
+      "Bash(npm.cmd run test:browser)",
+      "Bash(npm run verify)",
+      "Bash(npm.cmd run verify)",
+      "Bash(npm test)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm typecheck)",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__list_network_requests",
+      "mcp__claude_ai_Figma__get_screenshot",
+      "mcp__claude_ai_Figma__get_metadata",
+      "mcp__claude_ai_Figma__get_design_context",
+      "mcp__claude_ai_Notion__notion-fetch",
+      "mcp__claude_ai_Notion__notion-search",
+      "mcp__claude_ai_Notion__notion-search-agents",
+      "mcp__claude_ai_Notion__notion-get-comments",
+      "mcp__claude_ai_Notion__notion-get-teams",
+      "mcp__claude_ai_Notion__notion-get-users",
+      "mcp__claude_ai_Notion__notion-get-async-task",
+      "mcp__claude_ai_Notion__notion-list-favorite-pages",
+      "mcp__claude_ai_Notion__notion-list-private-pages",
+      "mcp__claude_ai_Notion__notion-list-recent-pages",
+      "mcp__claude_ai_Notion__notion-list-shared-pages",
+      "mcp__claude_ai_Notion__notion-query-data-sources",
+      "mcp__claude_ai_Notion__notion-query-database-view",
+      "mcp__claude_ai_Notion__notion-query-meeting-notes"
+    ]
+  }
+}
