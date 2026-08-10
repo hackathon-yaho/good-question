@@ -11,6 +11,8 @@ export type ApiErrorCode =
   /** POST /api/sessions — 동의 없는 아이는 세션을 시작할 수 없다 */
   | "CONSENT_REQUIRED"
   | "UNAUTHORIZED"
+  /** 오프라인·타임아웃·5xx — I-3 전체화면으로 올린다 */
+  | "NETWORK"
   | "UNKNOWN";
 
 export class ApiError extends Error {

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ToastHost } from "@/components/ui/Toast";
+import { NetworkErrorHost } from "@/features/system/NetworkErrorHost";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +23,10 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="antialiased">
-        <ToastHost>{children}</ToastHost>
+        {/* I-3은 전역이다. Toast 안쪽에 둬서 I-4 등에서 토스트를 쓸 수 있게 한다. */}
+        <ToastHost>
+          <NetworkErrorHost>{children}</NetworkErrorHost>
+        </ToastHost>
       </body>
     </html>
   );

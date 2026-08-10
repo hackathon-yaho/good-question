@@ -71,6 +71,13 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** 오프라인이면 실패한다. 이유는 mock.ts의 같은 함수 주석 참조. */
+function assertOnline() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    throw new ApiError("NETWORK", "오프라인 상태입니다");
+  }
+}
+
 /** 나이는 저장하지 않고 계산한다. 만 나이가 아니다. (PRD I-11) */
 function ageOf(birthYear: number): number {
   return new Date().getFullYear() - birthYear;
@@ -94,6 +101,7 @@ export const mockAccountApi: AccountApi = {
   async signIn(provider, body) {
     // OAuth 왕복을 흉내낸다. A-2에서 스피너가 보일 만큼은 걸려야 한다.
     await delay(700);
+    assertOnline();
     if (!body.authorizationCode) {
       throw new ApiError("UNAUTHORIZED", "인가 코드가 없습니다");
     }
@@ -110,6 +118,7 @@ export const mockAccountApi: AccountApi = {
 
   async listChildren() {
     await delay(150);
+    assertOnline();
     const store = load();
     const result: ChildListResult = {
       children: store.children.map(toChild),
@@ -120,6 +129,7 @@ export const mockAccountApi: AccountApi = {
 
   async createChild(body) {
     await delay(400);
+    assertOnline();
     const store = load();
 
     // 3명 제한은 서버가 막는다. 프론트만 막으면 안 된다. (A-4 체크리스트)
@@ -152,6 +162,7 @@ export const mockAccountApi: AccountApi = {
 
   async getHome(childId) {
     await delay(200);
+    assertOnline();
     const store = load();
     const child = store.children.find((c) => c.id === childId);
     if (!child) throw new ApiError("UNAUTHORIZED", "선택한 아이를 찾을 수 없습니다");

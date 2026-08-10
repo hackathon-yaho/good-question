@@ -10,6 +10,7 @@
  *    프론트에 판단 로직이 새어 들어가지 않게 경계를 여기서 끊는다.
  */
 
+import { ApiError } from "@/lib/api/errors";
 import { withChildName } from "@/lib/korean";
 import type {
   ActivityApi,
@@ -263,6 +264,19 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * 오프라인이면 요청이 실패해야 한다.
+ *
+ * 목이 언제나 성공하면 I-3(네트워크 오류) 경로를 한 번도 지나가 보지 못한다.
+ * 실제 HTTP 클라이언트로 바꿔도 같은 자리에서 같은 에러가 나므로, 화면 쪽 코드는
+ * 그대로 쓸 수 있다. 검증 스크립트도 test 전용 뒷문 없이 이 경로를 밟는다.
+ */
+function assertOnline() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    throw new ApiError("NETWORK", "오프라인 상태입니다");
+  }
+}
+
 function pick(list: string[], seed: number): string {
   return list.length ? list[seed % list.length] : "";
 }
@@ -273,6 +287,7 @@ let sessionSeq = 0;
 export const mockPlayApi: PlayApi = {
   async createSession({ childId, storyId, restart = false }) {
     await delay(200);
+    assertOnline();
     hydrate();
 
     // 같은 아이의 진행 중 세션이 있으면 그대로 이어준다.
@@ -298,6 +313,7 @@ export const mockPlayApi: PlayApi = {
 
   async getSession(sessionId) {
     await delay(150);
+    assertOnline();
     const session = ensureSession(sessionId);
     const scene = findScene(session.currentSceneId) ?? MOCK_SCENES[0];
 
@@ -322,6 +338,7 @@ export const mockPlayApi: PlayApi = {
 
   async completeScene(sessionId, sceneId) {
     await delay(120);
+    assertOnline();
     const session = ensureSession(sessionId);
     const next = nextSceneOf(sceneId);
 
@@ -354,6 +371,7 @@ export const mockPlayApi: PlayApi = {
   async submitUtterance(sessionId, body) {
     // LLM 왕복을 흉내낸다. C-6이 3초 이내면 기본 로더를 보여준다.
     await delay(900);
+    assertOnline();
 
     const session = ensureSession(sessionId);
     const scene = findScene(session.currentSceneId);
@@ -476,6 +494,7 @@ export const mockPlayApi: PlayApi = {
 export const mockActivityApi: ActivityApi = {
   async getActivity(sessionId) {
     await delay(150);
+    assertOnline();
     const session = ensureSession(sessionId);
     session.status = "post_activity";
 
@@ -499,6 +518,7 @@ export const mockActivityApi: ActivityApi = {
 
   async submitOrder(sessionId, submittedOrder) {
     await delay(400);
+    assertOnline();
     const session = ensureSession(sessionId);
     session.attemptCount += 1;
     persist();
@@ -524,6 +544,7 @@ export const mockActivityApi: ActivityApi = {
 
   async submitRetelling(sessionId, body) {
     await delay(400);
+    assertOnline();
     const session = ensureSession(sessionId);
     session.status = "completed";
     pushMessage(session, session.currentSceneId, "child", body.retellingText);

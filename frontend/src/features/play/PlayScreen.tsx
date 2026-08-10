@@ -40,6 +40,7 @@ import {
   WaitingPanel,
 } from "@/features/play/panels";
 
+import { useNetworkError, withTimeout } from "@/features/system/NetworkErrorHost";
 import { mockPlayApi } from "@/lib/api/mock";
 import type { PlayApi } from "@/lib/api/types";
 import { PlayState, isCharacterTurn } from "@/lib/play-state";
@@ -62,6 +63,7 @@ export function PlayScreen({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const network = useNetworkError();
   const [state, dispatch] = useReducer(playReducer, initialPlayState);
 
   const [paused, setPaused] = useState(false);
@@ -105,7 +107,10 @@ export function PlayScreen({
       .then((snapshot) => {
         if (alive) dispatch({ type: "HYDRATE", snapshot });
       })
-      .catch(() => toast.show("이야기를 불러오지 못했어요", "danger"));
+      .catch((error) => {
+        console.error("[play] 세션 로드 실패", error);
+        toast.show("이야기를 불러오지 못했어요", "danger");
+      });
     return () => {
       alive = false;
     };
@@ -142,13 +147,15 @@ export function PlayScreen({
   const displayedMicLevel = state.recording ? micLevel : 0;
 
   // --- 다음 장면으로 진행 ------------------------------------------------
+  // 이름 있는 함수 표현식으로 둔다. 실패 시 재시도가 자기 자신을 다시 불러야 하는데,
+  // ref에 담아 두면 React 19 린트가 "훅에 넘긴 값을 다시 대입한다"고 막는다.
   const advanceScene = useCallback(
-    async (sceneId: string) => {
+    async function advance(sceneId: string): Promise<void> {
       if (advancingRef.current) return;
       advancingRef.current = true;
       setAdvancing(true);
       try {
-        const result = await api.completeScene(sessionId, sceneId);
+        const result = await withTimeout(api.completeScene(sessionId, sceneId));
         if (result.postActivityReady || !result.nextScene) {
           dispatch({ type: "POST_ACTIVITY_READY" });
           router.push(`/activity/${sessionId}`);
@@ -158,13 +165,15 @@ export function PlayScreen({
         dispatch({ type: "SCENE_LOADED", scene: nextScene, openingMessage });
       } catch (error) {
         console.error("[play] 장면 전환 실패", error);
-        toast.show("다음 장면을 불러오지 못했어요", "danger");
+        // 장면 전환이 막히면 이야기가 더 진행되지 않는다. 토스트로는 부족하다.
+        // I-3을 띄우고 같은 요청을 그대로 다시 보낼 수 있게 한다. (명세 I-3)
+        network.show({ retry: () => advance(sceneId) });
       } finally {
         advancingRef.current = false;
         setAdvancing(false);
       }
     },
-    [api, router, sessionId, toast]
+    [api, network, router, sessionId]
   );
 
   // --- 자막·대사 TTS ----------------------------------------------------
@@ -272,10 +281,12 @@ export function PlayScreen({
     dispatch({ type: "SUBMIT" });
 
     try {
-      const result = await api.submitUtterance(sessionId, {
-        text,
-        sttRawText: state.sttRawText || undefined,
-      });
+      const result = await withTimeout(
+        api.submitUtterance(sessionId, {
+          text,
+          sttRawText: state.sttRawText || undefined,
+        })
+      );
       // 기다리는 동안 장면이 바뀌었으면 이 응답은 지난 장면의 것이다. 버린다.
       if (currentSceneIdRef.current !== submittedSceneId) return;
       dispatch({ type: "SERVER_RESULT", result });
@@ -285,12 +296,17 @@ export function PlayScreen({
       console.error("[play] 발화 제출 실패", error);
       // 지난 장면의 실패로 지금 장면의 상태를 되돌리지 않는다.
       if (currentSceneIdRef.current !== submittedSceneId) return;
-      toast.show("잠깐 연결이 끊겼어요. 다시 해볼까?", "danger");
-      dispatch({ type: "RETRY_SPEAKING" });
+      // 아이가 한 말이 사라지지 않게, 같은 발화를 그대로 다시 보내는 재시도를 준다.
+      network.show({
+        retry: async () => {
+          dispatch({ type: "TRANSCRIBED", text });
+          submittingRef.current = false;
+        },
+      });
     } finally {
       submittingRef.current = false;
     }
-  }, [api, scene?.sceneId, sessionId, state.draftText, state.sttRawText, stt, toast]);
+  }, [api, network, scene?.sceneId, sessionId, state.draftText, state.sttRawText, stt]);
 
   const replay = useCallback(() => {
     if (!state.characterText) return;
