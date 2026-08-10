@@ -84,6 +84,9 @@ const REACTIONS: Record<string, Record<ResponseMode, string[]>> = {
 
 type MockSession = {
   sessionId: string;
+  childId: string | null;
+  /** B-1 이어하기 카드가 최신 1건을 고르는 기준 */
+  lastActivityAt: number;
   currentSceneId: string;
   turnCount: number;
   accumulatedElements: string[];
@@ -101,12 +104,73 @@ type MockSession = {
 
 const sessions = new Map<string, MockSession>();
 
+/**
+ * 세션을 브라우저에 남긴다.
+ *
+ * 왜: 이어하기(B-1 히어로 카드, C 이어하기 복원)가 이 서비스의 표시 기능이다.
+ * 메모리에만 두면 새로고침하거나 주소로 다시 들어올 때마다 진행이 사라져
+ * "이어하기"라는 화면이 거짓이 된다.
+ *
+ * `Set`은 JSON으로 안 나가므로 배열로 바꿔 담는다.
+ */
+const SESSION_STORE_KEY = "gq.mock.sessions";
+
+type PersistedSession = Omit<MockSession, "missionRevealedScenes"> & {
+  missionRevealedScenes: string[];
+};
+
+let hydrated = false;
+
+function hydrate() {
+  if (hydrated) return;
+  hydrated = true;
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as {
+      seq?: number;
+      sessions?: PersistedSession[];
+    };
+    for (const item of parsed.sessions ?? []) {
+      sessions.set(item.sessionId, {
+        ...item,
+        missionRevealedScenes: new Set(item.missionRevealedScenes ?? []),
+      });
+    }
+    sessionSeq = Math.max(sessionSeq, parsed.seq ?? 0);
+  } catch {
+    // 형식이 깨졌으면 없는 것으로 취급한다. 처음부터 시작하는 편이 안전하다.
+  }
+}
+
+function persist() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      SESSION_STORE_KEY,
+      JSON.stringify({
+        seq: sessionSeq,
+        sessions: [...sessions.values()].map((session) => ({
+          ...session,
+          missionRevealedScenes: [...session.missionRevealedScenes],
+        })),
+      })
+    );
+  } catch {
+    // 저장 실패해도 이번 세션 동안은 동작해야 한다.
+  }
+}
+
 function ensureSession(sessionId: string): MockSession {
+  hydrate();
   const existing = sessions.get(sessionId);
   if (existing) return existing;
 
   const created: MockSession = {
     sessionId,
+    childId: null,
+    lastActivityAt: Date.now(),
     currentSceneId: MOCK_SCENES[0].id,
     turnCount: 0,
     accumulatedElements: [],
@@ -121,6 +185,7 @@ function ensureSession(sessionId: string): MockSession {
     attemptCount: 0,
   };
   sessions.set(sessionId, created);
+  persist();
   return created;
 }
 
@@ -163,6 +228,7 @@ function pushMessage(
   speakerType: Message["speakerType"],
   text: string
 ): Message {
+  session.lastActivityAt = Date.now();
   session.turnOrder += 1;
   const message: Message = {
     id: `m_${session.turnOrder}`,
@@ -201,7 +267,35 @@ function pick(list: string[], seed: number): string {
   return list.length ? list[seed % list.length] : "";
 }
 
+/** 목 세션 ID 카운터. 실제로는 서버가 UUID를 만든다. */
+let sessionSeq = 0;
+
 export const mockPlayApi: PlayApi = {
+  async createSession({ childId, storyId, restart = false }) {
+    await delay(200);
+    hydrate();
+
+    // 같은 아이의 진행 중 세션이 있으면 그대로 이어준다.
+    // B-4 "처음부터 하기"(restart)는 기존 세션을 stopped로 바꾸고 새로 만든다.
+    const existing = [...sessions.values()]
+      .filter(
+        (s) =>
+          s.childId === childId &&
+          (s.status === "in_progress" || s.status === "stopped")
+      )
+      .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0];
+
+    if (existing && !restart) return mockPlayApi.getSession(existing.sessionId);
+    if (existing && restart) existing.status = "stopped";
+
+    sessionSeq += 1;
+    const sessionId = `ss_${storyId.slice(0, 6)}_${sessionSeq}`;
+    const session = ensureSession(sessionId);
+    session.childId = childId;
+    persist();
+    return mockPlayApi.getSession(sessionId);
+  },
+
   async getSession(sessionId) {
     await delay(150);
     const session = ensureSession(sessionId);
@@ -232,6 +326,7 @@ export const mockPlayApi: PlayApi = {
     const next = nextSceneOf(sceneId);
 
     if (!next) {
+      persist();
       return { nextScene: null, postActivityReady: true };
     }
 
@@ -252,6 +347,7 @@ export const mockPlayApi: PlayApi = {
       nextScene: { ...toSceneInfo(next, session), openingMessage },
       postActivityReady: false,
     };
+    persist();
     return response;
   },
 
@@ -372,6 +468,7 @@ export const mockPlayApi: PlayApi = {
       missionTriggered,
       highlightWords: HIGHLIGHT_WORDS[scene.id] ?? [],
     };
+    persist();
     return response;
   },
 };
@@ -383,6 +480,7 @@ export const mockActivityApi: ActivityApi = {
     session.status = "post_activity";
 
     if (!session.cardOrder) session.cardOrder = shuffleCards(sessionId);
+    persist();
 
     const byId = new Map<string, { text: string }>(
       MOCK_POST_ACTIVITY.cards.map((c) => [c.id, { text: c.text }])
@@ -403,6 +501,7 @@ export const mockActivityApi: ActivityApi = {
     await delay(400);
     const session = ensureSession(sessionId);
     session.attemptCount += 1;
+    persist();
 
     // 정답 판정은 서버가 한다. 프론트 판정을 허용하지 않는다. (PRD 8.11)
     const correct = [...MOCK_POST_ACTIVITY.cards]
@@ -428,6 +527,7 @@ export const mockActivityApi: ActivityApi = {
     const session = ensureSession(sessionId);
     session.status = "completed";
     pushMessage(session, session.currentSceneId, "child", body.retellingText);
+    persist();
 
     const childCount = session.messages.filter(
       (m) => m.speakerType === "child"
@@ -454,4 +554,48 @@ export const mockActivityApi: ActivityApi = {
 /** 개발 편의용 — 세션을 처음 상태로 되돌린다. */
 export function resetMockSession(sessionId: string) {
   sessions.delete(sessionId);
+  persist();
+}
+
+/** 데모 초기화 — 모든 세션을 지운다. */
+export function resetAllMockSessions() {
+  sessions.clear();
+  sessionSeq = 0;
+  persist();
+}
+
+/**
+ * B-1 이어하기 카드용. 해당 아이의 진행 중 세션 중 최신 1건.
+ *
+ * 이어하기 세션이 여러 개일 때 `last_activity_at` 최신 1건만 노출한다.
+ * (screens.md B-1 체크리스트)
+ *
+ */
+export function activeMockSession(childId: string): {
+  sessionId: string;
+  currentSceneOrder: number;
+  sceneProgress: { current: number; total: number };
+  lastActivityAt: string;
+} | null {
+  hydrate();
+  const found = [...sessions.values()]
+    .filter(
+      (s) =>
+        s.childId === childId &&
+        (s.status === "in_progress" || s.status === "stopped")
+    )
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0];
+
+  if (!found) return null;
+
+  const scene = findScene(found.currentSceneId) ?? MOCK_SCENES[0];
+  return {
+    sessionId: found.sessionId,
+    currentSceneOrder: scene.sceneOrder,
+    sceneProgress: {
+      current: toScreenIndex(scene.sceneOrder),
+      total: TOTAL_SCREEN_SCENES,
+    },
+    lastActivityAt: new Date(found.lastActivityAt).toISOString(),
+  };
 }

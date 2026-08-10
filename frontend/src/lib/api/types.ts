@@ -85,6 +85,12 @@ export type SceneCompleteResponse = {
  * 목(mock)과 실제 HTTP 클라이언트가 이 형태를 공유한다. (작업 분장 5장 권장)
  */
 export type PlayApi = {
+  /** POST /api/sessions — api.md 3.4. B-1 "오늘의 이야기", B-3·B-4에서 부른다. */
+  createSession(body: {
+    childId: string;
+    storyId: string;
+    restart?: boolean;
+  }): Promise<SessionSnapshot>;
   getSession(sessionId: string): Promise<SessionSnapshot>;
   submitUtterance(
     sessionId: string,
@@ -149,4 +155,96 @@ export type ActivityApi = {
     sessionId: string,
     body: { retellingText: string }
   ): Promise<RetellingResult>;
+};
+
+/* ── 인증·계정 — api.md 3.1 ──────────────────────────────────────── */
+
+/** MVP 소셜 로그인은 카카오만이다. (PRD M-01, open-questions Q-02) */
+export type AuthProvider = "kakao";
+
+export type Parent = { id: string; name: string; email: string };
+
+/** POST /api/auth/{provider} */
+export type AuthResult = {
+  accessToken: string;
+  /** false → /onboarding/consent, true → /profiles. A-2 분기 판단용 확정 필드 */
+  hasCompletedOnboarding: boolean;
+  parent: Parent;
+};
+
+/* ── 아이 프로필 — api.md 3.2 ────────────────────────────────────── */
+
+/**
+ * A-3에서 받은 동의 값. A-4 제출 때 아이 정보와 **함께** 보낸다.
+ * `child_consents`가 `child_id`를 요구하므로 A-3 시점에는 레코드를 만들 수 없다.
+ */
+export type ConsentValues = {
+  termsOfService: boolean;
+  privacyPolicy: boolean;
+  childDataProcessing: boolean;
+  marketing: boolean;
+};
+
+export type Child = {
+  id: string;
+  name: string;
+  birthYear: number;
+  /** 서버가 `현재 연도 - birthYear`로 계산한다. 만 나이가 아니다. (PRD I-11) */
+  age: number;
+  avatarId: string;
+  /** false면 세션 시작 불가. 프론트는 동의 화면으로 유도한다. */
+  consentGranted: boolean;
+  /** A-5 "최근 활동" 상대 표기용. 활동이 없으면 null */
+  lastActivityAt: string | null;
+  registeredAt: string;
+};
+
+export type ChildListResult = {
+  children: Child[];
+  /** 최대 등록 인원. 프론트가 3을 하드코딩하지 않는다. (PRD I-09) */
+  limit: number;
+};
+
+/* ── 홈 — api.md 3.3 ─────────────────────────────────────────────── */
+
+export type HomeStory = {
+  id: string;
+  title: string;
+  coverImageUrl: string | null;
+  estimatedMinutes: number | null;
+  topics: string[];
+};
+
+export type HomeInProgress = {
+  sessionId: string;
+  storyId: string;
+  storyTitle: string;
+  coverImageUrl: string | null;
+  currentSceneOrder: number;
+  /** 화면 단위(4구간) 진행바용. currentSceneOrder(1~9)와 분모가 다르다. (Q-10) */
+  sceneProgress: { current: number; total: number };
+  lastActivityAt: string;
+};
+
+/** GET /api/home?childId={id} */
+export type HomeSnapshot = {
+  child: { id: string; name: string; avatarId: string };
+  /** 진행 중 세션이 없으면 null. 프론트는 그 자리를 빈 채로 두지 않는다. */
+  inProgress: HomeInProgress | null;
+  recommended: HomeStory[];
+};
+
+export type AccountApi = {
+  signIn(
+    provider: AuthProvider,
+    body: { authorizationCode: string }
+  ): Promise<AuthResult>;
+  listChildren(): Promise<ChildListResult>;
+  createChild(body: {
+    name: string;
+    birthYear: number;
+    avatarId: string;
+    consents: ConsentValues;
+  }): Promise<Child>;
+  getHome(childId: string): Promise<HomeSnapshot>;
 };

@@ -32,6 +32,19 @@ export type MockScene = {
 export const STORY_ID = "s_banggui_daughter_in_law_001";
 export const STORY_TITLE = "방귀 뀌는 며느리";
 
+/** 이야기 기본 정보 — PRD 7.1 (주최측 제공값) */
+export const STORY_META = {
+  id: STORY_ID,
+  title: STORY_TITLE,
+  summary:
+    "큰 방귀를 부끄러워하던 며느리가 자신의 다름을 장점으로 바꾸는 이야기",
+  difficulty: "보통",
+  topics: ["다름", "자기이해", "장점 발견"],
+  estimatedMinutes: 20,
+  // 표지 이미지 미수령. 규격은 assets.md §2, 폴백은 §3-1.
+  coverImageUrl: null,
+} as const;
+
 export const MOCK_SCENES: MockScene[] = [
   {
     id: "sc_banggui_01",

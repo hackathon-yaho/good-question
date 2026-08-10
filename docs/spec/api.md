@@ -138,6 +138,9 @@ X-Internal-Token: <shared-secret>
 `hasCompletedOnboarding`은 [화면 명세 A-2](screens.md)에서 분기 판단에 쓰도록 확정된 필드입니다.
 `false` → `/onboarding/consent`, `true` → `/profiles`
 
+`provider`는 **`kakao`만** 구현합니다 (2026-08-10 확정, [Q-02](../open-questions.md)).
+프론트는 A-2에 카카오 버튼 하나만 렌더합니다.
+
 #### `GET /api/parents/me` ⚪ · H-1
 
 ```json
@@ -200,6 +203,10 @@ X-Internal-Token: <shared-secret>
 
 > `child_consents`는 `child_id`가 필요하므로 A-3에서 레코드를 만들 수 없습니다.
 > A-3의 동의 값을 클라이언트에 임시 보관했다가 여기서 함께 전송합니다.
+>
+> 동의는 **아이 한 명당 한 건**입니다. 그래서 A-5 "+ 아이 추가"도 A-3을 먼저 거칩니다.
+> 이 엔드포인트는 `consents` 필수 3개가 `true`가 아니면 403 `CONSENT_REQUIRED`로 거절해야 합니다.
+> → [Q-21](../open-questions.md)
 
 #### `PATCH /api/children/{childId}` ⚪ · H-2
 

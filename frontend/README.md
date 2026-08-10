@@ -57,9 +57,16 @@ src/
 ├── components/
 │   ├── shells/                  ImmersiveShell · SidebarShell · CenteredShell
 │   └── ui/                      공통 컴포넌트 10종 (screens.md §1-6)
+├── features/
+│   ├── account/                 A-2 로그인 · A-3 동의 · A-4 등록 · A-5 선택
+│   ├── home/                    B-1 홈
+│   ├── play/                    C — 대화 상태머신
+│   └── activity/                D — 말하기 후 활동
 └── lib/
     ├── thinking-elements.ts     사고 요소 8종 → 아이 화면 4그룹 매핑 (§1-7)
-    └── play-state.ts            PlayState · ActivityStep · 서버 모드 매핑
+    ├── play-state.ts            PlayState · ActivityStep · 서버 모드 매핑
+    ├── client-store.ts          토큰 · 선택한 아이 (localStorage)
+    └── relative-date.ts         A-5 "최근 활동" 상대 표기 규칙
 ```
 
 `/dev/gallery`에서 토큰과 컴포넌트를 한 화면에 볼 수 있습니다. 디자인 시안(Stitch)을
@@ -75,7 +82,7 @@ src/
 - [x] 5 — C-7, C-12 + 장면 전환
 - [x] 부분 — C-10·C-11 미션 카드, C-13 일시정지, I-2 인식 실패
 - [x] 6 — `/activity` D-1 ~ D-7 (카드 순서 → 키워드 → 다시 말하기 → 완료)
-- [ ] 2 — A-2 → A-4 → A-5 → B-1 (로그인해서 홈까지)
+- [x] 2 — A-1 → A-2 → **A-3** → A-4 → A-5 → B-1 (로그인해서 홈까지)
 - [ ] 7 — I-1 마이크 권한, I-3 네트워크 오류, I-4 권한 거부
 - [ ] 8 — B-2, B-3, B-4, E, F
 - [ ] 9 — G, H
@@ -84,13 +91,25 @@ src/
 `/play`의 상태머신이 이 프로젝트에서 가장 위험한 부분이고, 늦게 발견되는 문제일수록
 비쌉니다"라고 경고한 것을 따랐습니다.
 
+**2단계에 A-3(동의)을 넣었습니다.** §6 목록에는 없지만, A-4의 `POST /api/children`이
+A-3의 동의 값을 함께 받는 계약이고(api.md 3.2) 동의 없는 아이는 세션을 시작할 수
+없습니다(라우트 가드). A-3을 빼면 프론트가 동의 값을 임의로 만들어 넣게 되는데
+그건 요건 위반입니다.
+
 ## 지금 확인할 수 있는 것
 
 ```bash
 npm run dev
-# http://localhost:3000/play/demo    이야기 전체 완주 (목 서버)
-# http://localhost:3000/dev/gallery  토큰·컴포넌트
+# http://localhost:3000/            로그인부터 전체 동선
+# http://localhost:3000/play/demo   이야기 전체 완주 (목 서버, 로그인 생략)
+# http://localhost:3000/dev/gallery 토큰·컴포넌트
 ```
+
+전체 동선: `/` → `/login` → `/onboarding/consent` → `/onboarding/child` → `/profiles`
+→ `/home` → `/play/{sessionId}` → `/activity/{sessionId}`
+
+`/login` 하단의 **데모 상태 초기화**(개발 모드에서만 보임)로 계정·아이·세션을 지우고
+처음부터 다시 볼 수 있습니다.
 
 `/play/demo`에서 도입 → 전개1 → 대화1 → … → 장면4 → `/activity/demo`까지 이어집니다.
 서버가 없어도 `src/lib/api/mock.ts`가 [api.md 3절](../docs/spec/api.md) 계약을 흉내내
@@ -116,13 +135,19 @@ npm run dev
 `PlayApi` 인터페이스 하나만 맞추면 화면 코드는 손대지 않습니다.
 
 ```
-src/lib/api/types.ts   PlayApi 계약 (유지)
-src/lib/api/mock.ts    목 구현 (버릴 것)
-src/features/play/PlayScreen.tsx   api 기본값만 교체
+src/lib/api/types.ts          PlayApi · ActivityApi · AccountApi 계약 (유지)
+src/lib/api/errors.ts          에러 코드 (유지 — 문구가 아니라 코드로 분기한다)
+src/lib/api/mock.ts            /play · /activity 목 (버릴 것)
+src/lib/api/mock-account.ts    계정 · 아이 · 홈 목 (버릴 것)
+src/lib/client-store.ts        토큰 · 선택한 아이 (서버 세션으로 옮길 것)
+화면 컴포넌트                   api 기본값만 교체
 ```
 
 ⚠️ `api`는 **클라이언트에서 주입**합니다. 서버 컴포넌트에서 메서드를 가진 객체를
 prop으로 넘기면 `Functions cannot be passed directly to Client Components`로 터집니다.
+
+목 서버는 localStorage에 상태를 남깁니다. 이어하기(B-1 히어로 카드, C 이어하기 복원)가
+표시 기능이라 메모리에만 두면 새로고침마다 진행이 사라져 화면이 거짓이 됩니다.
 
 ## 지켜야 할 규칙
 
