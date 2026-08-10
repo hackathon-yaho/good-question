@@ -117,6 +117,12 @@ type MockSession = {
   /** D-6에서 아이가 다시 말한 이야기. 텍스트만 남긴다. 음성은 저장하지 않는다. */
   retellingText: string | null;
   completedAt: string | null;
+  /**
+   * 세션 전체에서 확인된 사고 요소. `accumulatedElements`는 장면마다 초기화되지만
+   * 보호자 리포트(G)는 세션 전체를 봐야 하므로 따로 쌓는다.
+   * 실제로는 `utterance_analyses.detected_elements`에서 집계할 값이다.
+   */
+  detectedElements: string[];
 };
 
 const sessions = new Map<string, MockSession>();
@@ -202,6 +208,7 @@ function ensureSession(sessionId: string): MockSession {
     attemptCount: 0,
     retellingText: null,
     completedAt: null,
+    detectedElements: [],
   };
   sessions.set(sessionId, created);
   persist();
@@ -419,6 +426,7 @@ export const mockPlayApi: PlayApi = {
     const detected = isLowInformation ? [] : missingBefore.slice(0, 1);
 
     session.accumulatedElements.push(...detected);
+    session.detectedElements.push(...detected);
     session.turnsWithoutNewElement = detected.length
       ? 0
       : session.turnsWithoutNewElement + 1;
@@ -643,6 +651,10 @@ export type MockSessionView = {
   childUtteranceCount: number;
   /** 활동한 날짜(YYYY-MM-DD) 목록 — F-1 "함께한 날" */
   activityDates: string[];
+  /** 아이 발화 원문 + 장면 — G-2 근거 발화, G-3 대표 발화 */
+  childMessages: { text: string; sceneIndex: number; createdAt: string }[];
+  /** 세션 전체 사고 요소 — G-2 집계 */
+  detectedElements: string[];
 };
 
 export function mockSessionsOf(childId: string): MockSessionView[] {
@@ -671,6 +683,16 @@ export function mockSessionsOf(childId: string): MockSessionView[] {
           (m) => m.speakerType === "child"
         ).length,
         activityDates: [...dates],
+        childMessages: session.messages
+          .filter((m) => m.speakerType === "child")
+          .map((m) => ({
+            text: m.text,
+            sceneIndex: toScreenIndex(
+              findScene(m.sceneId)?.sceneOrder ?? 1
+            ),
+            createdAt: m.createdAt,
+          })),
+        detectedElements: [...session.detectedElements],
       };
     });
 }

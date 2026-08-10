@@ -58,6 +58,8 @@ export function StoryDetailScreen({
   const childId = useSelectedChildId();
 
   const [story, setStory] = useState<StoryDetail | null>(null);
+  /** 없는 이야기 ID로 들어온 경우. 무한 로딩으로 두면 막다른 길이 된다. */
+  const [notFound, setNotFound] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
   const [gate, setGate] = useState<Gate>("none");
   const [starting, setStarting] = useState(false);
@@ -75,7 +77,7 @@ export function StoryDetailScreen({
         if (alive) setStory(detail);
       })
       .catch(() => {
-        if (alive) toast.show("이야기를 불러오지 못했어요", "danger");
+        if (alive) setNotFound(true);
       });
     return () => {
       alive = false;
@@ -146,6 +148,27 @@ export function StoryDetailScreen({
         }}
         onExit={() => setGate("none")}
       />
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-bg px-6">
+        <div className="flex flex-col items-center gap-5 text-center">
+          <span aria-hidden className="text-5xl">
+            🔍
+          </span>
+          <h1 className="text-parent-title font-bold text-text">
+            이야기를 찾을 수 없어요
+          </h1>
+          <p className="text-parent-body text-muted">
+            주소가 바뀌었거나 아직 준비 중인 이야기예요.
+          </p>
+          <PillButton onClick={() => router.replace("/stories")}>
+            이야기 목록으로
+          </PillButton>
+        </div>
+      </div>
     );
   }
 

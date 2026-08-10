@@ -375,6 +375,107 @@ export type ContentApi = {
   getMypage(childId: string): Promise<MypageSnapshot>;
 };
 
+/* ── 보호자 (선택) — api.md 3.8 ──────────────────────────────────── */
+
+/** A-6 보호자 홈 요약 */
+export type ParentSummary = {
+  child: { id: string; name: string; avatarId: string; age: number };
+  /** 최근 7일 완료 세션 수 */
+  thisWeekCount: number;
+  completedStories: number;
+  /** 아이 발화 평균 문장 수 */
+  avgChildSentences: number;
+  /** false면 0 대신 "아직 기록이 없어요"를 보여준다. (A-6 체크리스트) */
+  hasRecords: boolean;
+};
+
+export type ReportListItem = {
+  sessionId: string;
+  storyTitle: string;
+  coverImageUrl: string | null;
+  date: string;
+  status: SessionStatus;
+};
+
+export type ReportListResult = {
+  /** 아이 전환 칩 */
+  children: { id: string; name: string }[];
+  /** 최근 4주 라인차트 — 주별 아이 발화 수 */
+  weeklyTrend: { weekLabel: string; utteranceCount: number }[];
+  /** 추이 문구. 근거가 없으면 null. 없는 추세를 말하지 않는다. */
+  trendMessage: string | null;
+  reports: ReportListItem[];
+};
+
+/**
+ * G-2 역량 카드. 표시 순서는 리포트 가이드 4절이 못 박아 두었다.
+ * 역량명 → 특징 → 근거 발화 → 잘한 점 → 보완할 부분.
+ *
+ * ⚠️ `DECISION`·`REASON` 같은 내부 태그를 여기 담지 않는다. (가이드 4절)
+ */
+export type CompetencyCard = {
+  name: string;
+  feature: string;
+  evidence: string | null;
+  strength: string;
+  next: string;
+};
+
+export type ReportDetail = {
+  sessionId: string;
+  storyTitle: string;
+  date: string;
+  summary: string;
+  vocabulary: {
+    mainWords: string[];
+    repeated: string[];
+    feedback: string;
+  };
+  competencies: CompetencyCard[];
+  /** 사고 요소 집계 → 마음/이유/생각/방법 (아이 화면과 같은 4그룹) */
+  elementCounts: { label: string; count: number }[];
+  /** 대표 발화는 **1개**다. 선정 이유를 한 문장으로 함께 준다. (가이드 5절, Q-08) */
+  representative: {
+    text: string;
+    sceneLabel: string;
+    reason: string;
+  } | null;
+  /** 가정 연계 대화 가이드 — 가이드 6·7절 */
+  guide: {
+    intro: string;
+    storyQuestions: string[];
+    dailyQuestions: string[];
+  };
+};
+
+export type NoticeItem = {
+  id: string;
+  category: "안내" | "업데이트";
+  title: string;
+  body: string;
+  date: string;
+  unread: boolean;
+};
+
+export type ParentAccount = Parent & {
+  provider: AuthProvider;
+  createdAt: string;
+};
+
+export type ParentApi = {
+  getSummary(childId: string): Promise<ParentSummary>;
+  listReports(childId: string): Promise<ReportListResult>;
+  getReport(sessionId: string): Promise<ReportDetail>;
+  getParent(): Promise<ParentAccount>;
+  updateChild(
+    childId: string,
+    body: { name?: string; avatarId?: string }
+  ): Promise<Child>;
+  deleteChild(childId: string): Promise<void>;
+  listNotices(): Promise<NoticeItem[]>;
+  withdraw(): Promise<void>;
+};
+
 export type AccountApi = {
   signIn(
     provider: AuthProvider,

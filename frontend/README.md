@@ -65,6 +65,7 @@ src/
 │   ├── activity/                D — 말하기 후 활동
 │   ├── wordbook/                E-1 · E-2 단어장
 │   ├── mypage/                  F-1 마이페이지
+│   ├── parent/                  A-6 · G-1~G-4 리포트 · H-1~H-7 설정
 │   └── system/                  I-1 · I-3 · I-4 예외
 └── lib/
     ├── thinking-elements.ts     사고 요소 8종 → 아이 화면 4그룹 매핑 (§1-7)
@@ -89,7 +90,7 @@ src/
 - [x] 2 — A-1 → A-2 → **A-3** → A-4 → A-5 → B-1 (로그인해서 홈까지)
 - [x] 7 — I-1 마이크 권한, I-3 네트워크 오류, I-4 권한 거부
 - [x] 8 — B-2, B-3, B-4, **C-9**, E-1, E-2, F-1
-- [ ] 9 — G, H
+- [x] 9 — **A-6**, G-1~G-4, H-1~H-7
 
 3단계를 2단계보다 먼저 했습니다. screens.md §6이 "3단계를 절대 뒤로 미루지 마세요.
 `/play`의 상태머신이 이 프로젝트에서 가장 위험한 부분이고, 늦게 발견되는 문제일수록
@@ -99,6 +100,19 @@ src/
 A-3의 동의 값을 함께 받는 계약이고(api.md 3.2) 동의 없는 아이는 세션을 시작할 수
 없습니다(라우트 가드). A-3을 빼면 프론트가 동의 값을 임의로 만들어 넣게 되는데
 그건 요건 위반입니다.
+
+### 일부러 만들지 않은 것
+
+근거가 없는 UI는 넣지 않았습니다. 화면에만 있는 값은 거짓말이 됩니다.
+
+| 항목 | 이유 |
+| --- | --- |
+| C-8 힌트 시트 | PRD 5.4가 MVP 범위 밖, 3단계 힌트 콘텐츠가 없음 ([Q-05](../docs/open-questions.md)) |
+| G-2 역량 4점 dot | 점 개수를 정하는 산출 기준이 어디에도 없음 ([Q-23](../docs/open-questions.md)) |
+| "별가루" 칩 (B-1·F-1) | 적립 규칙이 DB·요건 어디에도 없음 ([Q-12](../docs/open-questions.md)) |
+| A-2 구글·네이버 버튼 | PRD M-01은 카카오만 ([Q-02](../docs/open-questions.md)) |
+| H-4 "1:1 문의하기" 버튼 | 연결 대상 미정. 눌러도 아무 일 없는 버튼보다 안내가 정직함 |
+| G-3 "전체 대화 보기" | 연결 화면이 설계에 없음 |
 
 ## 지금 확인할 수 있는 것
 
@@ -110,10 +124,26 @@ npm run dev
 ```
 
 전체 동선: `/` → `/login` → `/onboarding/consent` → `/onboarding/child` → `/profiles`
-→ `/home` → `/play/{sessionId}` → `/activity/{sessionId}`
+→ `/home` → `/stories/{storyId}` → `/play/{sessionId}` → `/activity/{sessionId}`
 
 `/login` 하단의 **데모 상태 초기화**(개발 모드에서만 보임)로 계정·아이·세션을 지우고
 처음부터 다시 볼 수 있습니다.
+
+| 경로 | 화면 |
+| --- | --- |
+| `/` | A-1 스플래시 (인증 확인 후 replace 이동) |
+| `/login` | A-2 로그인 |
+| `/onboarding/consent` · `/onboarding/child` | A-3 동의 · A-4 아이 등록 |
+| `/profiles` | A-5 아이 선택 |
+| `/home` | B-1 홈 |
+| `/stories` · `/stories/{storyId}` | B-2 목록 · B-3 상세 (+ B-4 모달) |
+| `/play/{sessionId}` | C-1~C-7, C-9~C-13 (단일 페이지 상태 전환) |
+| `/activity/{sessionId}` | D-1~D-7 |
+| `/wordbook` · `/mypage` | E-1·E-2 · F-1 |
+| `/parent` | A-6 보호자 홈 |
+| `/parent/reports` · `/parent/reports/{sessionId}?tab=` | G-1 · G-2/G-3/G-4 |
+| `/parent/settings` · `/parent/settings/children` | H-1 (+H-7) · H-2 (+H-6) |
+| `/parent/notices` · `/parent/support` · `/parent/guide` | H-3 · H-4 · H-5 |
 
 `/play/demo`에서 도입 → 전개1 → 대화1 → … → 장면4 → `/activity/demo`까지 이어집니다.
 서버가 없어도 `src/lib/api/mock.ts`가 [api.md 3절](../docs/spec/api.md) 계약을 흉내내
