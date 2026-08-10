@@ -2,7 +2,7 @@
 // 헤드리스에는 음성 인식이 없으므로 SpeechRecognition을 스텁으로 주입한다.
 import { chromium } from "playwright-core";
 
-import { chromeExecutable } from "./_browser.mjs";
+import { SHOT, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -119,7 +119,7 @@ if (closing) {
   console.log(`  ${banned.length ? "FAIL 평가 표현 발견: " + banned : "OK   평가 표현 없음"}`);
 }
 
-await page.screenshot({ path: "turn-shot.png" });
+await page.screenshot({ path: SHOT("turn-shot") });
 if (errors.length) { console.log("\n=== pageerror ==="); errors.slice(0, 6).forEach((e) => console.log("  " + e)); }
 console.log("\n스크린샷: turn-shot.png");
 await browser.close();

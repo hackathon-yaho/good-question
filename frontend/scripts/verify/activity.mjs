@@ -1,7 +1,7 @@
 // D-1 ~ D-7 전체 검증. 오답 → 재시도 → 정답 → 키워드 점등 → 완료까지.
 import { chromium } from "playwright-core";
 
-import { chromeExecutable } from "./_browser.mjs";
+import { SHOT, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 const browser = await chromium.launch({ executablePath: EXE, headless: true });
@@ -156,7 +156,7 @@ const bannedFinal = ["점수", "등급", "%", "별가루"].filter((w) => finalBo
 ok(bannedFinal.length === 0, `평가·미정의 표현 없음${bannedFinal.length ? " → " + bannedFinal : ""}`);
 console.log("  통계: " + finalBody.split("\n").filter((l) => /번$|명$|개$/.test(l.trim())).join(" / "));
 
-await page.screenshot({ path: "activity-shot.png" });
+await page.screenshot({ path: SHOT("activity-shot") });
 if (errs.length) { console.log("\n=== pageerror ==="); errs.slice(0, 6).forEach((e) => console.log("  " + e)); }
 console.log("\n스크린샷: activity-shot.png");
 await browser.close();

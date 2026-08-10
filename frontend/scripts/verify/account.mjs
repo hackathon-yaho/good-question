@@ -1,7 +1,7 @@
 // 2단계 검증 — A-1 → A-2 → A-3 → A-4 → A-5 → B-1, 그리고 새로고침 유지·가드.
 import { chromium } from "playwright-core";
 
-import { BASE, chromeExecutable } from "./_browser.mjs";
+import { SHOT, BASE, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -211,5 +211,5 @@ if (errs.length) {
   [...new Set(errs)].slice(0, 8).forEach((e) => console.log("  " + e));
 }
 console.log(`\n${fails === 0 ? "전부 통과" : `실패 ${fails}건`}`);
-await page.screenshot({ path: "account-shot.png" });
+await page.screenshot({ path: SHOT("account-shot") });
 await browser.close();

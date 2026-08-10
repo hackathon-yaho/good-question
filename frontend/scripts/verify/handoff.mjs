@@ -1,7 +1,7 @@
 // /play 완주 → /activity 자동 이동. 상태를 읽고 그에 맞는 조작만 한다.
 import { chromium } from "playwright-core";
 
-import { chromeExecutable } from "./_browser.mjs";
+import { SHOT, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 const browser = await chromium.launch({ executablePath: EXE, headless: true });
@@ -110,5 +110,5 @@ const scenes = seen.filter((s) => s === "C12").length;
 console.log(`  ${scenes === 4 ? "OK  " : "info"} C-12 장면 전환 ${scenes}회 (대화 장면 4개)`);
 
 if (errs.length) { console.log("\npageerror:"); errs.slice(0, 5).forEach((e) => console.log("  " + e)); }
-await page.screenshot({ path: "handoff-ok.png" });
+await page.screenshot({ path: SHOT("handoff-ok") });
 await browser.close();

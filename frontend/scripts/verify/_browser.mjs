@@ -8,9 +8,10 @@
  *   GQ_CHROME="C:/Program Files/Google/Chrome/Application/chrome.exe" node scripts/verify/play.mjs
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** ms-playwright 캐시 위치 — OS별 */
 function cacheRoots() {
@@ -67,3 +68,13 @@ export function chromeExecutable() {
 }
 
 export const BASE = process.env.GQ_BASE ?? "http://localhost:3000";
+
+/**
+ * 스크린샷 저장 위치. `.shots/`는 git에서 무시한다.
+ * 저장소 루트에 PNG가 쌓이면 커밋에 섞여 들어간다.
+ */
+export function SHOT(name) {
+  const dir = join(dirname(fileURLToPath(import.meta.url)), ".shots");
+  mkdirSync(dir, { recursive: true });
+  return join(dir, `${name}.png`);
+}

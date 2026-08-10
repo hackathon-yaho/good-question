@@ -1,7 +1,7 @@
 // 9단계 검증 — A-6 보호자 홈 · G-1~G-4 리포트 · H-1~H-7 설정
 import { chromium } from "playwright-core";
 
-import { BASE, chromeExecutable } from "./_browser.mjs";
+import { SHOT, BASE, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -301,5 +301,5 @@ if (errs.length) {
   [...new Set(errs)].slice(0, 6).forEach((e) => console.log("  " + e));
 }
 console.log(`\n${fails === 0 ? "전부 통과" : `실패 ${fails}건`}`);
-await page.screenshot({ path: "parent-shot.png" });
+await page.screenshot({ path: SHOT("parent-shot") });
 await browser.close();

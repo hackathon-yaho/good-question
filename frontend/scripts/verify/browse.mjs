@@ -1,7 +1,7 @@
 // 8단계 검증 — B-2 목록 · B-3 상세 · B-4 이어하기 모달 · C-9 단어 팝업 · E 단어장 · F-1 마이페이지
 import { chromium } from "playwright-core";
 
-import { BASE, chromeExecutable } from "./_browser.mjs";
+import { SHOT, BASE, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -280,5 +280,5 @@ if (errs.length) {
   [...new Set(errs)].slice(0, 6).forEach((e) => console.log("  " + e));
 }
 console.log(`\n${fails === 0 ? "전부 통과" : `실패 ${fails}건`}`);
-await page.screenshot({ path: "browse-shot.png" });
+await page.screenshot({ path: SHOT("browse-shot") });
 await browser.close();

@@ -1,7 +1,7 @@
 // /play 도입부 클릭·TTS 검증
 import { chromium } from "playwright-core";
 
-import { chromeExecutable } from "./_browser.mjs";
+import { SHOT, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -107,7 +107,7 @@ if (logs.length) {
   logs.slice(0, 12).forEach((l) => console.log("  " + l));
 }
 
-await page.screenshot({ path: "play-shot.png", fullPage: false });
+await page.screenshot({ path: SHOT("play-shot"), fullPage: false });
 console.log("\n스크린샷: play-shot.png");
 
 await browser.close();

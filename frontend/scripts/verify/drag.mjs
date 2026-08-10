@@ -1,7 +1,7 @@
 // D-2 드래그(Pointer Events) + /play → /activity 연결 검증
 import { chromium } from "playwright-core";
 
-import { chromeExecutable } from "./_browser.mjs";
+import { SHOT, chromeExecutable } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 const browser = await chromium.launch({ executablePath: EXE, headless: true });
@@ -115,7 +115,7 @@ const ok = (c, l) => console.log(`  ${c ? "OK  " : "FAIL"} ${l}`);
 
   // /play 완주 → /activity 인계는 상태 인식 드라이버가 있는 verify-handoff.mjs가 담당한다.
   // 여기서 고정 루프로 또 돌리면 같은 것을 두 번, 그것도 더 약하게 검증한다.
-  await page.screenshot({ path: "drag-shot.png" });
+  await page.screenshot({ path: SHOT("drag-shot") });
   await page.close();
 }
 
