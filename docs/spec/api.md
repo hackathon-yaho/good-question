@@ -375,6 +375,11 @@ X-Internal-Token: <shared-secret>
 
 #### `POST /api/sessions/{sessionId}/scenes/{sceneId}/complete` ⚪ · C-1, C-2 → C-3
 
+> 🟡 **프론트 제안**: `nextScene`에 `highlightWords`를 추가해 주세요.
+> 장면의 **첫 대사**가 어려운 낱말이 가장 많이 나오는 자리인데, 지금 계약에는
+> 밑줄 단어를 실어 보낼 곳이 `POST .../messages` 응답뿐입니다. 그러면 첫 대사에는
+> 밑줄이 붙지 않아 C-9(단어 뜻 팝업)로 갈 통로가 사실상 닫힙니다.
+
 도입·전개 장면(`intro` / `narrative`) 재생 완료를 알리고 다음 장면으로 진행합니다.
 
 ```json
@@ -565,6 +570,65 @@ X-Internal-Token: <shared-secret>
 | `PATCH /api/wordbook/{id}` | C-9, E-1 | `{ liked: true }` |
 
 > `wordbook`은 확장 테이블이며 선택 요건입니다. 범위 확정 필요 → [Q-06](../open-questions.md)
+
+**응답 형태 (프론트 구현 기준, 2026-08-10)** 🟡
+
+E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 목으로 구현해 두었고 타입은
+`frontend/src/lib/api/types.ts`의 `WordEntry`입니다.
+
+```json
+{
+  "words": [
+    {
+      "id": "uuid",
+      "word": "창피한",
+      "meaning": "남이 볼까 봐 부끄럽고 얼굴이 뜨거워지는 마음",
+      "storyId": "uuid",
+      "storyTitle": "방귀 뀌는 며느리",
+      "sceneIndex": 2,
+      "contextSentence": "아이고 이게 무슨 일이냐! … 이렇게 창피한 며느리와 함께 못살겠다!",
+      "liked": false,
+      "savedAt": "...",
+      "isNew": true
+    }
+  ],
+  "total": 1,
+  "storyFilters": [{ "storyId": "uuid", "title": "방귀 뀌는 며느리" }]
+}
+```
+
+| 필드 | 비고 |
+| --- | --- |
+| `sceneIndex` | 서버가 `sourceSceneId` → **화면 단위**(1~4) 인덱스로 변환. E-2 "장면 N에서 만났어요" |
+| `contextSentence` | E-2·C-9 "이야기 속에서는" 카드. 담을 때의 대사 원문 |
+| `isNew` | E-1 "새 단어" 칩. 서버가 기준(예: 24시간)을 정합니다 |
+| `total` | 필터와 무관한 전체 개수. E-1 제목 옆 "N개" 칩 |
+
+발음은 저장된 오디오가 아니라 **TTS**입니다. 오디오 URL을 내려줄 필요가 없습니다.
+
+### 3.9 마이페이지 (선택) ⚪ · F-1
+
+| 엔드포인트 | 화면 | 비고 |
+| --- | --- | --- |
+| `GET /api/mypage?childId={id}` | F-1 | 프로필 + 통계 3개 + 완료 이야기 + 재구성 발화 목록 |
+
+```json
+{
+  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "age": 8 },
+  "stats": { "completedStories": 1, "savedWords": 3, "activeDays": 2 },
+  "completedStories": [
+    { "sessionId": "uuid", "storyId": "uuid", "title": "방귀 뀌는 며느리", "coverImageUrl": "...", "completedAt": "..." }
+  ],
+  "retellings": [
+    { "sessionId": "uuid", "storyTitle": "방귀 뀌는 며느리", "text": "며느리가 방귀를 참다가…", "createdAt": "..." }
+  ]
+}
+```
+
+- `retellings[].text`는 `post_activity_results.retelling_text`입니다. **오디오가 아닙니다.**
+  F-1 "내 이야기 들어보기"는 이 텍스트를 TTS로 읽습니다 → [Q-07](../open-questions.md)
+- `stats`에 점수·등급을 넣지 않습니다. 활동량만입니다 ([PRD 10.1](../product/prd.md))
+- "별가루" 필드는 만들지 않습니다 → [Q-12](../open-questions.md)
 
 ### 3.8 보호자 (선택) ⚪
 

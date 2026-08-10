@@ -81,7 +81,12 @@ export type PlayAction =
   | { type: "HYDRATE"; snapshot: SessionSnapshot }
   | { type: "SENTENCE_NEXT" }
   | { type: "NARRATION_DONE" }
-  | { type: "SCENE_LOADED"; scene: SceneInfo; openingMessage: Message | null }
+  | {
+      type: "SCENE_LOADED";
+      scene: SceneInfo;
+      openingMessage: Message | null;
+      highlightWords?: HighlightWord[];
+    }
   | { type: "POST_ACTIVITY_READY" }
   | { type: "CHARACTER_TTS_DONE" }
   | { type: "RECORDING_START" }
@@ -161,7 +166,8 @@ export function playReducer(
         maxTurns: scene.maxTurns ?? 0,
         accumulatedElements: [],
         mission: null,
-        highlightWords: [],
+        // 첫 대사의 밑줄 단어는 유지한다. 여기서 비우면 C-9로 갈 통로가 닫힌다.
+        highlightWords: action.highlightWords ?? [],
         draftText: "",
         sttRawText: "",
         interimText: "",

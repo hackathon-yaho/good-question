@@ -36,15 +36,28 @@ import {
 
 const CHILD_NAME = "민준";
 
-/** 장면별 밑줄 단어. 실제로는 콘텐츠에 정의된다. (screens.md 7-1 #5) */
-const HIGHLIGHT_WORDS: Record<string, { word: string; meaning: string }[]> = {
-  sc_banggui_05: [
-    { word: "구박", meaning: "누군가를 못마땅해하며 자꾸 나무라는 것" },
-  ],
-  sc_banggui_07: [
-    { word: "뾰족한", meaning: "딱 들어맞는, 좋은 생각이라는 뜻" },
-  ],
-};
+/**
+ * 밑줄 단어 사전. 실제로는 콘텐츠에 정의된다. (screens.md 7-1 #5)
+ *
+ * ⚠️ **장면 ID로 묶지 않는다.** 처음에는 그렇게 했다가 "구박"을 sc_banggui_05에
+ *    달아 놨는데 그 장면 대사에는 그 단어가 없어서 밑줄이 한 번도 그려지지 않았다.
+ *    지금은 실제로 내려보내는 텍스트에서 찾아 붙인다. 밑줄이 없는 단어를 가리키는
+ *    일이 구조적으로 불가능해진다.
+ */
+const WORD_GLOSSARY: { word: string; meaning: string }[] = [
+  { word: "창피한", meaning: "남이 볼까 봐 부끄럽고 얼굴이 뜨거워지는 마음" },
+  { word: "뾰족한", meaning: "딱 들어맞는, 좋은 생각이라는 뜻" },
+  { word: "구박", meaning: "누군가를 못마땅해하며 자꾸 나무라는 것" },
+  { word: "친정", meaning: "결혼한 여자가 태어나서 자란 집" },
+];
+
+/** 이 텍스트에 실제로 들어 있는 단어만 밑줄 대상으로 내려준다. */
+function highlightWordsIn(text: string) {
+  if (!text) return [];
+  return WORD_GLOSSARY.filter((entry) => text.includes(entry.word)).map(
+    (entry) => ({ ...entry })
+  );
+}
 
 /** 캐릭터별 반응 문구. 실제로는 캐릭터 LLM이 생성한다. */
 const REACTIONS: Record<string, Record<ResponseMode, string[]>> = {
@@ -101,6 +114,9 @@ type MockSession = {
   /** 말하기 후 활동 */
   cardOrder: string[] | null;
   attemptCount: number;
+  /** D-6에서 아이가 다시 말한 이야기. 텍스트만 남긴다. 음성은 저장하지 않는다. */
+  retellingText: string | null;
+  completedAt: string | null;
 };
 
 const sessions = new Map<string, MockSession>();
@@ -184,6 +200,8 @@ function ensureSession(sessionId: string): MockSession {
     status: "in_progress",
     cardOrder: null,
     attemptCount: 0,
+    retellingText: null,
+    completedAt: null,
   };
   sessions.set(sessionId, created);
   persist();
@@ -361,7 +379,13 @@ export const mockPlayApi: PlayApi = {
     }
 
     const response: SceneCompleteResponse = {
-      nextScene: { ...toSceneInfo(next, session), openingMessage },
+      nextScene: {
+        ...toSceneInfo(next, session),
+        openingMessage,
+        // 첫 대사(C-3)가 어려운 낱말이 가장 많이 나오는 자리다. 여기에 밑줄이
+        // 없으면 C-9로 갈 통로가 사실상 닫힌다.
+        highlightWords: highlightWordsIn(openingMessage?.text ?? ""),
+      },
       postActivityReady: false,
     };
     persist();
@@ -484,7 +508,7 @@ export const mockPlayApi: PlayApi = {
       sceneEnded: mode === "CLOSING",
       nextSceneId: next?.id ?? null,
       missionTriggered,
-      highlightWords: HIGHLIGHT_WORDS[scene.id] ?? [],
+      highlightWords: highlightWordsIn(characterText),
     };
     persist();
     return response;
@@ -547,6 +571,8 @@ export const mockActivityApi: ActivityApi = {
     assertOnline();
     const session = ensureSession(sessionId);
     session.status = "completed";
+    session.retellingText = body.retellingText;
+    session.completedAt = new Date().toISOString();
     pushMessage(session, session.currentSceneId, "child", body.retellingText);
     persist();
 
@@ -592,31 +618,59 @@ export function resetAllMockSessions() {
  * (screens.md B-1 체크리스트)
  *
  */
-export function activeMockSession(childId: string): {
+export function activeMockSession(childId: string): MockSessionView | null {
+  return (
+    mockSessionsOf(childId).find(
+      (s) => s.status === "in_progress" || s.status === "stopped"
+    ) ?? null
+  );
+}
+
+/**
+ * 세션을 읽기 전용으로 넘겨준다. B-2 배지·B-3 이어하기·F-1 통계가 모두 세션에서
+ * 나오는데, 그 화면들의 목이 이 Map을 직접 만지면 경계가 무너진다.
+ * 최신 활동 순으로 정렬해 준다.
+ */
+export type MockSessionView = {
   sessionId: string;
+  storyId: string;
+  status: SessionStatus;
   currentSceneOrder: number;
   sceneProgress: { current: number; total: number };
   lastActivityAt: string;
-} | null {
+  retellingText: string | null;
+  completedAt: string | null;
+  childUtteranceCount: number;
+  /** 활동한 날짜(YYYY-MM-DD) 목록 — F-1 "함께한 날" */
+  activityDates: string[];
+};
+
+export function mockSessionsOf(childId: string): MockSessionView[] {
   hydrate();
-  const found = [...sessions.values()]
-    .filter(
-      (s) =>
-        s.childId === childId &&
-        (s.status === "in_progress" || s.status === "stopped")
-    )
-    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0];
-
-  if (!found) return null;
-
-  const scene = findScene(found.currentSceneId) ?? MOCK_SCENES[0];
-  return {
-    sessionId: found.sessionId,
-    currentSceneOrder: scene.sceneOrder,
-    sceneProgress: {
-      current: toScreenIndex(scene.sceneOrder),
-      total: TOTAL_SCREEN_SCENES,
-    },
-    lastActivityAt: new Date(found.lastActivityAt).toISOString(),
-  };
+  return [...sessions.values()]
+    .filter((s) => s.childId === childId)
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
+    .map((session) => {
+      const scene = findScene(session.currentSceneId) ?? MOCK_SCENES[0];
+      const dates = new Set(
+        session.messages.map((m) => m.createdAt.slice(0, 10))
+      );
+      return {
+        sessionId: session.sessionId,
+        storyId: STORY_ID,
+        status: session.status,
+        currentSceneOrder: scene.sceneOrder,
+        sceneProgress: {
+          current: toScreenIndex(scene.sceneOrder),
+          total: TOTAL_SCREEN_SCENES,
+        },
+        lastActivityAt: new Date(session.lastActivityAt).toISOString(),
+        retellingText: session.retellingText,
+        completedAt: session.completedAt,
+        childUtteranceCount: session.messages.filter(
+          (m) => m.speakerType === "child"
+        ).length,
+        activityDates: [...dates],
+      };
+    });
 }

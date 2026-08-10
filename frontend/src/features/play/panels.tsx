@@ -14,7 +14,8 @@ import { SpeechBubble } from "@/components/ui/SpeechBubble";
 import { ThinkingElementStars } from "@/components/ui/ThinkingElementStars";
 import { CharacterPortrait } from "@/features/play/CharacterPortrait";
 import { ConversationHistory } from "@/features/play/ConversationHistory";
-import type { Message } from "@/lib/api/types";
+import { HighlightedText } from "@/features/play/HighlightedText";
+import type { HighlightWord, Message } from "@/lib/api/types";
 
 /** C-2 우측 — 대기 상태. "지금은 아니야"가 확실히 읽혀야 한다. */
 export function WaitingPanel({ displayName }: { displayName: string | null }) {
@@ -46,6 +47,8 @@ export function CharacterPanel({
   guided,
   onReplay,
   replayDisabled,
+  highlightWords = [],
+  onWordClick,
 }: {
   displayName: string;
   text: string;
@@ -56,6 +59,9 @@ export function CharacterPanel({
   guided: boolean;
   onReplay: () => void;
   replayDisabled: boolean;
+  /** 서버가 지정한 밑줄 단어. 탭하면 C-9가 열린다. */
+  highlightWords?: readonly HighlightWord[];
+  onWordClick?: (word: HighlightWord) => void;
 }) {
   return (
     <div className="flex size-full min-h-0 flex-col">
@@ -76,7 +82,15 @@ export function CharacterPanel({
 
       <div className="px-6 py-5">
         <SpeechBubble speaker="character" emphasis>
-          {text}
+          {onWordClick && highlightWords.length > 0 ? (
+            <HighlightedText
+              text={text}
+              words={highlightWords}
+              onWordClick={onWordClick}
+            />
+          ) : (
+            text
+          )}
         </SpeechBubble>
         <div className="mt-3 flex justify-end">
           <PillButton

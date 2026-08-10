@@ -75,7 +75,18 @@ export type UtteranceResponse = {
 
 /** POST /api/sessions/{sessionId}/scenes/{sceneId}/complete — api.md 3.4 */
 export type SceneCompleteResponse = {
-  nextScene: (SceneInfo & { openingMessage: Message | null }) | null;
+  nextScene:
+    | (SceneInfo & {
+        openingMessage: Message | null;
+        /**
+         * 첫 대사의 밑줄 단어. C-3에서 탭하면 C-9가 열린다.
+         *
+         * 🟡 api.md 3.4의 이 엔드포인트는 아직 초안(⚪)이다. 첫 대사에 밑줄이 없으면
+         *    단어장으로 갈 통로가 닫히므로 프론트에서 필요한 필드로 제안한다.
+         */
+        highlightWords: HighlightWord[];
+      })
+    | null;
   /** 마지막 장면이 끝나 후속 활동으로 넘어가야 하면 true */
   postActivityReady: boolean;
 };
@@ -232,6 +243,136 @@ export type HomeSnapshot = {
   /** 진행 중 세션이 없으면 null. 프론트는 그 자리를 빈 채로 두지 않는다. */
   inProgress: HomeInProgress | null;
   recommended: HomeStory[];
+};
+
+/* ── 이야기 탐색 — api.md 3.3 ─────────────────────────────────────── */
+
+export type StoryListItem = {
+  id: string;
+  title: string;
+  summary: string;
+  coverImageUrl: string | null;
+  estimatedMinutes: number | null;
+  difficulty: string | null;
+  topics: string[];
+  /** 이 아이의 세션 상태. B-2 배지에 쓴다. childId가 필요한 이유다. */
+  sessionStatus: SessionStatus | null;
+};
+
+export type StoryListResult = {
+  stories: StoryListItem[];
+  /** 필터 칩. `stories.topics` distinct */
+  availableTopics: string[];
+};
+
+export type StoryCharacter = {
+  name: string;
+  displayName: string;
+  imageUrl: string | null;
+};
+
+/** B-3 진행 중 세션. 있으면 프론트가 B-4 모달을 띄운다. */
+export type ExistingSession = {
+  sessionId: string;
+  currentSceneOrder: number;
+  sceneProgress: { current: number; total: number };
+  status: SessionStatus;
+};
+
+export type StoryDetail = {
+  id: string;
+  title: string;
+  summary: string;
+  coverImageUrl: string | null;
+  estimatedMinutes: number | null;
+  difficulty: string | null;
+  topics: string[];
+  /** 도입 장면의 scene_description */
+  intro: string;
+  /** 이야기 단위 고정 문구. conflict에서 뽑는 게 아니다. (PRD F-03, Q-03) */
+  situation: string;
+  childRole: string;
+  characters: StoryCharacter[];
+  existingSession: ExistingSession | null;
+  /** false면 세션을 시작할 수 없다. 동의 화면으로 유도한다. */
+  consentGranted: boolean;
+};
+
+/* ── 단어장 — 선택 요건 A-02 (Q-06) ──────────────────────────────── */
+
+export type WordEntry = {
+  id: string;
+  word: string;
+  /** 아이가 읽을 쉬운 뜻 */
+  meaning: string;
+  storyId: string;
+  storyTitle: string;
+  /** "장면 N에서 만났어요" 표기용 — 화면 단위 인덱스 */
+  sceneIndex: number;
+  /** "이야기 속에서는" 카드에 넣을 원문. 없으면 null */
+  contextSentence: string | null;
+  liked: boolean;
+  savedAt: string;
+  /** E-1 "새 단어" 칩 — 최근에 담은 것 */
+  isNew: boolean;
+};
+
+/** E-1 필터 — api.md §3.7: `all` / `liked` / `story:{storyId}` */
+export type WordbookFilter = "all" | "liked" | `story:${string}`;
+
+export type WordbookResult = {
+  words: WordEntry[];
+  total: number;
+  /** 이야기별 필터 칩 */
+  storyFilters: { storyId: string; title: string }[];
+};
+
+/* ── 마이페이지 (F-1) ────────────────────────────────────────────── */
+
+export type MypageSnapshot = {
+  child: { id: string; name: string; avatarId: string; age: number };
+  /** 점수·등급이 아니라 활동량이다. (PRD 10.1) */
+  stats: {
+    completedStories: number;
+    savedWords: number;
+    activeDays: number;
+  };
+  completedStories: {
+    sessionId: string;
+    storyId: string;
+    title: string;
+    coverImageUrl: string | null;
+    completedAt: string;
+  }[];
+  /**
+   * D-6에서 아이가 다시 말한 이야기. **텍스트다.**
+   * 원본 음성을 저장하지 않으므로 "들어보기"는 TTS로 읽어 준다. (Q-07)
+   */
+  retellings: {
+    sessionId: string;
+    storyTitle: string;
+    text: string;
+    createdAt: string;
+  }[];
+};
+
+export type ContentApi = {
+  listStories(childId: string, topic?: string): Promise<StoryListResult>;
+  getStory(storyId: string, childId: string): Promise<StoryDetail>;
+  listWords(childId: string, filter?: WordbookFilter): Promise<WordbookResult>;
+  saveWord(
+    childId: string,
+    body: {
+      word: string;
+      meaning: string;
+      storyId: string;
+      /** DB 장면 ID. 화면 단위 인덱스는 서버가 계산해 내려준다. */
+      sourceSceneId: string;
+      contextSentence?: string | null;
+    }
+  ): Promise<WordEntry>;
+  toggleWordLiked(childId: string, wordId: string): Promise<WordEntry>;
+  getMypage(childId: string): Promise<MypageSnapshot>;
 };
 
 export type AccountApi = {

@@ -60,8 +60,12 @@ src/
 ├── features/
 │   ├── account/                 A-2 로그인 · A-3 동의 · A-4 등록 · A-5 선택
 │   ├── home/                    B-1 홈
-│   ├── play/                    C — 대화 상태머신
-│   └── activity/                D — 말하기 후 활동
+│   ├── stories/                 B-2 목록 · B-3 상세 · B-4 이어하기 모달
+│   ├── play/                    C — 대화 상태머신 (C-9 단어 팝업 포함)
+│   ├── activity/                D — 말하기 후 활동
+│   ├── wordbook/                E-1 · E-2 단어장
+│   ├── mypage/                  F-1 마이페이지
+│   └── system/                  I-1 · I-3 · I-4 예외
 └── lib/
     ├── thinking-elements.ts     사고 요소 8종 → 아이 화면 4그룹 매핑 (§1-7)
     ├── play-state.ts            PlayState · ActivityStep · 서버 모드 매핑
@@ -84,7 +88,7 @@ src/
 - [x] 6 — `/activity` D-1 ~ D-7 (카드 순서 → 키워드 → 다시 말하기 → 완료)
 - [x] 2 — A-1 → A-2 → **A-3** → A-4 → A-5 → B-1 (로그인해서 홈까지)
 - [x] 7 — I-1 마이크 권한, I-3 네트워크 오류, I-4 권한 거부
-- [ ] 8 — B-2, B-3, B-4, E, F
+- [x] 8 — B-2, B-3, B-4, **C-9**, E-1, E-2, F-1
 - [ ] 9 — G, H
 
 3단계를 2단계보다 먼저 했습니다. screens.md §6이 "3단계를 절대 뒤로 미루지 마세요.

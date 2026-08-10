@@ -40,9 +40,13 @@ import {
   WaitingPanel,
 } from "@/features/play/panels";
 
+import { WordPopup } from "@/features/play/WordPopup";
 import { useNetworkError, withTimeout } from "@/features/system/NetworkErrorHost";
 import { mockPlayApi } from "@/lib/api/mock";
-import type { PlayApi } from "@/lib/api/types";
+import { mockContentApi } from "@/lib/api/mock-content";
+import type { ContentApi, HighlightWord, PlayApi } from "@/lib/api/types";
+import { getSelectedChildId } from "@/lib/client-store";
+import { STORY_ID } from "@/mocks/story-banggui";
 import { PlayState, isCharacterTurn } from "@/lib/play-state";
 import { playTurnChime } from "@/lib/sound";
 import { useSpeechRecognition } from "@/lib/speech/useSpeechRecognition";
@@ -57,9 +61,12 @@ import { TOTAL_SCREEN_SCENES, toScreenIndex } from "@/mocks/story-banggui";
 export function PlayScreen({
   sessionId,
   api = mockPlayApi,
+  contentApi = mockContentApi,
 }: {
   sessionId: string;
   api?: PlayApi;
+  /** C-9 "단어장에 담기"용. 단어장이 선택 요건이라 대화 계약과 분리해 둔다. */
+  contentApi?: ContentApi;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -78,6 +85,9 @@ export function PlayScreen({
    * 이야기 상세(B-3)에서 넘어오면 제스처가 이어지지만 주소 직접 입력은 아니다.
    */
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  /** C-9 단어 뜻 팝업. 열려 있는 동안 TTS·마이크는 그대로 둔다. */
+  const [openWord, setOpenWord] = useState<HighlightWord | null>(null);
+  const [savedWords, setSavedWords] = useState<readonly string[]>([]);
 
   const { speak, cancel: cancelTts, speaking } = useSpeechSynthesis();
 
@@ -161,8 +171,14 @@ export function PlayScreen({
           router.push(`/activity/${sessionId}`);
           return;
         }
-        const { openingMessage, ...nextScene } = result.nextScene;
-        dispatch({ type: "SCENE_LOADED", scene: nextScene, openingMessage });
+        const { openingMessage, highlightWords, ...nextScene } =
+          result.nextScene;
+        dispatch({
+          type: "SCENE_LOADED",
+          scene: nextScene,
+          openingMessage,
+          highlightWords,
+        });
       } catch (error) {
         console.error("[play] 장면 전환 실패", error);
         // 장면 전환이 막히면 이야기가 더 진행되지 않는다. 토스트로는 부족하다.
@@ -308,6 +324,26 @@ export function PlayScreen({
     }
   }, [api, network, scene?.sceneId, sessionId, state.draftText, state.sttRawText, stt]);
 
+  /**
+   * C-9 "단어장에 담기". 단어장은 선택 요건이라 실패해도 대화는 계속되어야 한다.
+   * 그래서 여기서 던지지 않고 WordPopup이 토스트만 띄운다.
+   */
+  const saveWord = useCallback(
+    async (word: HighlightWord) => {
+      const childId = getSelectedChildId();
+      if (!childId) throw new Error("선택된 아이가 없습니다");
+      await contentApi.saveWord(childId, {
+        word: word.word,
+        meaning: word.meaning,
+        storyId: STORY_ID,
+        sourceSceneId: scene?.sceneId ?? "",
+        contextSentence: state.characterText || null,
+      });
+      setSavedWords((prev) => [...prev, word.word]);
+    },
+    [contentApi, scene?.sceneId, state.characterText]
+  );
+
   const replay = useCallback(() => {
     if (!state.characterText) return;
     speak(state.characterText, {
@@ -357,13 +393,25 @@ export function PlayScreen({
   );
 
   const overlay = (
-    <PauseSheet
-      open={paused}
-      settings={settings}
-      onChange={setSettings}
-      onResume={resume}
-      onExit={exit}
-    />
+    <>
+      <PauseSheet
+        open={paused}
+        settings={settings}
+        onChange={setSettings}
+        onResume={resume}
+        onExit={exit}
+      />
+      <WordPopup
+        word={openWord}
+        contextSentence={state.characterText || null}
+        saved={openWord ? savedWords.includes(openWord.word) : false}
+        onSpeak={(text, opts) =>
+          speak(text, { rate: opts?.rate ?? settings.rate, volume: settings.volume })
+        }
+        onSave={saveWord}
+        onClose={() => setOpenWord(null)}
+      />
+    </>
   );
 
   // C-1 도입 — 풀브리드
@@ -479,6 +527,8 @@ export function PlayScreen({
                 guided={state.status === PlayState.GUIDED}
                 onReplay={replay}
                 replayDisabled={speaking}
+                highlightWords={state.highlightWords}
+                onWordClick={setOpenWord}
               />
             ) : null}
 
