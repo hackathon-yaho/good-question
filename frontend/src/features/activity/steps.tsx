@@ -1,0 +1,399 @@
+/**
+ * 말하기 후 활동 단계 화면 — docs/spec/screens.md D-1, D-3, D-4, D-5, D-6, D-7
+ *
+ * D-2(카드 배열)만 드래그 로직 때문에 파일이 따로 있다.
+ */
+
+"use client";
+
+import { Modal } from "@/components/ui/Modal";
+import { MicButton } from "@/components/ui/MicButton";
+import { PillButton } from "@/components/ui/PillButton";
+import type { ActivityCard, RetellingResult } from "@/lib/api/types";
+
+/** D-1 활동 인트로 */
+export function ActivityIntro({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="flex size-full flex-col items-center justify-center gap-6 px-10 text-center">
+      <div
+        aria-hidden
+        className="flex h-[23.75rem] w-full max-w-[34rem] items-center justify-center rounded-card bg-primary-soft text-kid-body font-bold text-muted"
+      >
+        단체 일러스트 준비 중
+      </div>
+
+      <span className="rounded-pill bg-secondary px-5 py-1.5 text-parent-body font-bold text-white">
+        이야기 끝!
+      </span>
+
+      <h1 className="text-intro leading-tight font-bold text-text">
+        이제 네 이야기로 다시 들려줄래?
+      </h1>
+
+      <p className="text-kid-body text-muted">
+        카드를 순서대로 놓고, 그다음에 이야기를 들려주면 돼
+      </p>
+
+      <PillButton size="kid-lg" onClick={onStart}>
+        시작하기
+      </PillButton>
+    </div>
+  );
+}
+
+/**
+ * D-3 순서 오답 피드백
+ *
+ * ⚠️ 절대 금지: 빨간색, X 마크, "틀렸어요", "실패".
+ *    실패를 지적하면 아이가 위축된다.
+ */
+export function FeedbackModal({
+  open,
+  onRetry,
+  onHint,
+}: {
+  open: boolean;
+  onRetry: () => void;
+  onHint: () => void;
+}) {
+  return (
+    <Modal open={open} width={560} dismissible={false} label="다시 해보기">
+      <div className="flex flex-col items-center gap-5 text-center">
+        <div
+          aria-hidden
+          className="flex size-[8.75rem] items-center justify-center rounded-full bg-accent-soft text-5xl"
+        >
+          🙂
+        </div>
+
+        <p className="text-headline font-bold text-primary">거의 다 왔어!</p>
+
+        <p className="text-kid-body text-text">
+          순서가 조금 바뀐 것 같아. 다시 한 번 놓아볼까?
+        </p>
+
+        <div className="flex w-full gap-3">
+          <PillButton variant="outlined" className="basis-2/5" onClick={onHint}>
+            힌트 보기
+          </PillButton>
+          <PillButton className="basis-3/5" onClick={onRetry}>
+            다시 해보기
+          </PillButton>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** D-4 정답 → 핵심 단어 공개 */
+export function KeywordReveal({
+  slots,
+  keywords,
+  onNext,
+}: {
+  slots: readonly (ActivityCard | null)[];
+  keywords: readonly string[];
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex size-full flex-col items-center justify-center gap-7 px-10">
+      <p className="rounded-pill bg-secondary px-6 py-2 text-kid-button font-bold text-white">
+        순서를 맞췄어!
+      </p>
+
+      <ol className="flex items-center gap-3">
+        {slots.map((card, index) => (
+          <li key={card?.id ?? index} className="flex items-center gap-3">
+            <div className="flex h-[10rem] w-[13.75rem] items-center justify-center rounded-card border-2 border-secondary bg-secondary-soft p-3 text-center">
+              <span className="text-parent-body leading-snug font-bold text-text">
+                {card?.text}
+              </span>
+            </div>
+            {index < slots.length - 1 ? (
+              <span aria-hidden className="text-2xl text-muted">
+                ›
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+
+      <p className="text-kid-body font-bold text-text">
+        이 단어들을 넣어서 말해볼까?
+      </p>
+
+      <ul className="flex flex-wrap justify-center gap-3">
+        {keywords.map((keyword) => (
+          <li
+            key={keyword}
+            className="flex min-h-touch-kid items-center rounded-pill border-2 border-accent bg-surface px-6 text-kid-button font-bold text-text"
+          >
+            {keyword}
+          </li>
+        ))}
+      </ul>
+
+      <PillButton size="kid-lg" onClick={onNext}>
+        이야기 말하기
+      </PillButton>
+    </div>
+  );
+}
+
+/**
+ * D-5 이야기 재구성 말하기
+ *
+ * 키워드 실시간 점등이 이 화면의 핵심 인터랙션이다.
+ * Web Speech API의 interimResults로 부분 전사를 받아 즉시 점등한다.
+ * STT를 Whisper(파일 업로드)로 바꾸면 최종 결과 일괄 점등으로 폴백해야 한다.
+ */
+export function Retelling({
+  cards,
+  keywords,
+  spokenKeywords,
+  recording,
+  interimText,
+  micLevel,
+  errorCode,
+  onMicClick,
+  onDone,
+}: {
+  cards: readonly (ActivityCard | null)[];
+  keywords: readonly string[];
+  spokenKeywords: readonly string[];
+  recording: boolean;
+  interimText: string;
+  micLevel: number;
+  errorCode: string | null;
+  onMicClick: () => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="flex size-full flex-col items-center gap-5 px-10 py-8">
+      <h1 className="text-narration font-bold text-text">
+        이야기를 처음부터 들려줘
+      </h1>
+
+      {/* 참고용 카드 스트립 */}
+      <ol className="flex gap-3">
+        {cards.map((card, index) => (
+          <li
+            key={card?.id ?? index}
+            className="flex h-[8.125rem] w-[11.25rem] items-center justify-center rounded-card border border-border bg-surface p-2 text-center"
+          >
+            <span className="text-sm leading-snug text-muted">{card?.text}</span>
+          </li>
+        ))}
+      </ol>
+
+      {/* 키워드 점등 */}
+      <ul className="flex flex-wrap justify-center gap-3">
+        {keywords.map((keyword) => {
+          const spoken = spokenKeywords.includes(keyword);
+          return (
+            <li
+              key={keyword}
+              className={[
+                "flex min-h-touch items-center gap-2 rounded-pill border-2 px-5 text-kid-body font-bold transition-colors",
+                spoken
+                  ? "border-secondary bg-secondary text-white"
+                  : "border-accent bg-surface text-muted",
+              ].join(" ")}
+            >
+              {spoken ? <span aria-hidden>✓</span> : null}
+              {keyword}
+              <span className="sr-only">
+                {spoken ? "말했어요" : "아직 안 말했어요"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
+        <MicButton
+          state={recording ? "recording" : "idle"}
+          size={200}
+          level={micLevel}
+          onClick={onMicClick}
+        />
+
+        {errorCode ? (
+          <p className="text-kid-body text-primary">
+            잘 안 들렸어. 다시 말해줄래?
+          </p>
+        ) : (
+          <p className="text-parent-body text-muted">
+            {recording ? "듣고 있어요…" : "마이크를 누르고 이야기해줘"}
+          </p>
+        )}
+
+        {interimText ? (
+          <p className="max-w-[40rem] rounded-bubble bg-secondary-soft px-5 py-3 text-center text-kid-body text-text">
+            {interimText}
+          </p>
+        ) : null}
+      </div>
+
+      <PillButton size="kid" onClick={onDone} disabled={!recording}>
+        말 다 했어요
+      </PillButton>
+    </div>
+  );
+}
+
+/**
+ * D-6 재구성 결과 확인
+ *
+ * ⚠️ 원문 명세의 "내 목소리로 다시 듣기"는 원본 음성 저장을 전제하는데,
+ *    PRD 10.3이 원본 음성 저장을 금지한다. (open-questions Q-07)
+ *    TTS로 텍스트를 읽어주는 방식으로 대체하고 문구도 바꿨다.
+ *    "내 목소리로"를 그대로 두면 거짓말이 된다.
+ */
+export function ReviewPanel({
+  text,
+  keywords,
+  speaking,
+  onListen,
+  onRetell,
+  onComplete,
+  submitting,
+}: {
+  text: string;
+  keywords: readonly string[];
+  speaking: boolean;
+  onListen: () => void;
+  onRetell: () => void;
+  onComplete: () => void;
+  submitting: boolean;
+}) {
+  return (
+    <div className="flex size-full flex-col items-center justify-center gap-6 px-10 py-8">
+      <h1 className="text-narration font-bold text-text">내가 만든 이야기</h1>
+
+      <div className="max-h-[45%] w-full max-w-[53.75rem] overflow-y-auto rounded-card border border-border bg-surface p-8">
+        <p className="text-kid-body leading-[1.7] text-text">
+          {highlight(text, keywords)}
+        </p>
+      </div>
+
+      <PillButton variant="outlined" onClick={onListen} disabled={speaking}>
+        🔊 내 이야기 다시 듣기
+      </PillButton>
+
+      <div className="flex w-full max-w-[34rem] gap-3">
+        <PillButton
+          variant="outlined"
+          size="kid"
+          className="basis-2/5"
+          onClick={onRetell}
+        >
+          다시 말하기
+        </PillButton>
+        <PillButton
+          size="kid"
+          className="basis-3/5"
+          onClick={onComplete}
+          disabled={submitting}
+        >
+          이야기 완성하기
+        </PillButton>
+      </div>
+    </div>
+  );
+}
+
+/** 키워드에 마커 배경을 입힌다. */
+function highlight(text: string, keywords: readonly string[]) {
+  if (keywords.length === 0) return text;
+
+  const pattern = new RegExp(`(${keywords.map(escapeRegExp).join("|")})`, "g");
+  return text.split(pattern).map((part, i) =>
+    keywords.includes(part) ? (
+      <mark key={i} className="rounded bg-accent-soft px-1 text-text">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * D-7 세션 완료
+ *
+ * ⚠️ 금지: 점수, 등급, 퍼센트. 축하하되 평가하지 않는다.
+ *    "별가루"는 요건·DB 어디에도 없어 MVP에서 제외했다. (open-questions Q-12)
+ */
+export function ActivityComplete({
+  result,
+  onHome,
+  onWordbook,
+}: {
+  result: RetellingResult;
+  onHome: () => void;
+  onWordbook: () => void;
+}) {
+  const stats = [
+    { label: "말한 횟수", value: `${result.stats.childUtteranceCount}번` },
+    { label: "함께한 친구", value: `${result.stats.characterCount}명` },
+    { label: "새 단어", value: `${result.stats.newWordCount}개` },
+  ];
+
+  return (
+    <div className="relative flex size-full flex-col items-center justify-center gap-6 overflow-hidden px-10">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        {[
+          [10, 20], [26, 70], [42, 18], [58, 62], [74, 28], [88, 72],
+          [18, 48], [66, 10],
+        ].map(([left, top], i) => (
+          <span
+            key={i}
+            style={{ left: `${left}%`, top: `${top}%`, animationDelay: `${i * 0.2}s` }}
+            className="absolute animate-pulse text-3xl text-accent"
+          >
+            ✦
+          </span>
+        ))}
+      </div>
+
+      <div
+        aria-hidden
+        className="z-10 flex h-[22.5rem] w-full max-w-[32rem] items-center justify-center rounded-card bg-primary-soft text-kid-body font-bold text-muted"
+      >
+        단체 일러스트 준비 중
+      </div>
+
+      <h1 className="z-10 text-hero leading-tight font-bold text-text">
+        이야기를 끝까지 해냈어!
+      </h1>
+
+      <ul className="z-10 flex gap-4">
+        {stats.map((stat) => (
+          <li
+            key={stat.label}
+            className="flex min-w-[9rem] flex-col items-center gap-1 rounded-card border border-border bg-surface px-6 py-4"
+          >
+            <span className="text-parent-body text-muted">{stat.label}</span>
+            <span className="text-kid-button font-bold text-text">
+              {stat.value}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="z-10 flex gap-3">
+        <PillButton variant="outlined" size="kid" onClick={onWordbook}>
+          내 단어장 보기
+        </PillButton>
+        <PillButton size="kid" onClick={onHome}>
+          홈으로 가기
+        </PillButton>
+      </div>
+    </div>
+  );
+}
