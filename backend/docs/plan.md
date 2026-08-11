@@ -44,13 +44,17 @@ Phase 3  세션·조회  ──────────────────�
 | 2 | 엔티티 9개 정의 + 팀 추가 컬럼 | M-58, M-15, B-01~B-05 |
 | 3 | `text[]` · `jsonb` 타입 매핑 확인 | [setup.md](setup.md) |
 | 4 | 조건부 NOT NULL 완화 (`scene_type = dialogue`만 필수) | [PRD I-05](../../docs/product/prd.md) |
-| 5 | 콘텐츠 시드 — 이야기 1건 + 장면 9건 | M-13, M-14, M-16~M-18 |
-| 6 | 코드 상수 — `remainingWorries`·`guidanceStyle`·캐릭터 표시명·미션 정의 | M-19, B-08 |
+| 5 | ~~콘텐츠 시드 — 이야기 1건 + 장면 9건~~ | M-13, M-14, M-16~M-18 — **완료** |
+| 6 | ~~코드 상수 — `remainingWorries`·`guidanceStyle`·캐릭터 표시명·미션 정의~~ | M-19, B-08 — **완료** |
 
 **완료 조건**
-- 기동 시 테이블이 전부 생성되고, 시드가 **두 번 기동해도 중복되지 않는다**
-- `story_scenes` 9건 조회 시 `scene_type`이 `intro` 1 / `narrative` 4 / `dialogue` 4
-- `dialogue` 장면 4건에 `conflict`·`element_criteria`·`preferred_turns`·`max_turns`가 채워져 있다
+- [x] 기동 시 테이블이 전부 생성되고, 시드가 **두 번 기동해도 중복되지 않는다** — 재기동 2회 확인 (2026-08-12)
+- [x] `story_scenes` 9건 조회 시 `scene_type`이 `intro` 1 / `narrative` 4 / `dialogue` 4 — psql로 확인
+- [x] `dialogue` 장면 4건에 `conflict`·`element_criteria`·`preferred_turns`·`max_turns`가 채워져 있다 — psql로 확인
+
+> **Phase 1 완료** (2026-08-12). `story/ContentSeeder.java`(시드), `story/constant/`(코드 상수 —
+> `DialogueContents`, `Missions`) + 단위 테스트. `scene_description`이 대화 장면 4건에는 PRD에
+> 없어 팀이 작성했다 (D-19).
 
 > `tts_cache`(B-06)는 여기서 테이블만 만들어 두고 Phase 5에서 씁니다.
 

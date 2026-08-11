@@ -385,6 +385,26 @@ client_secret_post` + 실제 Client Secret 조합이 정상 동작합니다.
 
 ---
 
+### D-19 · 대화 장면 4건의 `scene_description`은 팀이 한 줄로 작성한다
+
+[PRD 7.4](../../docs/product/prd.md)는 도입·전개 장면의 `scene_description`만 제공합니다.
+대화 장면(대화1~4)의 `scene_description`은 제공 자료에 없는데, [PRD 7.5.1](../../docs/product/prd.md)은
+`sceneContext`(발화 분석 입력)를 `scene_description` + `conflict`로 구성하도록 정의하고 있어
+값이 없으면 그 조립 자체가 안 됩니다.
+
+**결정**: `conflict`·`element_criteria`와 같은 성격의 팀 창작 값으로 취급하고, 각 대화 장면이
+시작되는 상황을 한 문장으로 적었습니다 (`story/ContentSeeder.java`). 자문위원 검수 대상이
+아니므로 다른 팀 창작 값과 함께 실제 발화 샘플 검증 후 조정될 수 있습니다 (PRD 7.5.4).
+
+**추가로 정한 것 — `remainingWorries`·`guidanceStyle`·캐릭터 표시명 (M-19, B-08)**: DB 컬럼이
+아니라 `story/constant/DialogueContents.java`에 `scene_order` 키로 둡니다. 며느리가 대화1·4에
+모두 등장하지만 심리 상태가 달라 캐릭터 단위가 아니라 캐릭터+장면 조합 단위로 관리해야 하기
+때문입니다 (PRD 7.5.4). DB에 두지 않는 이유는 D-17(이 폴더에 값을 복사하지 않는다)과 같은
+결로, 자문위원 검수 대상이 아닌 팀 창작물이라 재배포로 바꾸는 편이 시드 데이터 `UPDATE`보다
+다루기 쉽기 때문입니다.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
@@ -396,6 +416,7 @@ client_secret_post` + 실제 Client Secret 조합이 정상 동작합니다.
 | [open-questions Q-12](../../docs/open-questions.md) | 별가루 MVP 제외 권고 | **채택 (후순위)** | D-09 — 담당자 결정 |
 | [PRD 9.3](../../docs/product/prd.md) | 1안 권장, TTS만 2안 교체 | **처음부터 2안 전면** | D-01 — iPad 안정성 |
 | [api.md 3.1](../../docs/spec/api.md) | `POST /api/auth/{provider}` — 프론트가 code 전달 | **백엔드 리다이렉트 방식** (`oauth2Login`) | D-18 |
+| [PRD 7.4](../../docs/product/prd.md) | 도입·전개 장면만 `scene_description` 제공 | **대화 장면 4건도 팀이 한 줄씩 작성** | D-19 |
 
 ---
 

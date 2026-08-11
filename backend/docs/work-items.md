@@ -49,14 +49,14 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 값 위치 |
 | --- | --- | --- | --- |
-| M-13 | `stories` 1건 | 필수-기반 | [PRD 7.1](../../docs/product/prd.md) |
-| M-14 | `story_scenes` 9건 (도입1 + 전개4 + 대화4) | 필수-기반 | [PRD 7.2](../../docs/product/prd.md) · [7.4](../../docs/product/prd.md) · [7.5](../../docs/product/prd.md) |
-| M-16 | `conflict` 4건 | 필수-기반 | [PRD 7.5.1](../../docs/product/prd.md) |
-| M-17 | `element_criteria` 4건 | 필수-기반 | [PRD 7.5.2](../../docs/product/prd.md) |
-| M-18 | `preferred_turns` 4건 | 필수-기반 | [PRD 7.3](../../docs/product/prd.md) |
-| — | `post_activity_config` | 필수-기반 | [PRD 7.8](../../docs/product/prd.md) |
-| M-19 | `remainingWorries` · `guidanceStyle` **코드 상수** | 필수-기반 | [PRD 7.5.3](../../docs/product/prd.md) |
-| B-08 | 캐릭터 **표시명** 매핑 코드 상수 | 필수-기반 | [PRD I-13](../../docs/product/prd.md) |
+| M-13 | ~~`stories` 1건~~ | 필수-기반 | **완료.** `story/ContentSeeder.java` |
+| M-14 | ~~`story_scenes` 9건 (도입1 + 전개4 + 대화4)~~ | 필수-기반 | **완료.** 재기동 중복 삽입 없음 확인 (existsByTitle) |
+| M-16 | ~~`conflict` 4건~~ | 필수-기반 | **완료** |
+| M-17 | ~~`element_criteria` 4건~~ | 필수-기반 | **완료** |
+| M-18 | ~~`preferred_turns` 4건~~ | 필수-기반 | **완료** |
+| — | ~~`post_activity_config`~~ | 필수-기반 | **완료** |
+| M-19 | ~~`remainingWorries` · `guidanceStyle` **코드 상수**~~ | 필수-기반 | **완료.** `story/constant/DialogueContents.java`, scene_order 키. 단위 테스트 포함 |
+| B-08 | ~~캐릭터 **표시명** 매핑 코드 상수~~ | 필수-기반 | **완료.** `DialogueContents`에 함께 둠 (scene_order 단위라 별도 클래스로 안 나눔) |
 
 ### 주의
 
@@ -64,6 +64,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 - `character_name`에는 식별자(`ch_banggui_daughter_in_law`)를 저장하고 표시명은 별도 상수 (B-08)
 - 시드는 **중복 삽입 방지 조건**을 걸 것. `ddl-auto`는 데이터를 넣어주지 않음 → [setup.md](setup.md)
 - `element_criteria`는 AI 담당 튜닝 결과로 **재배포 없이 UPDATE**할 수 있어야 함 ([PRD 8.7](../../docs/product/prd.md))
+- 대화 장면 4건의 `scene_description`은 PRD에 없어 팀이 작성 (D-19)
 
 ---
 
