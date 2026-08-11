@@ -3,7 +3,29 @@
 | 항목 | 내용 |
 | --- | --- |
 | 작성일 | 2026-08-10 |
+| 최종 수정 | 2026-08-12 |
 | 기준 문서 | [../product/prd.md](../product/prd.md), [screens.md](screens.md) 5장, [../team/roles.md](../team/roles.md) 4장 |
+
+## 수정 이력
+
+### 2026-08-12 — 백엔드 결정 반영
+
+근거: [backend/docs/decisions.md](../../backend/docs/decisions.md)
+
+| 절 | 변경 |
+| --- | --- |
+| 1 | **STT/TTS 2안 확정** (OpenAI, 백엔드 처리). 선결 과제 해소 (D-01) |
+| 2.5 | 타임아웃 확정값 기재 (D-03) |
+| 3.2 | `children.avatar_id` 컬럼 추가 확정 (D-08) |
+| 3.3 | `stories.situation` · `child_role` 컬럼 추가 확정 (D-07) |
+| **3.5** | **발화 전송을 요청 3개로 분리.** `POST /api/stt` · `GET /api/tts` 신규 (D-02) |
+| 3.6 | 카드 재시도 3회 제한, 3회째 `correctOrder` 공개 (D-10) |
+| 3.7 | `highlightWords`는 빈 배열로 응답 (D-11) |
+| 4.3 | 타임아웃·재시도·실패 동작 확정 (D-03) |
+| 5 | 미결 항목 갱신 |
+
+> ⚠️ **2안 확정으로 이 문서의 "1안 기준" 전제가 바뀌었습니다.** 3.5절을 먼저 읽으세요.
+> 프론트 관점 정리는 [request/frontend/stt-tts-integration.md](../request/frontend/stt-tts-integration.md)에 있습니다.
 
 ## 0. 이 문서의 신뢰도
 
@@ -20,23 +42,25 @@
 
 ---
 
-## 1. 선결 과제 — STT/TTS 방식
+## 1. STT/TTS 방식 — ✅ 확정 (2안)
 
-이 결정에 따라 아래가 갈립니다. **API 확정 전에 먼저 정해야 합니다.**
-([PRD 9.3](../product/prd.md), [작업 분장 1장](../team/roles.md))
+**2026-08-12, 2안(OpenAI)으로 확정되었습니다.** STT는 Whisper, TTS는 OpenAI TTS이며
+**둘 다 백엔드가 호출합니다.** ([D-01](../../backend/docs/decisions.md))
 
-| 선택 | 발화 전송 | TTS | D-5 키워드 실시간 점등 |
-| --- | --- | --- | --- |
-| **1안. Web Speech API** | `application/json` — 텍스트만 | 프론트가 `SpeechSynthesis`로 재생. 백엔드 무관 | ✅ 가능 (interim result 지원) |
-| **2안. OpenAI Whisper + TTS** | `multipart/form-data` — 오디오 업로드 | 백엔드가 오디오 제공 | ❌ 불가 → 최종 결과에서 일괄 점등 폴백 |
+| | 1안. Web Speech API | **2안. OpenAI (확정)** |
+| --- | --- | --- |
+| STT | 브라우저 `SpeechRecognition` | **백엔드** (Whisper) |
+| TTS | 브라우저 `SpeechSynthesis` | **백엔드** (OpenAI TTS) |
+| iPad (지원 기기 1순위) | ⚠️ iOS Safari 불안정 | ✅ 안정 |
+| D-5 키워드 실시간 점등 | 가능 | ❌ **불가 → 최종 결과 일괄 점등 폴백** |
 
-본 문서는 **1안 기준**입니다. 2안 채택 시 차이는 `2안 변경점`에 표기했습니다.
+**결정 이유**: MVP 지원 기기 1순위가 iPad인데 1안은 iOS Safari에서 불안정합니다
+([PRD 9.3](../product/prd.md)). D-5 폴백을 감수하고 시연 안정성을 택했습니다.
 
-> ⚠️ 두 가지가 걸립니다.
-> - MVP 지원 기기 1순위가 **iPad**인데 1안은 iOS Safari에서 불안정합니다.
-> - [화면 명세 D-5](screens.md)의 키워드 실시간 점등은 1안에서만 가능합니다.
->
-> 즉 1안은 기능이 되지만 시연 기기가 위험하고, 2안은 안전하지만 D-5가 폴백됩니다.
+> ⚠️ **본 문서의 나머지 절은 1안 기준으로 쓰였습니다.** 3.5절만 2안으로 갱신되어 있으며,
+> 다른 절에 남아 있는 "2안 변경점" 표기는 이제 **본문이 아니라 확정 사항**입니다.
+
+**이 결정으로 해소된 항목**: [open-questions Q-16(=B-1)](../open-questions.md)
 
 ---
 
@@ -95,17 +119,33 @@ X-Internal-Token: <shared-secret>
 - 열거값(`NORMAL`, `PERSPECTIVE` 등)은 PRD 정의 그대로 대문자 유지
 - 일시는 ISO-8601 (`2026-08-10T13:34:00+09:00`)
 
-### 2.5 타임아웃
+### 2.5 타임아웃 ✅ 확정
 
-| 구간 | 값 | 근거 |
+[D-03](../../backend/docs/decisions.md)에서 확정되었습니다.
+
+| 구간 | 값 | 재시도 |
 | --- | --- | --- |
-| 프론트 → 백엔드 | 15초 | [화면 명세 C-6](screens.md) |
-| 백엔드 → AI 서버 (분석) | 미정 (5초 가정) | [작업 분장 5장](../team/roles.md) |
-| 백엔드 → AI 서버 (응답) | 미정 (5초 가정) | 같음 |
+| 프론트 → 백엔드 | 15초 (**실측 후 재검토**) | — |
+| 백엔드 → AI `/analyze` | **5초** | 0회 |
+| 백엔드 → AI `/respond` | **5초** | 0회 |
+| 백엔드 → Whisper | **8초** | 0회 |
 
-> ⚠️ **15초 예산이 맞지 않습니다.** AI 호출 두 번에 각 5초만 잡아도 10초이고,
-> 여기에 STT와 Render 콜드 스타트(수십 초)가 더해집니다.
-> ([작업 분장 3.11 · 5장](../team/roles.md)) 자세한 계산과 대응은 4.4절 · [Q-14](../open-questions.md) 참조.
+재시도를 두지 않는 이유: 한 턴에 AI 호출이 2회라 재시도 여유가 없습니다.
+
+**요청 분리로 15초 예산 안에 들어갑니다.** 3.5절에서 발화 1회를 요청 3개로 나눈 결과,
+각 구간이 8초 / 10초로 줄었습니다. 한 요청에 합치면 18초로 초과합니다.
+
+**실패 시 동작** ([D-03](../../backend/docs/decisions.md))
+
+| 실패 지점 | 백엔드 동작 |
+| --- | --- |
+| `/analyze` | 빈 분석(`detectedElements: []`, `utteranceValidity: UNCLEAR`)으로 **정상 진행** |
+| `/respond` | `character_closing`을 조회해 **장면 종료**, 다음 장면으로 |
+
+**어느 쪽도 에러를 프론트로 올리지 않습니다.** AI가 죽어도 아이 화면에서는 이야기가 계속됩니다.
+
+**슬립 방지**: 외부 크론 10분 핑 + 헬스체크에 `SELECT 1` 포함.
+Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 
 ---
 
@@ -169,7 +209,7 @@ X-Internal-Token: <shared-secret>
 | 필드 | 비고 |
 | --- | --- |
 | `age` | 서버가 `현재 연도 - birthYear`로 계산. 연도 기준 연령 ([PRD I-11](../product/prd.md)) |
-| `avatarId` | ⚠️ `children`에 대응 컬럼이 없음. 스키마 추가 필요 → [Q-11](../open-questions.md) |
+| `avatarId` | ✅ `children.avatar_id varchar` nullable 추가 확정 ([D-08](../../backend/docs/decisions.md)). **백엔드는 값을 검증하지 않습니다** — 아바타 6종 목록이 문서에 없기 때문 |
 | `consentGranted` | `false`면 세션 시작 불가. 프론트는 동의 화면으로 유도 |
 | `lastActivityAt` | A-5 "최근 활동" 상대 표기용 |
 | `registeredAt` | H-2 "YYYY.MM.DD 등록" 표기용 |
@@ -284,8 +324,8 @@ X-Internal-Token: <shared-secret>
 | 필드 | 근거 |
 | --- | --- |
 | `intro` | 도입 장면의 `scene_description` |
-| `situation` | ⚠️ 화면 명세는 "첫 장면 `conflict`"라고 했으나, [PRD F-03](../product/prd.md)에 이야기 단위 고정 문구가 확정되어 있습니다 → [Q-03](../open-questions.md) |
-| `childRole` | PRD F-03 확정 문구. DB 컬럼은 없음 |
+| `situation` | ✅ `stories.situation varchar` 컬럼 추가 확정 ([D-07](../../backend/docs/decisions.md)). **`conflict`를 쓰지 않습니다** — `conflict`는 장면별 캐릭터 딜레마이고 분석 LLM 입력용입니다 |
+| `childRole` | ✅ `stories.child_role varchar` 컬럼 추가 확정. [PRD F-03](../product/prd.md) 문구 저장 |
 | `characters` | `story_scenes.character_name` distinct + 표시명 매핑 ([PRD I-13](../product/prd.md)) |
 | `existingSession` | 있으면 프론트가 B-4 모달을 띄웁니다. 없으면 `null` |
 
@@ -398,11 +438,51 @@ X-Internal-Token: <shared-secret>
 { "status": "stopped" }
 ```
 
-### 3.5 발화 전송 — 핵심 엔드포인트 ✅
+### 3.5 발화 전송 — 핵심 흐름 ✅
 
-#### `POST /api/sessions/{sessionId}/messages` · C-5 "보내기"
+**2안 확정으로 발화 1회가 요청 3개로 나뉩니다.** ([D-02](../../backend/docs/decisions.md))
 
-[화면 명세 5-1](screens.md)에 확정된 형태입니다. 백엔드는 이 한 번의 요청 안에서
+```
+1. 캐릭터 대사 재생          ── ③ GET /api/tts 로 받은 오디오
+2. 재생 종료 → 마이크 자동 활성화
+3. 아이가 말함, 녹음
+4. 녹음 종료 → 오디오 업로드  ── ① POST /api/stt          (최대 8초)
+5. 변환 텍스트 화면 표시 → 아이가 확인·수정                 ← 요청이 갈리는 지점
+6. [보내기] 클릭             ── ② POST /messages          (최대 10초)
+7. 캐릭터 대사 말풍선 즉시 표시
+8. 대사 오디오 요청·재생     ── ③ GET /api/tts
+```
+
+**①과 ②를 합칠 수 없습니다.** [PRD F-05](../product/prd.md)가 *"변환된 텍스트를 화면에 표시"* 하고
+*"보내기 버튼을 눌러 제출"* 하도록 요구하므로, 아이의 확인 동작이 중간에 들어갑니다.
+합치면 확인 단계가 사라져 요건을 못 맞춥니다.
+
+**부수 효과** — [Q-09(빈 발화)](../open-questions.md)가 해소됩니다. STT 결과가 비면 ①에서 끝나고
+②를 호출하지 않으므로, `messages`에 빈 `text`가 들어갈 경로 자체가 없어집니다.
+
+---
+
+#### ① `POST /api/stt` ✅ · C-4 → C-5
+
+`multipart/form-data` — `audio` 파트에 녹음 파일.
+브라우저 기본 포맷 그대로 받습니다 (Chrome `webm` / iOS Safari `mp4`).
+
+**Response 200**
+
+```json
+{ "text": "며느리가 창피해서 계속 참았던 것 같아요." }
+```
+
+- 인식 결과가 없으면 `text`는 빈 문자열입니다. **프론트는 이때 `/messages`를 호출하지 않습니다** → I-2
+- **원본 음성은 저장하지 않습니다.** 메모리 처리 후 즉시 폐기 ([PRD 10.3](../product/prd.md))
+- 타임아웃 8초
+
+---
+
+#### ② `POST /api/sessions/{sessionId}/messages` · C-5 "보내기"
+
+[화면 명세 5-1](screens.md)에 확정된 형태이며 **텍스트를 받습니다** (오디오 아님).
+백엔드는 이 한 번의 요청 안에서
 `저장 → 분석 LLM → 후처리 → 진행 판단 → 캐릭터 LLM → 상태 갱신`을 모두 수행합니다.
 
 **Request**
@@ -423,8 +503,9 @@ X-Internal-Token: <shared-secret>
 - `text`가 비면 메시지를 생성하지 않고 422 `STT_EMPTY` → 프론트는 I-2 → [Q-09](../open-questions.md)
 - `sceneId`는 서버가 세션의 `current_scene_id`로 판단합니다 (요청에 없음)
 
-> **2안 변경점**: `multipart/form-data`로 `audio` 파트를 받아 서버에서 STT를 수행합니다.
-> 원본 음성은 저장하지 않고 메모리 처리 후 즉시 폐기합니다. ([PRD 10.3](../product/prd.md))
+> ~~**2안 변경점**: `multipart/form-data`로 `audio` 파트를 받아 서버에서 STT를 수행합니다.~~
+> **2026-08-12 폐기.** 오디오를 이 엔드포인트에 실으면 F-05의 "확인 후 보내기"가 사라집니다.
+> STT는 위 ①번 `POST /api/stt`로 분리했습니다. ([D-02](../../backend/docs/decisions.md))
 
 **Response 200**
 
@@ -455,7 +536,8 @@ X-Internal-Token: <shared-secret>
 | `sceneEnded` | `true`면 `characterMessage` 재생 후 C-12로 |
 | `nextSceneId` | `sceneEnded=true`일 때 채움. 마지막 장면이면 `null` → `/activity`로 |
 | `missionTriggered` | 미션 노출 신호. 없으면 `null` |
-| `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업 |
+| `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. **당분간 빈 배열 `[]`** ([D-11](../../backend/docs/decisions.md)) |
+| `characterMessageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)) |
 
 **프론트가 하지 말아야 할 것**
 
@@ -486,6 +568,30 @@ X-Internal-Token: <shared-secret>
 
 > `maxTurns: 6`은 화면 명세의 예시값입니다. 실제 콘텐츠의 `max_turns`는 장면별로 4·5·5·4입니다.
 > ([PRD 7.2](../product/prd.md))
+
+---
+
+#### ③ `GET /api/tts?messageId={id}` ✅ · C-3 음성 재생
+
+캐릭터 대사·내레이션의 오디오를 반환합니다. 응답은 `audio/mpeg` 바이트입니다.
+
+- 캐시에 있으면 즉시, 없으면 생성 후 반환합니다
+- **고정 대사 11건은 애플리케이션 기동 시 미리 생성**되어 거의 즉시 옵니다 ([D-05](../../backend/docs/decisions.md))
+- 캐시는 `tts_cache` 테이블에 저장합니다. **파일시스템에 두지 않습니다** — Render 무료 티어는 재배포 시 초기화됩니다
+- "다시 듣기"는 재요청 없이 프론트가 받은 오디오를 다시 재생하면 됩니다
+
+**프리워밍 대상이 13건이 아니라 11건인 이유**
+
+| 종류 | 건수 | 프리워밍 |
+| --- | --- | --- |
+| 도입·전개 내레이션 (`scene_description`) | 5 | ✅ |
+| `character_closing` | 4 | ✅ |
+| `character_opening` — 대화2·대화3 | 2 | ✅ |
+| `character_opening` — 대화1·대화4 | 2 | ❌ 아이 이름이 들어가 아이마다 다름 |
+
+제외된 2건은 첫 재생 시 생성해 캐시에 추가합니다.
+
+> **프론트는 브라우저 `SpeechSynthesis`를 쓰지 않습니다.** 백엔드가 준 오디오를 재생합니다.
 
 ### 3.6 말하기 후 활동 ✅
 
@@ -527,7 +633,22 @@ X-Internal-Token: <shared-secret>
 ```
 
 - **정답 판정은 서버가 합니다.** 프론트 판정을 허용하지 않습니다 ([PRD 8.11](../product/prd.md))
-- 재시도 횟수 제한 여부는 팀 미결 → [Q-15](../open-questions.md)
+- ✅ **재시도 3회 제한 확정** ([D-10](../../backend/docs/decisions.md))
+
+3회째 응답에는 `correctOrder`가 함께 실립니다.
+
+```json
+{
+  "isCorrect": false,
+  "attemptCount": 3,
+  "correctOrder": ["card_1", "card_2", "card_3", "card_4"],
+  "retellingKeywords": ["며느리", "방귀", "배나무", "시아버지"]
+}
+```
+
+- 프론트는 정답 배치를 보여주고 **다음 단계로 넘깁니다.** 실패를 지적하지 않습니다 (D-3 원칙)
+- 3회로 통과시켜도 서버는 `is_order_correct = false`로 저장합니다. 기록은 사실대로 남깁니다
+- `GET /activity`의 "`correctOrder`를 내려주지 않는다"는 **처음에** 주지 말라는 뜻입니다
 
 #### `POST /api/sessions/{sessionId}/activity/retelling` ✅ · D-6
 
@@ -557,7 +678,13 @@ X-Internal-Token: <shared-secret>
 | `POST /api/wordbook` | C-9 | `{ childId, word, meaning, sourceSceneId }` |
 | `PATCH /api/wordbook/{id}` | C-9, E-1 | `{ liked: true }` |
 
-> `wordbook`은 확장 테이블이며 선택 요건입니다. 범위 확정 필요 → [Q-06](../open-questions.md)
+> ✅ **범위 확정** ([D-11](../../backend/docs/decisions.md)): `wordbook` 테이블 + API 3개는
+> **선택-후순위**입니다. 필수 항목을 전부 끝낸 뒤 착수합니다.
+>
+> `highlightWords`(3.5 응답)는 **당분간 빈 배열 `[]`로 내려갑니다.** 밑줄 칠 단어의 선정 기준과
+> 뜻을 누가 쓸지가 어느 문서에도 없고, 캐릭터 대사는 LLM이 실시간 생성해 고정 목록과 안 맞을 수 있습니다.
+> 채우려면 ① 장면별 고정 목록을 팀이 창작(`story_scenes.highlight_words jsonb` 추가)하거나
+> ② `/respond` 응답에 AI가 함께 반환하도록 계약을 확장해야 합니다.
 
 ### 3.8 보호자 (선택) ⚪
 
@@ -731,11 +858,15 @@ X-Internal-Token: <shared-secret>
 | 항목 | 상태 |
 | --- | --- |
 | 프로토콜 | ✅ REST / JSON |
-| 엔드포인트 경로 | 🟡 `POST /analyze`, `POST /respond` (작업분장 예시) |
-| 인증 | 🟡 내부 호출용 고정 토큰 수준이면 충분 |
-| 타임아웃 | ⚪ 미정 |
-| 실패 시 백엔드 동작 | ⚪ 재시도 횟수, 최종 실패 시 응답 내용 미정 |
-| 배포 주소 | ⚪ 미정 |
+| 엔드포인트 경로 | 🟡 `POST /analyze`, `POST /respond` 가정. **AI 담당 명세 수령 후 확정** |
+| 인증 | 🟡 `X-Internal-Token` 고정 토큰. 값 미정 |
+| 타임아웃 | ✅ **각 5초** ([D-03](../../backend/docs/decisions.md)) |
+| 재시도 | ✅ **0회.** 한 턴에 2회 호출이라 여유 없음 |
+| 실패 시 백엔드 동작 | ✅ `/analyze` → 빈 분석으로 진행 / `/respond` → `character_closing`으로 장면 종료 |
+| 배포 주소 | ⚪ 미정. **mock 스텁으로 선행 진행 중** |
+
+> 백엔드는 AI 서버 완성을 기다리지 않고 **고정 JSON 스텁**으로 먼저 연결해 전체 흐름을 검증합니다.
+> 주소가 확정되면 환경변수만 교체합니다.
 
 ### 4.4 비용·성능 제약
 
@@ -746,17 +877,30 @@ X-Internal-Token: <shared-secret>
 | `NORMAL` / `GUIDED` | `/analyze` 1회 + `/respond` 1회 = **2회** |
 | `CLOSING` | `/analyze` 1회 = **1회** |
 
-**응답 시간 예산** — [작업 분장 5장](../team/roles.md)의 계산입니다.
+**응답 시간 예산** — 요청 분리로 해소되었습니다 ([D-02](../../backend/docs/decisions.md)).
 
 ```
-AI 분석 5초 + AI 응답 5초 = 10초
-  + STT (2안이면 오디오 업로드 왕복)
-  + Render 콜드 스타트 (수십 초)
-────────────────────────────────
-프론트 타임아웃 예산 15초  ← 초과
+[분리 전]  Whisper 8초 + AI 분석 5초 + AI 응답 5초 = 18초  ← 15초 초과
+
+[분리 후]  ① POST /api/stt     Whisper 8초              ← 15초 이내
+           ② POST /messages    분석 5초 + 응답 5초 = 10초 ← 15초 이내
+           ③ GET  /api/tts     캐시 히트 시 즉시
 ```
 
-AI 서버 장애 시 아이 화면이 무한 로딩에 빠지지 않도록 백엔드가 방어해야 합니다. → [Q-14](../open-questions.md)
+각 구간이 예산 안에 들어갑니다. 남은 변수는 **Render 콜드 스타트**이며, 외부 크론 10분 핑으로
+슬립 진입 자체를 막습니다 (2.5절).
+
+> ⚠️ **실측이 필요합니다.** 배포 후 각 구간을 측정해 프론트에 공유하고, 그때 15초를 유지할지 정합니다.
+> ([Q-14](../open-questions.md))
+
+**OpenAI 키는 파트별로 분리합니다** ([D-16](../../backend/docs/decisions.md)).
+
+| 용도 | 키 소유 |
+| --- | --- |
+| Whisper (STT) · OpenAI TTS | 백엔드 담당 |
+| `gpt-5-mini` (분석 · 캐릭터 응답) | AI 담당 |
+
+위 1.5만~2만 토큰 상한은 **AI 담당 쪽에만** 걸립니다. 음성 비용 상한은 아직 정해지지 않았습니다.
 
 ### 4.5 계약 확정 전에도 진행 가능한 작업
 
@@ -772,16 +916,25 @@ AI 서버 장애 시 아이 화면이 무한 로딩에 빠지지 않도록 백�
 
 ## 5. 미결 항목
 
-| 항목 | 결정 주체 | 영향 |
+### 해소됨 (2026-08-12)
+
+| 항목 | 결정 |
+| --- | --- |
+| ~~STT 방식~~ | ✅ **2안 (Whisper, 백엔드)** — 1절 · D-01 |
+| ~~TTS 방식~~ | ✅ **2안 (OpenAI TTS, 백엔드)** + `tts_cache` DB 저장 + 기동 시 11건 프리워밍 — 3.5③ · D-05 |
+| ~~백엔드→AI 타임아웃·재시도·실패 응답~~ | ✅ 5초 / 0회 / 폴백 확정 — 2.5절 · D-03 |
+| ~~카드 순서 재시도 횟수 제한~~ | ✅ **3회** — 3.6절 · D-10 |
+| ~~`children.avatar_id` 스키마 추가~~ | ✅ 추가. 값 검증 없음 — 3.2절 · D-08 |
+
+### 남은 것
+
+| 항목 | 결정 주체 | 상태 |
 | --- | --- | --- |
-| STT 방식 (1절) | 3인 | 발화 전송 형태, 담당 파트, D-5 키워드 점등 |
-| TTS 방식 | 프론트·백엔드 | 백엔드 음성 응답 필요 여부, O-15 캐싱 |
-| 백엔드→AI 타임아웃·재시도·실패 응답 | 백엔드·AI | 프론트 15초 예산 안에 들어가야 함. 4.4절 참조 |
-| AI 서버 배포 주소·인증 | 백엔드·AI | 2.2절 내부 토큰 방식 |
-| AI 엔드포인트 경로 확정 | 백엔드·AI | `/analyze`, `/respond`로 굳힐지 |
-| 카드 순서 재시도 횟수 제한 | 3인 | `attemptCount` 처리 |
-| 이미지 URL 제공 방식 | 3인 | 정적 호스팅 vs DB 저장 |
-| `children.avatar_id` 스키마 추가 | 백엔드 | A-4·A-5·F-1 아바타 |
+| AI 서버 배포 주소 · 경로 · 내부 토큰 | 백엔드·AI | AI 담당 명세 대기. **mock 스텁으로 우회 중** |
+| 프론트 15초 예산 유지 여부 | 프론트·백엔드 | 배포 후 **실측** 필요 |
+| 이미지 URL 제공 방식 | 3인 | Supabase Storage 우선. **에셋 수령 시 확정.** 컬럼(`cover_image_url`·`background_image_url`)은 미리 추가 |
+| `highlightWords` 데이터 출처 | 3인 | 장면별 고정 목록 vs `/respond` 응답 확장. 당분간 빈 배열 |
+| 음성(Whisper·TTS) 비용 상한 | 백엔드 | 문서에 예산 없음 |
 | 리포트 응답 스키마 | 3인 | O-01 착수 시 |
 
 전체 미결·충돌 목록은 [../open-questions.md](../open-questions.md)를 참조하세요.
