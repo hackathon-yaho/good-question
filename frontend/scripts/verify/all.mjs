@@ -24,6 +24,7 @@ const SUITES = [
   ["system", "I-1 · I-3 · I-4 예외"],
   ["browse", "B-2·B-3·B-4 · C-9 · E · F-1"],
   ["parent", "A-6 · G · H"],
+  ["layout", "태블릿 5종 — 버튼 줄바꿈·넘침"],
 ];
 
 function run(name) {
