@@ -127,18 +127,20 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
-| — | 세션 생성 · 재시작 | 필수 | `POST /api/sessions` |
-| — | 세션 조회 (이어하기 복원) | 필수 | `GET /api/sessions/{sessionId}` |
-| M-46 | 장면 전환 처리 (9개 순차) | 필수 | `POST /api/sessions/{id}/scenes/{sceneId}/complete` |
-| — | 이야기 나가기 | 선택 | `PATCH /api/sessions/{sessionId}` |
-| M-44 | `story_sessions` 상태 갱신 | 필수 | [PRD 8.8](../../docs/product/prd.md) 전 필드 |
-| M-26 | **아이 이름 치환** | 필수 | 백엔드 담당 (D-04) |
+| — | ~~세션 생성 · 재시작~~ | 필수 | `POST /api/sessions` — **완료** |
+| — | ~~세션 조회 (이어하기 복원)~~ | 필수 | `GET /api/sessions/{sessionId}` — **완료** |
+| M-46 | 장면 전환 처리 (9개 순차) | 필수 | `POST /api/sessions/{id}/scenes/{sceneId}/complete` — 미착수 |
+| — | 이야기 나가기 | 선택 | `PATCH /api/sessions/{sessionId}` — 미착수 |
+| M-44 | `story_sessions` 상태 갱신 | 필수 | [PRD 8.8](../../docs/product/prd.md) 전 필드 — 세션 생성 부분만 완료. 장면 전환 갱신은 M-46과 함께 |
+| M-26 | **아이 이름 치환** | 필수 | 백엔드 담당 (D-04) — 장면 전환(M-46)에서 `character_opening` 저장 시점에 함께 구현 |
+| M-05 | ~~세션 시작 시 동의 검증 게이트~~ | 필수 | `POST /api/sessions`에서 403 `CONSENT_REQUIRED` — **완료** |
 
 스키마: [api.md 3.4](../../docs/spec/api.md)
 
 ### 주의
 
 - `restart: true`면 기존 세션을 `stopped`로 바꾸고 **새 세션 생성.** 기존 `messages`는 삭제하지 않음
+- `restart: false`(또는 생략)이고 진행 중(`in_progress`/`post_activity`) 세션이 **이미 있으면 새로 만들지 않고 그 세션을 그대로 반환**한다 (팀 결정 — api.md가 명시하지 않은 부분). 프론트가 B-4 모달 없이 실수로 두 번 호출해도 세션이 중복 생성되지 않는다
 - 동의 없는 아이로 세션 시작 시 403 `CONSENT_REQUIRED`
 - `dialogue` 장면 진입 시 `character_opening`을 **`messages`에 저장한 뒤** 함께 내려줌 ([PRD 6.2](../../docs/product/prd.md))
 - **장면 전환 시 초기화**할 필드가 따로 있음 ([PRD 8.8](../../docs/product/prd.md)). 초기화하지 않으면 다음 장면이 이전 요소를 물려받아 첫 턴에 즉시 종료됨

@@ -97,18 +97,21 @@ Phase 3  세션·조회  ──────────────────�
 | --- | --- | --- |
 | 1 | ~~이야기 목록 · 주제 필터 · 상세~~ | M-10, M-11 — **완료** |
 | 2 | ~~홈 (진행 중 + 추천)~~ | M-08 — **완료** |
-| 3 | 세션 생성 · 재시작 | `POST /api/sessions` |
-| 4 | 세션 조회 (이어하기 복원) | `GET /api/sessions/{id}` |
-| 5 | **아이 이름 치환** | M-26 |
-| 6 | 장면 전환 — `intro`/`narrative` 완료 → 다음 장면 | M-46 |
-| 7 | `dialogue` 진입 시 `character_opening`을 `messages`에 저장 후 응답 | M-33 일부 |
-| 8 | `sceneProgress` 화면 단위 변환 | D-12 |
+| 3 | ~~세션 생성 · 재시작~~ | `POST /api/sessions` — **완료** |
+| 4 | ~~세션 조회 (이어하기 복원)~~ | `GET /api/sessions/{id}` — **완료** |
+| 5 | **아이 이름 치환** | M-26 — 미착수 |
+| 6 | 장면 전환 — `intro`/`narrative` 완료 → 다음 장면 | M-46 — 미착수 |
+| 7 | `dialogue` 진입 시 `character_opening`을 `messages`에 저장 후 응답 | M-33 일부 — 미착수 |
+| 8 | ~~`sceneProgress` 화면 단위 변환~~ | D-12 — **완료** (`GET /api/home`에서 검증) |
 
 **완료 조건**
-- 세션 생성 → 도입(1) → 전개1(2) → 대화1(3)까지 장면이 넘어간다
-- 대화1 진입 시 `character_opening`에 **아이 이름이 치환되어** 저장된다 (받침 유무 반영)
-- `GET /api/sessions/{id}`로 중간 상태가 복원된다
-- `currentSceneOrder: 5` → `sceneProgress: { current: 2, total: 4 }`
+- [ ] 세션 생성 → 도입(1) → 전개1(2) → 대화1(3)까지 장면이 넘어간다 — 세션 생성(도입 진입)까지는 확인, 장면 전환(M-46)이 아직 없음
+- [ ] 대화1 진입 시 `character_opening`에 **아이 이름이 치환되어** 저장된다 (받침 유무 반영) — M-46과 함께 구현 예정
+- [x] `GET /api/sessions/{id}`로 중간 상태가 복원된다 — curl로 세션 생성 → 재조회 일치 확인, restart:true로 신규 세션+기존 세션 stopped 전환 확인
+- [x] `currentSceneOrder: 5` → `sceneProgress: { current: 2, total: 4 }` — Phase 3 항목 2(`GET /api/home`)에서 검증 완료
+
+> **다음 작업**: 항목 5~7(이름 치환 + 장면 전환 + character_opening 저장)이 한 덩어리다.
+> `POST /api/sessions/{id}/scenes/{sceneId}/complete`에서 함께 구현한다.
 
 ---
 
