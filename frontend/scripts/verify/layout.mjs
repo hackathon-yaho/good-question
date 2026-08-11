@@ -65,8 +65,16 @@ const STUB = () => {
     })
   );
   if (window.speechSynthesis) {
-    window.speechSynthesis.speak = (u) =>
+    // __holdTts를 켜면 긴 대사에서 onend를 보내지 않아 C-3(캐릭터 발화 중)에 머문다.
+    //
+    // ⚠️ 이게 없으면 C-3을 한 번도 못 본다. 스텁이 25ms에 끝나 C-4로 넘어가 버리기
+    //    때문이다. 실제 TTS는 몇 초 걸리므로 아이는 C-3을 오래 본다.
+    //    미션 + C-3에서 푸터가 패널 밖 250~300px로 밀려나 있었는데, 검증이
+    //    C-4만 보고 있어서 통과하고 있었다.
+    window.speechSynthesis.speak = (u) => {
+      if (window.__holdTts && u.text && u.text.length > 6) return;
       setTimeout(() => u.onend && u.onend(new Event("end")), 25);
+    };
     window.speechSynthesis.cancel = () => {};
     window.speechSynthesis.getVoices = () => [];
   }
@@ -187,6 +195,8 @@ const MISSION_PROBE = () => {
   }
   if (!panel) return { found: false };
 
+  const panelBox = panel.getBoundingClientRect();
+
   const clipped = [...panel.children]
     .filter((el) => el.scrollHeight > el.clientHeight + 1)
     // 미션 카드를 감싼 상자는 의도적으로 스크롤한다. 대화 패널이 잘리면 문제다.
@@ -201,7 +211,7 @@ const MISSION_PROBE = () => {
     return r.top < listBox.top - 1 || r.bottom > listBox.bottom + 1;
   }).length;
 
-  const mic = document.querySelector(
+  const mic = panel.querySelector(
     "button[aria-label='말하기 시작'], button[aria-label='말하는 중']"
   );
   const micRect = mic?.getBoundingClientRect();
@@ -215,25 +225,81 @@ const MISSION_PROBE = () => {
     ? dismiss.getBoundingClientRect().bottom <= cardBox.bottom + 1
     : false;
 
+  /* ── 눈에 보이는 블록끼리 실제로 겹치는지 ────────────────────────── */
+  const blocks = [];
+  const push = (el, name) => {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) return;
+    blocks.push({ el, name, ...r.toJSON() });
+  };
+
+  push(card, "미션 카드");
+  [...panel.querySelectorAll("div")]
+    .filter((d) => d.className.includes("rounded-bubble") && d.className.includes("bg-"))
+    .forEach((b, i) => push(b, `말풍선${i + 1}`));
+  [
+    ...panel.querySelectorAll(
+      "button[aria-label='말하기 시작'], button[aria-label='말하는 중'], button[aria-label='지금은 들을 차례예요'], button[aria-label='듣고 있어요']"
+    ),
+  ].forEach((m, i) => push(m, `마이크${i + 1}`));
+  push(panel.querySelector("header"), "헤더");
+  push(panel.querySelector("footer"), "푸터");
+  for (const b of panel.querySelectorAll("button")) {
+    const t = (b.textContent ?? "").trim();
+    if (t === "다시 듣기" || t === "보내기" || t === "알겠어요") push(b, `"${t}"`);
+  }
+
+  const overlaps = [];
+  for (let i = 0; i < blocks.length; i += 1) {
+    for (let j = i + 1; j < blocks.length; j += 1) {
+      const a = blocks[i];
+      const b = blocks[j];
+      // 부모-자식은 당연히 교차한다. 형제끼리만 본다.
+      if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      if (dy > 1 && dx > 1) {
+        overlaps.push(`${a.name} ↔ ${b.name} (세로 ${Math.round(dy)}px)`);
+      }
+    }
+  }
+
+  const outside = blocks
+    .filter((b) => b.bottom > panelBox.bottom + 1 || b.top < panelBox.top - 1)
+    .map(
+      (b) =>
+        `${b.name} ${Math.round(Math.max(b.bottom - panelBox.bottom, panelBox.top - b.top))}px`
+    );
+
   return {
     found: true,
     clipped,
     itemCount: list?.children.length ?? 0,
     hiddenItems,
     dismissVisible,
+    overlaps,
+    outside,
     mic: micRect
       ? { w: Math.round(micRect.width), h: Math.round(micRect.height) }
       : null,
   };
 };
 
-/** 미션이 뜰 때까지 /play를 몰고 간다. 장면 3의 첫 턴 뒤에 나온다. */
+/**
+ * 미션이 뜰 때까지 /play를 몰고 간다. 장면 3의 첫 턴 뒤에 나온다.
+ * 장면 3에 닿으면 TTS를 붙잡아, 미션이 뜬 뒤 C-3에 머물게 한다.
+ */
 async function driveToMission(page, id) {
   await page.goto(`${BASE}/play/${id}`, { waitUntil: "networkidle" });
   await page.getByText("탭하면 이야기가 시작돼요").click({ timeout: 8000 }).catch(() => {});
 
   for (let step = 0; step < 90; step += 1) {
     if (await page.locator("section.border-accent").count()) return true;
+    // 장면 3(마을 이장)부터 TTS를 붙잡는다. 그 전에 붙잡으면 진행이 멈춘다.
+    if (await page.getByText("마을 이장").count()) {
+      await page.evaluate(() => { window.__holdTts = true; });
+    }
     const body = await page.locator("body").innerText();
     if (body.includes("계속하기")) {
       await page.getByRole("button", { name: "계속하기" }).click().catch(() => {});
@@ -352,37 +418,66 @@ for (const vp of VIEWPORTS) {
     inspect(label, await page.evaluate(PROBE));
   }
 
-  // C-10 미션 — 미션 카드와 마이크가 한 패널에 함께 들어가는 가장 좁은 상황
-  if (await driveToMission(page, `lay-${vp.w}-mission`)) {
-    inspect("C-10 미션", await page.evaluate(PROBE));
+  /**
+   * C-10 미션 — 미션 카드와 대화 패널이 한 패널에 함께 들어가는 가장 좁은 상황.
+   *
+   * 두 상태를 다 본다.
+   *   C-3 (캐릭터 발화 중) — 미션이 뜬 직후. 실제로 여기서 푸터가 밖으로 밀려났다
+   *   C-4 (내 차례)        — 캐릭터 발화가 끝난 뒤
+   */
+  const checkMission = async (label, expectMic) => {
+    inspect(label, await page.evaluate(PROBE));
     const m = await page.evaluate(MISSION_PROBE);
     checked += 1;
 
     if (!m.found) {
-      problems.push("C-10 미션: 카드를 찾지 못했다");
-    } else {
-      for (const cls of m.clipped) {
-        problems.push(`C-10 미션: 대화 패널 내용이 잘림 — ${cls}`);
-      }
-      if (m.hiddenItems > 0) {
-        problems.push(
-          `C-10 미션: 체크리스트 ${m.itemCount}개 중 ${m.hiddenItems}개가 안 보인다`
-        );
-      }
-      if (!m.dismissVisible) {
-        problems.push("C-10 미션: \"알겠어요\"가 보이지 않는다 (닫을 방법이 없다)");
-      }
+      problems.push(`${label}: 미션 카드를 찾지 못했다`);
+      return;
+    }
+    for (const cls of m.clipped) {
+      problems.push(`${label}: 대화 패널 내용이 잘림 — ${cls}`);
+    }
+    for (const pair of m.overlaps) {
+      problems.push(`${label}: 겹침 — ${pair}`);
+    }
+    for (const out of m.outside) {
+      problems.push(`${label}: 패널 밖으로 밀려남 — ${out}`);
+    }
+    if (m.hiddenItems > 0) {
+      problems.push(
+        `${label}: 체크리스트 ${m.itemCount}개 중 ${m.hiddenItems}개가 안 보인다`
+      );
+    }
+    if (!m.dismissVisible) {
+      problems.push(`${label}: "알겠어요"가 보이지 않는다 (닫을 방법이 없다)`);
+    }
+    if (expectMic) {
       if (!m.mic) {
-        problems.push("C-10 미션: 마이크가 없다");
+        problems.push(`${label}: 마이크가 없다`);
       } else {
         if (Math.abs(m.mic.w - m.mic.h) > 1) {
-          problems.push(`C-10 미션: 마이크가 타원 ${m.mic.w}×${m.mic.h}`);
+          problems.push(`${label}: 마이크가 타원 ${m.mic.w}×${m.mic.h}`);
         }
         if (m.mic.w < 72) {
-          problems.push(`C-10 미션: 마이크 ${m.mic.w}px < 72px (§1-4)`);
+          problems.push(`${label}: 마이크 ${m.mic.w}px < 72px (§1-4)`);
         }
       }
     }
+  };
+
+  if (await driveToMission(page, `lay-${vp.w}-mission`)) {
+    // 미션이 뜬 직후는 C-3이다. TTS를 붙잡아 그 상태를 유지시켰다.
+    await checkMission("C-10 미션 + C-3", false);
+
+    // TTS를 풀어 C-4까지 본다.
+    await page.evaluate(() => { window.__holdTts = false; });
+    const atChildTurn = await page
+      .getByText("이제 말해 볼까?")
+      .waitFor({ timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (atChildTurn) await checkMission("C-10 미션 + C-4", true);
+    else problems.push("C-10 미션 + C-4: 상태 도달 실패");
   } else {
     problems.push("C-10 미션: 상태 도달 실패 — 검사하지 못했다");
   }

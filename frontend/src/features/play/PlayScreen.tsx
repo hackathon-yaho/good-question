@@ -534,6 +534,8 @@ export function PlayScreen({
                 replayDisabled={speaking}
                 highlightWords={state.highlightWords}
                 onWordClick={setOpenWord}
+                // 미션이 함께 떠 있으면 지난 기록과 비활성 마이크를 접는다.
+                compact={state.mission !== null}
               />
             ) : null}
 
