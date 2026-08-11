@@ -188,10 +188,10 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| B-09 | `POST /analyze` 클라이언트 | 필수 | 타임아웃 5초 · 재시도 0회 |
-| B-10 | `POST /respond` 클라이언트 | 필수 | 타임아웃 5초 · 재시도 0회 |
-| B-11 | **AI 서버 mock 스텁** | 필수-기반 | 고정 JSON 반환. AI 완성 전 전체 흐름 검증 |
-| B-12 | 실패 폴백 처리 | 필수 | 아래 표 |
+| B-09 | `POST /analyze` 클라이언트 | 필수 | 타임아웃 5초 · 재시도 0회 — 미착수 |
+| B-10 | `POST /respond` 클라이언트 | 필수 | 타임아웃 5초 · 재시도 0회 — 미착수 |
+| B-11 | ~~**AI 서버 mock 스텁**~~ | 필수-기반 | `aimock/AiMockController.java` — `POST /api/mock-ai/analyze`·`/respond`, 고정 JSON, 인증 불필요. **완료** |
+| B-12 | 실패 폴백 처리 | 필수 | 아래 표 — 미착수 |
 
 계약: [api.md 4.1 · 4.2](../../docs/spec/api.md)
 
@@ -210,6 +210,9 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 - `/analyze` 입력에 **넣지 않는 값**: 이야기 제목, 캐릭터 이름, 누적 요소, 턴 카운트 (의도적 설계)
 - `/respond`에 `detectedElements`·`utteranceValidity`를 넘기지 않음. `childIntent`와 `mainPoint`만
 - 배포 주소·경로는 **미결**. mock으로 선행하고 URL만 교체 → [decisions.md](decisions.md) 미결 U-01
+- mock 스텁은 **요청 내용을 보지 않고 고정 JSON만 반환**한다. "존재하지 않는 evidence를 반환하면 해당 요소가 삭제되는지" 같은 케이스는 `AiMockController.java`의 값을 직접 바꿔 재기동해 확인한다 (plan.md Phase 4 완료 조건)
+- mock은 `SecurityConfig.PUBLIC_ENDPOINTS`에 있어 **인증이 필요 없다** — 실제 AI 서버도 부모 JWT가 아니라 별도 내부 토큰(`AI_SERVER_INTERNAL_TOKEN`, U-01)으로 인증하므로 같은 성격
+- **실 AI 서버로 교체할 때 이 컨트롤러를 지운다** (U-01 확정 시)
 
 ---
 
