@@ -16,6 +16,8 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -36,6 +38,7 @@ public class ChildConsent {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "child_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Child child;
 
     @Column(name = "consent_version", nullable = false)

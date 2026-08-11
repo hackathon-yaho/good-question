@@ -17,6 +17,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 
 import java.util.List;
@@ -39,6 +41,7 @@ public class UtteranceAnalysis {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "message_id", nullable = false, unique = true)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Message message;
 
     @Enumerated(EnumType.STRING)

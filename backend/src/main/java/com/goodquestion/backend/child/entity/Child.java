@@ -75,4 +75,10 @@ public class Child {
     public void addStarDust(int amount) {
         this.starDust += amount;
     }
+
+    /** PATCH /api/children/{childId} — 전달된 필드만 바꾼다 (api.md 3.2). */
+    public void updateProfile(String name, String avatarId) {
+        if (name != null) this.name = name;
+        if (avatarId != null) this.avatarId = avatarId;
+    }
 }
