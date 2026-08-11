@@ -320,6 +320,71 @@ AI 담당 쪽에만 걸립니다. **음성 비용 상한은 어느 문서에도 
 
 ---
 
+### D-18 · 카카오 로그인은 백엔드 리다이렉트 방식(Spring Security `oauth2Login`)으로 구현한다
+
+api.md 3.1의 원안(`POST /api/auth/{provider}` — 프론트가 카카오 SDK로 code를 받아 백엔드에
+전달)을 **폐기합니다.** 대신 Spring Security의 `oauth2Login`이 인가 코드 발급·토큰 교환·
+사용자 정보 조회를 전부 처리하는 리다이렉트 방식을 씁니다.
+
+**근거**: 프론트에 카카오 SDK 연동이나 앱키 관리가 전혀 필요 없습니다. 브라우저가
+`GET /oauth2/authorization/kakao`로 이동하기만 하면 로그인이 끝나고, 백엔드가 JWT를
+HttpOnly 쿠키로 심어 프론트로 리다이렉트합니다. 참고 프로젝트 두 곳을 비교해 결정했습니다 —
+`yeogiyeogi-backend`(프론트 SDK 방식)가 아니라 `wcp-backend`(Spring Security 리다이렉트 방식)의
+구조를 따랐습니다.
+
+**흐름**
+
+```
+GET /api/oauth2/authorization/kakao  → 302 카카오
+GET /api/login/oauth2/code/kakao     → (code, Spring이 자동 처리)
+                                      → CustomOAuth2UserService: parents 조회/생성
+                                      → OAuth2SuccessHandler: JWT 쿠키 설정
+                                      → 302 {FRONTEND_URL}/auth/callback?hasCompletedOnboarding=
+```
+
+**해커톤 규모로 덜어낸 것** — 참고 프로젝트 대비:
+
+| 참고 프로젝트에 있던 것 | 우리 | 이유 |
+| --- | --- | --- |
+| Refresh Token + Redis 블랙리스트 | ❌ | Redis 미사용. **access token만, 유효기간 7일** — 시연 중 만료 없음 |
+| 쿠키 값 AES 암호화 | ❌ | JWT 자체가 서명되어 변조를 검증함. 이중 암호화 불필요 |
+| Rate Limiting(Bucket4j) | ❌ | Redis 의존 + 해커톤 범위에 불필요 |
+| Role/Status 기반 세밀한 인가 | ❌ | 로그인 사용자는 전부 `ROLE_PARENT` 하나 |
+| 매 요청 DB 조회 인증 | ❌ | JWT의 `parentId`만 principal로 사용 |
+
+**추가한 것** — 참고 프로젝트에 없던 것:
+
+- **`Authorization: Bearer` 헤더 지원.** 쿠키(브라우저)뿐 아니라 헤더로도 인증 가능 —
+  Postman/curl로 테스트하는 프론트·AI 담당이 쿠키 핸들링 없이 바로 쓸 수 있게 하기 위함
+- **`POST /api/auth/dev-login`.** 카카오 앱 등록 전에도 dev parent로 JWT를 즉시 발급받아
+  다른 파트가 막히지 않게 함. **시연 배포 전 반드시 제거**
+- **`parents`에 `provider`·`provider_id`·`email` 컬럼 추가.** PRD 8.3 원안은 `id`·`name`·
+  `created_at`뿐이라 재방문 사용자를 조회할 방법이 없었음. `email`은 **nullable** — 카카오
+  이메일 동의항목이 선택 동의로 빠질 수 있고, 식별은 `provider_id`로 하므로 이메일 없이도
+  서비스가 완전히 동작함
+
+**쿠키 설정**: `HttpOnly`, `Path=/`, `SameSite`는 `app.cookie-secure` 하나로 전환
+(`false`→`Lax`, `true`→`None; Secure`). 로컬(http)과 배포(https, Vercel↔Render 크로스 도메인)의
+차이를 환경변수 하나로 흡수합니다.
+
+**실측 검증 완료** (2026-08-12, 로컬):
+- `POST /api/auth/dev-login` → parent 생성 + 쿠키 설정 + `{parentId, accessToken}` 응답
+- 재호출 시 같은 parent 재사용 확인 (중복 생성 없음)
+- `GET /api/auth/me`를 `Authorization: Bearer`로 호출 → 200
+- 토큰 없이 호출 → 401 `{"code":"UNAUTHORIZED","message":"..."}` (api.md 2.3 포맷)
+- **`KAKAO_CLIENT_ID`가 비어 있으면 애플리케이션이 부팅 자체를 거부합니다** (Spring이 OAuth2
+  클라이언트 등록을 기동 시점에 검증). 카카오 앱 등록 전에는 `.env`에 placeholder 값을
+  넣어둬야 다른 작업(스키마 확인, dev-login 등)이 가능합니다.
+
+**실카카오 계정 로그인 검증 완료** (2026-08-12): 카카오 개발자 앱 등록 완료 후 브라우저로
+`/oauth2/authorization/kakao`부터 실제로 끝까지 진행했습니다. 동의 화면에 앱 이름·닉네임 항목만
+정확히 뜨고(`redirect_uri` 불일치 오류 없음), 동의 후 실제 카카오 회원번호로 `parents` 레코드가
+생성되고, `{FRONTEND_URL}/auth/callback?hasCompletedOnboarding=false`로 리다이렉트되고,
+쿠키만으로 `GET /api/auth/me`가 인증됨을 확인했습니다. `client-authentication-method:
+client_secret_post` + 실제 Client Secret 조합이 정상 동작합니다.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
@@ -330,6 +395,7 @@ AI 담당 쪽에만 걸립니다. **음성 비용 상한은 어느 문서에도 
 | [api.md 1절](../../docs/spec/api.md) | 문서 전체가 1안(Web Speech) 기준 | **2안 채택** | D-01 |
 | [open-questions Q-12](../../docs/open-questions.md) | 별가루 MVP 제외 권고 | **채택 (후순위)** | D-09 — 담당자 결정 |
 | [PRD 9.3](../../docs/product/prd.md) | 1안 권장, TTS만 2안 교체 | **처음부터 2안 전면** | D-01 — iPad 안정성 |
+| [api.md 3.1](../../docs/spec/api.md) | `POST /api/auth/{provider}` — 프론트가 code 전달 | **백엔드 리다이렉트 방식** (`oauth2Login`) | D-18 |
 
 ---
 

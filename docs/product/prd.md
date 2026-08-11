@@ -29,6 +29,17 @@
 
 > 6장(대화 엔진)·7장(콘텐츠) 값은 변경 없습니다.
 
+### 2026-08-12 (같은 날짜, 추가 변경) — 인증 방식 확정
+
+근거: [backend/docs/decisions.md](../../backend/docs/decisions.md) D-18
+
+| 절 | 변경 |
+| --- | --- |
+| 8.3 | `parents.provider`, `provider_id`, `email` 컬럼 추가 (팀 추가) |
+
+카카오 로그인 흐름 자체(리다이렉트 방식 확정)는 PRD 범위가 아니라 API 계약이라
+[spec/api.md 3.1](../spec/api.md)에 반영했습니다.
+
 ## 표기 규칙
 
 본 문서의 모든 항목은 출처를 구분하여 표기한다.
@@ -1210,15 +1221,24 @@ story_sessions.current_scene_id → story_scenes.id
 messages.scene_id               → story_scenes.id
 ```
 
-### 8.3 parents (주최측)
+### 8.3 parents (주최측 + 팀 추가 컬럼 3개)
 
 | 컬럼명 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | `uuid` | Y | 보호자 고유번호 |
 | `name` | `varchar` | Y | 보호자 이름 또는 닉네임 |
+| `provider` | `varchar` | Y | 소셜 로그인 제공자 **(팀 추가)** |
+| `provider_id` | `varchar` | Y | 제공자 측 사용자 식별값. unique **(팀 추가)** |
+| `email` | `varchar` | 선택 | 보호자 이메일 **(팀 추가)** |
 | `created_at` | `timestamptz` | Y | 계정 생성 일시 |
 
 > 주최측 정의서는 Supabase Auth 사용자 ID와 동일하게 사용하도록 되어 있으나, 본 프로젝트는 자체 인증을 사용하므로 해당 전제를 적용하지 않는다 (팀 결정 — 10장 참조).
+
+**`provider`·`provider_id`·`email` 추가 근거** (팀 결정, 2026-08-12): 원본 정의서는 `id`·`name`·
+`created_at` 세 컬럼뿐이었으나, 카카오 로그인으로 재방문한 사용자를 조회할 방법이 없었다.
+`provider_id`로 재방문 사용자를 식별한다 (unique). `email`은 **nullable**이다 — 카카오 이메일
+동의항목이 선택 동의로 빠질 수 있고, 식별은 `provider_id`로 하므로 이메일 없이도 서비스가
+완전히 동작한다 ([backend/docs/decisions.md](../../backend/docs/decisions.md) D-18).
 
 ### 8.4 children (주최측)
 

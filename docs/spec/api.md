@@ -153,36 +153,55 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 
 화면 ID는 [screens.md](screens.md)를 참조하세요.
 
-### 3.1 인증·계정
+### 3.1 인증·계정 ✅ 확정 (2026-08-12, 리다이렉트 방식으로 변경)
 
-#### `POST /api/auth/{provider}` ⚪ · A-2
+> ⚠️ **`POST /api/auth/{provider}` 계약을 폐기합니다.** 프론트가 카카오 SDK로 code를
+> 받아 백엔드에 전달하는 방식이 아니라, **백엔드가 카카오 로그인 전 과정을 처리하는
+> 리다이렉트 방식**(Spring Security `oauth2Login`)으로 확정되었습니다.
+> 근거·비교는 [backend/docs/decisions.md](../../backend/docs/decisions.md) D-18 참조.
 
-`provider`: `kakao` (PRD 확정) — 구글·네이버는 [Q-02](../open-questions.md) 참조
+**로그인 흐름**
 
-**Request**
-
-```json
-{ "authorizationCode": "..." }
+```
+1. 프론트   window.location.href = "{백엔드}/api/oauth2/authorization/kakao"
+2. 백엔드   302 → 카카오 로그인 페이지 (Spring Security가 자동 처리)
+3. 카카오   302 → {백엔드}/api/login/oauth2/code/kakao?code=...
+4. 백엔드   parents 조회/생성 → JWT를 HttpOnly 쿠키로 설정
+5. 백엔드   302 → {프론트}/auth/callback?hasCompletedOnboarding=false
+6. 프론트   쿠키는 이미 세팅됨. 쿼리의 hasCompletedOnboarding으로 즉시 분기
 ```
 
-**Response 200**
+`hasCompletedOnboarding`은 [화면 명세 A-2](screens.md)의 분기 판단에 쓰입니다.
+`false` → `/onboarding/consent`, `true` → `/profiles`. **아이 등록 여부(`children` 존재)로 계산**하며
+별도 컬럼이 아닙니다.
+
+**프론트가 직접 호출하는 엔드포인트가 없습니다** — 1번의 URL 이동이 전부입니다.
+이후 요청은 브라우저가 쿠키를 자동으로 실어 보냅니다(`credentials: 'include'` 필요).
+
+#### `GET /api/auth/me` ✅ · 로그인 확인
 
 ```json
-{
-  "accessToken": "eyJ...",
-  "hasCompletedOnboarding": false,
-  "parent": { "id": "uuid", "name": "이혜민", "email": "..." }
-}
+{ "id": "uuid", "name": "이혜민", "email": null, "hasCompletedOnboarding": false }
 ```
 
-`hasCompletedOnboarding`은 [화면 명세 A-2](screens.md)에서 분기 판단에 쓰도록 확정된 필드입니다.
-`false` → `/onboarding/consent`, `true` → `/profiles`
+- 인증 안 됨 → 401 `UNAUTHORIZED`
+- `email`은 **nullable**입니다. 카카오 이메일 동의항목이 선택 동의라 아이 없이도 로그인은 됩니다
 
-#### `GET /api/parents/me` ⚪ · H-1
+#### `POST /api/auth/logout` ✅
+
+쿠키를 삭제합니다. 응답 바디 없음.
+
+#### 개발용 — `POST /api/auth/dev-login` ⚠️ 시연 배포 전 제거
+
+카카오 앱 등록 전에 다른 파트가 인증 때문에 막히지 않도록 만든 우회 경로입니다.
+`?name=` 쿼리로 이름을 받고, 없으면 고정된 dev parent를 재사용합니다(호출할 때마다 새로 안 만듦).
 
 ```json
-{ "id": "uuid", "name": "이혜민", "email": "...", "provider": "kakao", "createdAt": "..." }
+{ "parentId": "uuid", "accessToken": "eyJ..." }
 ```
+
+쿠키도 같이 설정됩니다. Postman/curl 등에서는 `Authorization: Bearer {accessToken}` 헤더로도
+인증할 수 있습니다 — 모든 인증 필요 엔드포인트가 쿠키/헤더 둘 다 받습니다.
 
 ### 3.2 아이 프로필
 

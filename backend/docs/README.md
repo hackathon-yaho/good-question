@@ -53,3 +53,4 @@ DB 스키마, 콘텐츠 값, 대화 엔진 규칙은 [`docs/product/prd.md`](../
 | 문서 | 내용 |
 | --- | --- |
 | [docs/request/frontend/stt-tts-integration.md](../../docs/request/frontend/stt-tts-integration.md) | STT/TTS 연동 방식 변경 통보 (C안 채택) |
+| [docs/request/frontend/kakao-login-flow.md](../../docs/request/frontend/kakao-login-flow.md) | 카카오 로그인이 리다이렉트 방식으로 확정 (D-18). 프론트는 URL 이동 + 콜백 페이지만 필요 |

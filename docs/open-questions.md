@@ -79,6 +79,12 @@ B-2(프론트엔드 스택), B-5(구현 범위 합의)도 그대로입니다.
 > ✅ **2026-08-12 결정** — **Spring Security + JWT 확정** ([D-06](../backend/docs/decisions.md)).
 > Supabase는 **DB로만** 사용하고 Auth는 쓰지 않습니다.
 > **화면 명세 A-2의 "Supabase Auth" 표기 수정이 필요합니다** (프론트 담당).
+>
+> **추가 결정 (D-18)**: 로그인 자체도 프론트가 카카오 SDK로 code를 받아 백엔드에 보내는
+> 방식이 아니라, **백엔드 리다이렉트 방식**(Spring Security `oauth2Login`)입니다. 프론트는
+> `GET /api/oauth2/authorization/kakao`로 이동만 하면 되고, 카카오 SDK 연동이 필요 없습니다.
+> 로그인 완료 후 `{FRONTEND_URL}/auth/callback?hasCompletedOnboarding=`로 리다이렉트됩니다.
+> [api.md 3.1](spec/api.md) 참조.
 
 ### Q-02 · 소셜 로그인 개수 — 카카오만 vs 3종 ✅ 해소
 

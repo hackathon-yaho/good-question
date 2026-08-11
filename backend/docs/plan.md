@@ -62,18 +62,26 @@ Phase 3  세션·조회  ──────────────────�
 
 | 순서 | 작업 | 항목 |
 | --- | --- | --- |
-| 1 | Spring Security + JWT 발급·검증 | M-02 |
-| 2 | 카카오 OAuth 연동 → `parents` 생성/조회 | M-01, M-03 |
+| 1 | ~~Spring Security + JWT 발급·검증~~ | M-02 — **완료** (D-18) |
+| 2 | ~~카카오 OAuth2 리다이렉트 로그인 → `parents` 생성/조회~~ | M-01, M-03 — **완료** (D-18) |
 | 3 | 아이 프로필 CRUD + **3명 제한 검증** | M-04 |
 | 4 | 동의 기록 동시 생성 (`POST /api/children`) | M-05 |
 | 5 | 세션 시작 시 동의 검증 게이트 | M-05 |
-| 6 | CORS 설정 | B-24 |
+| 6 | ~~CORS 설정~~ | B-24 — **완료** |
 
 **완료 조건**
-- 카카오 로그인 → `accessToken` + `hasCompletedOnboarding` 응답
-- 아이 4명째 등록 시 409 `CHILD_LIMIT_EXCEEDED`
-- 다른 보호자의 아이 조회 시 403 `FORBIDDEN`
-- 동의 없는 아이로 세션 시작 시 403 `CONSENT_REQUIRED`
+- ✅ ~~카카오 로그인 → `accessToken` + `hasCompletedOnboarding` 응답~~
+  → **리다이렉트 방식으로 변경**되어 `GET /api/oauth2/authorization/kakao` 진입 후
+  `{프론트}/auth/callback?hasCompletedOnboarding=` 리다이렉트로 확인 (D-18). 실제 검증 완료 —
+  `POST /api/auth/dev-login` → `GET /api/auth/me`(200) / 토큰 없이 요청(401) 둘 다 확인
+- [ ] 아이 4명째 등록 시 409 `CHILD_LIMIT_EXCEEDED`
+- [ ] 다른 보호자의 아이 조회 시 403 `FORBIDDEN`
+- [ ] 동의 없는 아이로 세션 시작 시 403 `CONSENT_REQUIRED`
+
+> **카카오 실로그인 검증 완료** (2026-08-12). 카카오 앱 등록 후 브라우저로 동의→콜백→쿠키 인증까지
+> 실계정으로 확인했습니다. `POST /api/auth/dev-login`은 카카오 계정 없이 빠르게 테스트할 때
+> 계속 씁니다. `KAKAO_CLIENT_ID`가 비어 있으면 Spring이 부팅 자체를 거부하니, 값을 뺄 일이
+> 있으면 `.env`에 placeholder를 넣어두세요.
 
 ---
 

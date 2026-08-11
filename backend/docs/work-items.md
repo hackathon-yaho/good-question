@@ -71,20 +71,27 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| M-02 | Spring Security + JWT | 필수-기반 | Supabase Auth 미사용 ([PRD I-10](../../docs/product/prd.md)) |
-| M-01 | 카카오 소셜 로그인 | 필수 | **카카오 단독.** 구글·네이버 미구현 (D-06) |
-| M-03 | 보호자 계정 생성 (`parents`) | 필수 | |
+| M-02 | ~~Spring Security + JWT~~ | 필수-기반 | **완료.** Supabase Auth 미사용 ([PRD I-10](../../docs/product/prd.md)) · D-18 |
+| M-01 | ~~카카오 소셜 로그인~~ | 필수 | **완료.** 카카오 단독, 리다이렉트 방식. 실계정으로 로그인→쿠키 인증까지 검증 완료 (D-06 · D-18) |
+| M-03 | ~~보호자 계정 생성 (`parents`)~~ | 필수 | **완료.** `provider`·`provider_id`·`email` 컬럼 추가 (D-18) |
 | M-04 | 아이 프로필 CRUD (`children`) | 필수 | **계정당 최대 3명** 검증 → 409 `CHILD_LIMIT_EXCEEDED` |
 | M-05 | 동의 관리 (`child_consents`) | 필수 | 동의 없거나 철회 시 **세션 시작 차단** (서버에서 막을 것) |
 
 ### 엔드포인트
 
-| 메서드 | 경로 | 스키마 |
-| --- | --- | --- |
-| POST | `/api/auth/kakao` | [api.md 3.1](../../docs/spec/api.md) |
-| GET | `/api/parents/me` | [api.md 3.1](../../docs/spec/api.md) |
-| GET · POST | `/api/children` | [api.md 3.2](../../docs/spec/api.md) |
-| PATCH · DELETE | `/api/children/{childId}` | [api.md 3.2](../../docs/spec/api.md) |
+| 메서드 | 경로 | 스키마 | 상태 |
+| --- | --- | --- | --- |
+| GET | `/api/oauth2/authorization/kakao` | [api.md 3.1](../../docs/spec/api.md) | ✅ Spring Security 자동 처리 |
+| GET | `/api/login/oauth2/code/kakao` | 〃 | ✅ 〃 |
+| GET | `/api/auth/me` | 〃 | ✅ 완료 |
+| POST | `/api/auth/logout` | 〃 | ✅ 완료 |
+| POST | `/api/auth/dev-login` | 〃 | ✅ 완료. **시연 전 제거** |
+| GET · POST | `/api/children` | [api.md 3.2](../../docs/spec/api.md) | 미착수 |
+| PATCH · DELETE | `/api/children/{childId}` | [api.md 3.2](../../docs/spec/api.md) | 미착수 |
+
+> `GET /api/parents/me`(api.md 3.1 원안)는 아직 없습니다. 지금은 `GET /api/auth/me`가
+> 그 역할(로그인 확인 + `hasCompletedOnboarding`)을 겸합니다. Phase 3에서 아이 목록 등
+> 프로필 조회가 필요해지면 그때 분리하거나 합칩니다.
 
 ### 주의
 

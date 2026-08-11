@@ -74,16 +74,22 @@ volumes:
 | `SPRING_DATASOURCE_URL` | DB 연결 | 로컬 Docker ↔ Supabase를 **이 값만 바꿔** 전환 |
 | `SPRING_DATASOURCE_USERNAME` | | |
 | `SPRING_DATASOURCE_PASSWORD` | | |
-| `JWT_SECRET` | 토큰 서명 | |
-| `KAKAO_CLIENT_ID` | 카카오 OAuth | |
-| `KAKAO_CLIENT_SECRET` | | |
-| `KAKAO_REDIRECT_URI` | | 로컬/배포 값이 다름 |
+| `JWT_SECRET` | 토큰 서명 | 32자(바이트) 이상. **없으면 부팅 자체가 실패한다** |
+| `JWT_ACCESS_VALIDITY` | 액세스 토큰 유효기간(ms) | 기본 7일. refresh token 없음 (D-18) |
+| `KAKAO_CLIENT_ID` | 카카오 OAuth | Redirect URI는 코드에서 `{baseUrl}/login/oauth2/code/kakao`로 고정 조립됨. **비어 있으면 부팅 자체가 실패한다** — 값 없이 작업할 때는 placeholder를 넣어둘 것 |
+| `KAKAO_CLIENT_SECRET` | 〃 | Client Secret 미발급 시 비워도 컴파일·부팅은 되나 실제 로그인은 `invalid_client`로 실패할 수 있음 |
+| `FRONTEND_URL` | 로그인 성공/실패 후 리다이렉트 대상 | 뒤에 `/auth/callback`이 자동으로 붙음 |
+| `COOKIE_SECURE` | JWT 쿠키 `Secure`·`SameSite` 전환 | 로컬(http) `false` / 배포(https) `true`. Vercel↔Render 크로스 도메인이라 배포는 `SameSite=None`이 필요 |
 | `OPENAI_API_KEY` | **Whisper · TTS 전용** | 백엔드 담당 키 (D-16). AI 서버 키와 별개 |
 | `AI_SERVER_BASE_URL` | AI 서버 주소 | **미결 U-01.** mock 단계에서는 로컬 스텁 주소 |
 | `AI_SERVER_INTERNAL_TOKEN` | 내부 호출 인증 | 미결 U-01. `X-Internal-Token` 헤더 |
-| `CORS_ALLOWED_ORIGINS` | Vercel 오리진 | |
+| `CORS_ALLOWED_ORIGINS` | 프론트 오리진(콤마 구분) | `Access-Control-Allow-Credentials`가 켜져 있어 쿠키 인증에 필수 |
 
 **`OPENAI_API_KEY`는 백엔드 것만 둡니다.** `gpt-5-mini` 호출은 AI 서버가 자기 키로 합니다 (D-16).
+
+**개발용 인증 우회**: `POST /api/auth/dev-login`으로 카카오 없이 JWT를 즉시 발급받을 수 있습니다.
+`Authorization: Bearer {accessToken}` 헤더로도 인증되므로 Postman/curl에서 쿠키 없이 테스트
+가능합니다. **시연 배포 전 반드시 제거합니다.**
 
 ---
 
