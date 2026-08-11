@@ -128,6 +128,7 @@ html[data-shell="immersive"] {               /* 몰입형 C·D */
   --color-accent:      #FFC94B;  /* 별가루, 하이라이트 */
   --color-accent-soft: #FFF4D6;
   --color-info:        #5B8DEF;  /* 캐릭터 발화 중 */
+  --color-info-soft:   #E9EEFB;  /* 캐릭터 말풍선 채움 (프론트 추가, 2026-08-12) */
   --color-text:        #2E2A27;
   --color-muted:       #8A817A;
   --color-border:      #EFE4D8;
@@ -147,6 +148,12 @@ html[data-shell="immersive"] {               /* 몰입형 C·D */
   --font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
 }
 ```
+
+> **캐릭터 말풍선은 테두리가 아니라 채움으로 그립니다 (2026-08-12).**
+> 원래 `흰색 + border`였는데 우측 패널도 흰색(surface)이라 테두리가 말풍선을 보이게 하는
+> 유일한 수단이었고, 폭이 패널의 92%라서 위아래 변이 **수평 구분선처럼** 읽혔습니다.
+> §1-5의 색 규칙(캐릭터 발화 = info / 아이 발화 = secondary)에 맞춰 `info-soft`로 채웠습니다.
+> 원래 팔레트에 info의 soft 짝만 빠져 있어 토큰을 추가했습니다.
 
 ### 1-3. 타이포 스케일
 

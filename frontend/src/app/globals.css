@@ -25,6 +25,12 @@
   --color-accent: #ffc94b; /* 하이라이트 */
   --color-accent-soft: #fff4d6;
   --color-info: #5b8def; /* 캐릭터 발화 중 */
+  /* 캐릭터 말풍선 채움. 명세 §1-2에는 info의 soft 짝만 빠져 있었다.
+     primary·secondary·accent에는 다 있고, §1-5가 캐릭터 발화를 info로 정했으므로
+     아이 말풍선(secondary-soft)과 대칭이 되도록 채웠다.
+     이 채움 덕분에 말풍선 테두리를 없앨 수 있다. 테두리는 패널 폭의 92%라
+     위아래 변이 수평 구분선처럼 읽혔다. */
+  --color-info-soft: #e9eefb;
   --color-text: #2e2a27;
   --color-muted: #8a817a;
   --color-border: #efe4d8;

@@ -16,6 +16,14 @@
  *   - 대화 패널 내용이 잘림 → 실패
  *   - 체크리스트 4개 중 안 보이는 것 있음 → 실패
  *   - 마이크가 정원이 아니거나 72px 미만(§1-4) → 실패
+ *
+ * 푸터도 본다. `height: min(100%, …)`를 높이가 auto인 푸터에 쓴 적이 있는데,
+ * 순환 참조가 되어 푸터가 130px → 354px로 부풀고 내용이 위쪽에 몰렸다.
+ * 겹치지도 잘리지도 않아 기존 검사를 전부 통과했다.
+ *   - 푸터 안에 쓰이지 않은 빈 공간이 24px 넘게 남음 → 실패
+ *
+ * 상태 목록에 **C-3(캐릭터 발화)** 을 넣어야 한다. 미션이 열린 C-3은 compact라
+ * 그 마이크가 접혀서 결함이 나타나지 않는다. 미션 없는 C-3을 봐야 잡힌다.
  */
 
 import { chromium } from "playwright-core";
@@ -167,11 +175,45 @@ const PROBE = () => {
     }
   }
 
+  /**
+   * 푸터 안에 쓰이지 않은 빈 공간이 있는가.
+   *
+   * 푸터 박스는 바닥에 닿아 있는데 **내용만 위쪽에 몰려** 아래가 텅 비는 일이 있었다.
+   * `height: min(100%, …)`를 높이가 auto인 푸터에 써서 순환 참조가 생겨 푸터가
+   * 130px → 354px로 부푼 경우다. 겹치지도 잘리지도 않아 다른 검사가 전부 통과했다.
+   *
+   * 그래서 "푸터가 바닥에 붙었는가"가 아니라 "푸터 안이 비었는가"를 본다.
+   */
+  const panel = [...document.querySelectorAll("section")].find((s) =>
+    s.className.includes("w-[40%]")
+  );
+  let footerSlackPx = null;
+  let footerHeightPx = null;
+  if (panel) {
+    const footer = panel.querySelector("footer");
+    const kids = [...(footer?.children ?? [])].filter((c) => {
+      const r = c.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+    if (footer && kids.length > 0) {
+      const fb = footer.getBoundingClientRect();
+      const st = getComputedStyle(footer);
+      const contentBottom = Math.max(
+        ...kids.map((c) => c.getBoundingClientRect().bottom)
+      );
+      const expectedBottom = fb.bottom - parseFloat(st.paddingBottom);
+      footerSlackPx = Math.round(expectedBottom - contentBottom);
+      footerHeightPx = Math.round(fb.height);
+    }
+  }
+
   return {
     rootFontPx:
       Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * 100) / 100,
     docW: document.documentElement.scrollWidth,
     innerW: window.innerWidth,
+    footerSlackPx,
+    footerHeightPx,
     rows,
   };
 };
@@ -339,6 +381,22 @@ async function drivePlay(page, id, target) {
       .catch(() => false);
   }
 
+  // C-3은 발화를 제출한 뒤 캐릭터가 답하는 상태다. TTS를 붙잡아 머물게 한다.
+  // 미션 없는 C-3을 안 보면, 푸터가 부푸는 부류의 결함이 통째로 새어나간다.
+  if (target === "C3") {
+    await page.evaluate(() => { window.__holdTts = true; });
+    await page.evaluate((t) => window.__say(t), LONG);
+    await page.getByText("이렇게 말한 게 맞아?").waitFor({ timeout: 8000 }).catch(() => {});
+    await page.getByRole("button", { name: "보내기" }).click().catch(() => {});
+    const ok = await page
+      .getByText("말하는 중")
+      .waitFor({ timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    await page.waitForTimeout(400);
+    return ok;
+  }
+
   await page.evaluate((t) => window.__say(t), LONG);
   return page
     .getByText("이렇게 말한 게 맞아?")
@@ -384,6 +442,12 @@ for (const vp of VIEWPORTS) {
     if (found.docW > found.innerW + 1) {
       problems.push(`${label}: 가로 스크롤 (문서 ${found.docW} > 창 ${found.innerW})`);
     }
+    // 푸터 안이 비어 있으면 무언가가 푸터를 부풀린 것이다.
+    if (found.footerSlackPx !== null && found.footerSlackPx > 24) {
+      problems.push(
+        `${label}: 푸터 안에 빈 공간 ${found.footerSlackPx}px (푸터 높이 ${found.footerHeightPx}px)`
+      );
+    }
     for (const r of found.rows) {
       checked += 1;
       if (r.lines > 1) {
@@ -408,6 +472,7 @@ for (const vp of VIEWPORTS) {
   for (const [target, label] of [
     ["C4", "C-4 내 차례"],
     ["C5", "C-5 확인"],
+    ["C3", "C-3 캐릭터 발화"],
     ["I2", "I-2 인식 실패"],
   ]) {
     const reached = await drivePlay(page, `lay-${vp.w}-${target}`, target);
