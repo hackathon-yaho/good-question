@@ -9,16 +9,20 @@
  *   busy      변환 중(TRANSCRIBING). 녹음은 끝났고 STT 대기
  *   disabled  캐릭터 발화 중. 여기서 켜면 캐릭터 음성이 녹음된다
  *
- * ── 공간이 좁으면 줄어든다 ──────────────────────────────────────────
- * 설계 크기를 **상한**으로 쓰고, 부모가 좁으면 그만큼 작아진다.
- * 예전에는 180px 고정이었는데, 미션 카드가 열려 우측 패널이 좁아지면 마이크가
- * 줄지 않아 말풍선과 푸터 위로 삐져나와 겹쳤다. flex 중앙 정렬은 내용이 넘칠 때
- * 위아래로 삐져나가기 때문이다.
+ * ── adaptive: 공간이 좁으면 줄어든다 ────────────────────────────────
+ * `adaptive`를 켜면 설계 크기를 **상한**으로 쓰고 부모가 좁으면 작아진다.
+ * 미션 카드가 열려 우측 패널이 좁아질 때 마이크가 줄지 않아 말풍선과 푸터 위로
+ * 삐져나와 겹쳤기 때문이다. flex 중앙 정렬은 내용이 넘칠 때 위아래로 삐져나간다.
+ *
+ * ⚠️ **기본값은 false다.** adaptive는 `height: min(100%, …)`를 쓰므로 부모 높이가
+ *    정해져 있어야 한다. 높이가 auto인 푸터 안에서 켜면 순환 참조가 되어 부모가
+ *    엉뚱하게 부풀어 오른다(실제로 C-3 푸터가 130px → 354px로 늘어났다).
+ *    쓰는 곳은 C-4처럼 **높이가 확정된 flex 칸** 안뿐이다.
  *
  * 내부 요소(펄스 링·글리프·웨이브폼)는 전부 **비율**로 잡는다. 지름과 따로
  * 계산하면 마이크가 줄었을 때 안쪽이 원을 뚫고 나온다.
  *
- * 다만 §1-4의 72px 하한은 지킨다. 그보다 좁으면 부모가 잘라내는 편이,
+ * adaptive에서는 §1-4의 72px 하한을 지킨다. 그보다 좁으면 부모가 잘라내는 편이,
  * 누를 수 없는 버튼을 그리는 것보다 낫다.
  */
 
@@ -38,6 +42,11 @@ type Props = {
   size?: number;
   /** 0~1 정규화된 입력 레벨. 웨이브폼 바 높이에 쓴다. */
   level?: number;
+  /**
+   * 부모가 좁으면 줄어들게 할지. **부모 높이가 확정된 곳에서만** 켠다.
+   * 위 주석의 경고 참조.
+   */
+  adaptive?: boolean;
 };
 
 /** 클릭 타겟 하한 — C·D 화면 72px (§1-4) */
@@ -50,21 +59,29 @@ const LABEL: Record<MicState, string> = {
   disabled: "지금은 들을 차례예요",
 };
 
-export function MicButton({ state, onClick, size, level = 0 }: Props) {
+export function MicButton({
+  state,
+  onClick,
+  size,
+  level = 0,
+  adaptive = false,
+}: Props) {
   const disabled = state === "disabled" || state === "busy";
   const diameter = size ?? (disabled ? 96 : 180);
 
   return (
-    // 설계 지름은 상한이다. 부모가 좁으면 그만큼 작아지고, 항상 정원을 유지한다.
-    // 펄스 링이 지름의 1.35배까지 번지므로 그만큼 안쪽으로 물러나 자리를 확보한다.
     <div
-      style={{
-        // 높이를 먼저 정하고 aspect-square로 폭을 따라오게 한다.
-        // width와 maxHeight를 따로 주면 좁아질 때 폭만 남아 **타원**이 된다.
-        height: `min(100%, ${rem(diameter)})`,
-        maxWidth: "100%",
-        minHeight: rem(MIN_TOUCH_PX),
-      }}
+      style={
+        adaptive
+          ? {
+              // 높이를 먼저 정하고 aspect-square로 폭을 따라오게 한다.
+              // width와 maxHeight를 따로 주면 좁아질 때 폭만 남아 **타원**이 된다.
+              height: `min(100%, ${rem(diameter)})`,
+              maxWidth: "100%",
+              minHeight: rem(MIN_TOUCH_PX),
+            }
+          : { width: rem(diameter), height: rem(diameter) }
+      }
       className="relative flex aspect-square shrink-0 items-center justify-center"
     >
       {/* 동심원 펄스 링 2개 — idle/recording에서만 (§C-4)

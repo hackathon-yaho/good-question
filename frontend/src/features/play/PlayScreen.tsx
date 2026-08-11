@@ -508,7 +508,7 @@ export function PlayScreen({
               48%가 필요하고, 남은 절반으로 마이크가 120px 넘게 확보된다.
               더 키우면 마이크가 §1-4의 72px 하한에 가까워진다. */}
           {state.mission ? (
-            <div className="flex max-h-[50%] shrink-0 flex-col overflow-hidden border-b border-border pt-4">
+            <div className="flex max-h-[50%] shrink-0 flex-col overflow-hidden pt-4">
               <MissionCard
                 mission={state.mission}
                 onDismiss={() => dispatch({ type: "MISSION_DISMISS" })}

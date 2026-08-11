@@ -134,7 +134,7 @@ export function CharacterPanel({
 
       {/* GUIDED에서만 별 뱃지를 노출한다. "GUIDED"라는 개념은 아이에게 보이지 않는다. */}
       {guided ? (
-        <div className="shrink-0 border-y border-border bg-accent-soft/50 py-4">
+        <div className="shrink-0 bg-accent-soft/50 py-4">
           <ThinkingElementStars accumulatedElements={accumulatedElements} />
         </div>
       ) : null}
@@ -143,7 +143,7 @@ export function CharacterPanel({
           둘 다 너무 좁아진다. */}
       {compact ? null : <ConversationHistory messages={messages} />}
 
-      <footer className="flex shrink-0 flex-col items-center gap-2 border-t border-border px-6 py-5">
+      <footer className="flex shrink-0 flex-col items-center gap-2 px-6 pb-5">
         {compact ? null : <MicButton state="disabled" size={96} />}
         <p className="text-parent-body text-muted">
           {displayName}이(가) 말하고 있어요
@@ -204,13 +204,15 @@ export function ChildTurnPanel({
           이제 말해 볼까?
         </p>
 
-        {/* 남은 높이를 마이크가 받는다. MicButton이 그 안에서 상한까지만 커진다. */}
+        {/* 남은 높이를 마이크가 받는다. 이 칸은 flex-1로 높이가 확정되므로
+            adaptive를 켜도 안전하다. MicButton 주석의 경고 참조. */}
         <div className="flex min-h-0 w-full flex-1 items-center justify-center">
           <MicButton
             state={recording ? "recording" : "idle"}
             size={180}
             level={micLevel}
             onClick={onMicClick}
+            adaptive
           />
         </div>
 
@@ -225,7 +227,7 @@ export function ChildTurnPanel({
         ) : null}
       </div>
 
-      <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-5">
+      <footer className="flex shrink-0 items-center justify-end gap-3 px-6 pb-5">
         <PillButton size="kid" onClick={onSubmit} disabled={submitDisabled}>
           보내기
         </PillButton>
@@ -324,7 +326,7 @@ export function ThinkingPanel({
         <p className="animate-pulse text-kid-body text-muted">{hint}</p>
       </div>
 
-      <footer className="flex shrink-0 justify-center border-t border-border py-5">
+      <footer className="flex shrink-0 justify-center pb-5">
         <MicButton state="disabled" size={96} />
       </footer>
     </div>
