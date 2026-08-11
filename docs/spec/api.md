@@ -44,7 +44,7 @@
 
 ## 1. STT/TTS 방식 — ✅ 확정 (2안)
 
-**2026-08-12, 2안(OpenAI)으로 확정되었습니다.** STT는 Whisper, TTS는 OpenAI TTS이며
+**2026-08-12, 2안(OpenAI)으로 재확정되었습니다.** STT는 Whisper, TTS는 OpenAI TTS이며
 **둘 다 백엔드가 호출합니다.** ([D-01](../../backend/docs/decisions.md))
 
 | | 1안. Web Speech API | **2안. OpenAI (확정)** |
@@ -61,6 +61,12 @@
 > 다른 절에 남아 있는 "2안 변경점" 표기는 이제 **본문이 아니라 확정 사항**입니다.
 
 **이 결정으로 해소된 항목**: [open-questions Q-16(=B-1)](../open-questions.md)
+
+> ⚠️ **2026-08-10에는 1안(Web Speech API)으로 결정했었고, 프론트는 그 결정에 따라
+> 이미 구현까지 마쳤습니다** (발화 전송 `application/json` 텍스트만, TTS는 프론트
+> `SpeechSynthesis` 재생, STT는 프론트 담당, D-5 키워드 실시간 점등을 interim result로
+> 완전 구현). **2026-08-12에 iPad 안정성 문제로 2안으로 뒤집혔으며, 프론트의 기존 구현은
+> 재작업이 필요합니다.**
 
 ---
 
@@ -187,6 +193,9 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 - 인증 안 됨 → 401 `UNAUTHORIZED`
 - `email`은 **nullable**입니다. 카카오 이메일 동의항목이 선택 동의라 아이 없이도 로그인은 됩니다
 
+`provider`는 **`kakao`만** 구현합니다 (2026-08-10 확정, [Q-02](../open-questions.md)).
+프론트는 A-2에 카카오 버튼 하나만 렌더합니다.
+
 #### `POST /api/auth/logout` ✅
 
 쿠키를 삭제합니다. 응답 바디 없음.
@@ -259,6 +268,10 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 
 > `child_consents`는 `child_id`가 필요하므로 A-3에서 레코드를 만들 수 없습니다.
 > A-3의 동의 값을 클라이언트에 임시 보관했다가 여기서 함께 전송합니다.
+>
+> 동의는 **아이 한 명당 한 건**입니다. 그래서 A-5 "+ 아이 추가"도 A-3을 먼저 거칩니다.
+> 이 엔드포인트는 `consents` 필수 3개가 `true`가 아니면 403 `CONSENT_REQUIRED`로 거절해야 합니다.
+> → [Q-21](../open-questions.md)
 
 #### `PATCH /api/children/{childId}` ⚪ · H-2
 
@@ -426,6 +439,11 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 > ([작업 분장 3.10](../team/roles.md))
 
 #### `POST /api/sessions/{sessionId}/scenes/{sceneId}/complete` ⚪ · C-1, C-2 → C-3
+
+> 🟡 **프론트 제안**: `nextScene`에 `highlightWords`를 추가해 주세요.
+> 장면의 **첫 대사**가 어려운 낱말이 가장 많이 나오는 자리인데, 지금 계약에는
+> 밑줄 단어를 실어 보낼 곳이 `POST .../messages` 응답뿐입니다. 그러면 첫 대사에는
+> 밑줄이 붙지 않아 C-9(단어 뜻 팝업)로 갈 통로가 사실상 닫힙니다.
 
 도입·전개 장면(`intro` / `narrative`) 재생 완료를 알리고 다음 장면으로 진행합니다.
 
@@ -704,6 +722,65 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 > 뜻을 누가 쓸지가 어느 문서에도 없고, 캐릭터 대사는 LLM이 실시간 생성해 고정 목록과 안 맞을 수 있습니다.
 > 채우려면 ① 장면별 고정 목록을 팀이 창작(`story_scenes.highlight_words jsonb` 추가)하거나
 > ② `/respond` 응답에 AI가 함께 반환하도록 계약을 확장해야 합니다.
+
+**응답 형태 (프론트 구현 기준, 2026-08-10)** 🟡
+
+E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 목으로 구현해 두었고 타입은
+`frontend/src/lib/api/types.ts`의 `WordEntry`입니다.
+
+```json
+{
+  "words": [
+    {
+      "id": "uuid",
+      "word": "창피한",
+      "meaning": "남이 볼까 봐 부끄럽고 얼굴이 뜨거워지는 마음",
+      "storyId": "uuid",
+      "storyTitle": "방귀 뀌는 며느리",
+      "sceneIndex": 2,
+      "contextSentence": "아이고 이게 무슨 일이냐! … 이렇게 창피한 며느리와 함께 못살겠다!",
+      "liked": false,
+      "savedAt": "...",
+      "isNew": true
+    }
+  ],
+  "total": 1,
+  "storyFilters": [{ "storyId": "uuid", "title": "방귀 뀌는 며느리" }]
+}
+```
+
+| 필드 | 비고 |
+| --- | --- |
+| `sceneIndex` | 서버가 `sourceSceneId` → **화면 단위**(1~4) 인덱스로 변환. E-2 "장면 N에서 만났어요" |
+| `contextSentence` | E-2·C-9 "이야기 속에서는" 카드. 담을 때의 대사 원문 |
+| `isNew` | E-1 "새 단어" 칩. 서버가 기준(예: 24시간)을 정합니다 |
+| `total` | 필터와 무관한 전체 개수. E-1 제목 옆 "N개" 칩 |
+
+발음은 저장된 오디오가 아니라 **TTS**입니다. 오디오 URL을 내려줄 필요가 없습니다.
+
+### 3.9 마이페이지 (선택) ⚪ · F-1
+
+| 엔드포인트 | 화면 | 비고 |
+| --- | --- | --- |
+| `GET /api/mypage?childId={id}` | F-1 | 프로필 + 통계 3개 + 완료 이야기 + 재구성 발화 목록 |
+
+```json
+{
+  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "age": 8 },
+  "stats": { "completedStories": 1, "savedWords": 3, "activeDays": 2 },
+  "completedStories": [
+    { "sessionId": "uuid", "storyId": "uuid", "title": "방귀 뀌는 며느리", "coverImageUrl": "...", "completedAt": "..." }
+  ],
+  "retellings": [
+    { "sessionId": "uuid", "storyTitle": "방귀 뀌는 며느리", "text": "며느리가 방귀를 참다가…", "createdAt": "..." }
+  ]
+}
+```
+
+- `retellings[].text`는 `post_activity_results.retelling_text`입니다. **오디오가 아닙니다.**
+  F-1 "내 이야기 들어보기"는 이 텍스트를 TTS로 읽습니다 → [Q-07](../open-questions.md)
+- `stats`에 점수·등급을 넣지 않습니다. 활동량만입니다 ([PRD 10.1](../product/prd.md))
+- "별가루" 필드는 만들지 않습니다 → [Q-12](../open-questions.md)
 
 ### 3.8 보호자 (선택) ⚪
 
