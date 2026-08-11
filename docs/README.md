@@ -2,6 +2,10 @@
 
 `good-question` 프로젝트의 모든 문서를 보관하는 폴더입니다.
 
+> **2026-08-12 수정** — 백엔드 결정 반영. STT/TTS 방식이 확정되어 미결 11건이 해소되었습니다.
+> 변경 문서: `product/prd.md`(v1.1) · `team/roles.md`(v1.1) · `spec/api.md` · `open-questions.md` ·
+> `request/frontend/stt-tts-integration.md`(신규). 근거는 [backend/docs/decisions.md](../backend/docs/decisions.md).
+
 ## 어디서부터 읽어야 하나
 
 | 상황 | 읽을 문서 |
@@ -44,13 +48,17 @@ docs/
 | --- | --- | --- |
 | [competition.md](competition.md) | 대회명·주최·일정·제출물·심사 관련 | 완결 |
 | [open-questions.md](open-questions.md) | 지금 결정해야 할 것 4건 + 문서 간 충돌 17건 | 완결 |
-| [product/prd.md](product/prd.md) | **정본.** 서비스 정의 · 대화 엔진 · 콘텐츠 · 데이터 모델 · 구현 체크리스트 77개 · 이슈 로그 19건 | 완결 (v1.0) |
-| [team/roles.md](team/roles.md) | PRD의 77개 항목을 담당자 기준으로 재편성 + 백엔드↔AI 계약 | 완결 (v1.0) |
-| [spec/screens.md](spec/screens.md) | 화면 48개의 UI·상태 전환·데이터 바인딩 | 완결 (v1) |
-| [spec/api.md](spec/api.md) | 프론트↔백엔드, 백엔드↔AI 인터페이스 | ⚠️ 항목별 확정/제안/초안 표기 참조 |
+| [product/prd.md](product/prd.md) | **정본.** 서비스 정의 · 대화 엔진 · 콘텐츠 · 데이터 모델 · 구현 체크리스트 · 이슈 로그 19건 | 완결 (v1.1) |
+| [team/roles.md](team/roles.md) | PRD 항목을 담당자 기준으로 재편성 + 백엔드↔AI 계약 | 완결 (v1.1) |
+| [spec/screens.md](spec/screens.md) | 화면 48개의 UI·상태 전환·데이터 바인딩 | ⚠️ **갱신 필요.** STT/TTS 변경 미반영 |
+| [spec/api.md](spec/api.md) | 프론트↔백엔드, 백엔드↔AI 인터페이스 | 2026-08-12 갱신. 항목별 확정/제안/초안 표기 참조 |
 | [spec/assets.md](spec/assets.md) | 필요한 이미지·에셋의 규격·수령 상태·폴백 | ⚠️ 규격은 팀 제안 (합의 전) |
 | [reference/](reference/) | 주최측 원문(줄거리, 캐릭터 성격, 리포트 가이드, 인터뷰) | 완결 |
-| [request/](request/) | 파트 간 요청 사항과 요구사항 정의서 | 템플릿만 |
+| [request/](request/) | 파트 간 요청 사항 | [frontend/stt-tts-integration.md](request/frontend/stt-tts-integration.md) 1건 |
+
+> ⚠️ **`spec/screens.md`에 갱신이 필요한 지점이 있습니다** (프론트 담당).
+> A-2 Supabase Auth 표기 · 구글·네이버 버튼 · I-2 빈 발화 전송 · 브라우저 STT/TTS 전제 ·
+> D-5 키워드 실시간 점등. 상세는 [request/frontend/stt-tts-integration.md](request/frontend/stt-tts-integration.md).
 
 ## 정본 관계
 
@@ -78,22 +86,29 @@ docs/
 
 ## 지금 막혀 있는 것
 
-### 확정 (2026-08-10)
-
-| 항목 | 결정 |
-| --- | --- |
-| 프론트엔드 스택 | **Next.js** |
-| STT / TTS | **Web Speech API** — 발화는 텍스트만 전송, TTS는 프론트 재생 |
-| 시연 기기 | **노트북 Chrome** |
-
-### 남은 것
+**2026-08-12 기준**입니다.
 
 | 항목 | 상태 |
 | --- | --- |
-| 인증 방식 (Supabase vs 자체 JWT) | 🔴 문서 간 충돌 |
-| AI 타임아웃·재시도·실패 응답 | 🔴 정상 동작만 10초. 프론트 예산 15초 |
-| 요건 위반 소지 3건 (미션 모달 / 음성 재생 / 빈 발화) | 🔴 구현 전 해소 |
+| 요건 위반 소지 **2건** (미션 모달 / 음성 재생) | 🔴 구현 전 해소. **프론트 결정** |
+| 구현 범위 합의 (48화면 vs 필수 11개) | 🔴 |
 | 에셋 (이야기 일러스트 · 로고 · 아바타 · 약관 전문) | ❌ 미수령. 폴백은 [spec/assets.md](spec/assets.md)에 정리 |
+| AI 서버 배포 주소·경로 | ⚪ 미정. 백엔드가 mock 스텁으로 선행 진행 중 |
+| 프론트 15초 타임아웃 유지 여부 | ⚪ 배포 후 실측 필요 |
 | 미확보 문서 4건 | ❌ 전부 없이 진행 가능. [reference/README.md](reference/README.md) |
+
+### 확정 · 해소
+
+| 항목 | 결정 |
+| --- | --- |
+| ~~프론트엔드 스택~~ | ✅ **Next.js** (2026-08-10) |
+| ~~시연 기기~~ | ✅ **노트북 Chrome** (2026-08-10) |
+| ~~STT/TTS 방식~~ | ✅ **2안 OpenAI (Whisper + TTS), 백엔드 처리** (2026-08-12 재확정). 프론트가 2026-08-10 결정(1안 Web Speech API) 기준으로 이미 구현한 부분은 재작업이 필요합니다 |
+| ~~인증 방식~~ | ✅ 자체 JWT + 카카오 단독 |
+| ~~AI 타임아웃·재시도·실패 응답~~ | ✅ 5초 / 0회 / 폴백 확정 |
+| ~~빈 발화 (요건 위반 소지)~~ | ✅ STT 엔드포인트 분리로 **구조적 해소** |
+
+**남은 🔴는 전부 프론트 쪽 결정입니다.** 백엔드는 결정이 끝나 착수 가능합니다
+([backend/docs/plan.md](../backend/docs/plan.md)).
 
 자세한 내용과 판단 근거는 [open-questions.md](open-questions.md)에 있습니다.
