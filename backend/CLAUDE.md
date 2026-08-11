@@ -121,6 +121,16 @@ public class SessionService {
 - **최소 변경.** 요청받은 것만 수정합니다. 관련 없는 코드를 리팩터링하거나 이름을 바꾸지 않습니다.
 - **불명확하면 묻습니다.** 요건이 애매하면 추측으로 채우지 않고 먼저 확인합니다.
 - **비트리비얼한 로직에는 근거를 남깁니다.** 트레이드오프가 있는 구현은 왜 그렇게 했는지 짧게 코멘트나 응답에 남깁니다.
+- **루트 docs 동기화.** `backend/docs/decisions.md`에 새 결정(D-xx)을 남길 때, 그 결정이 `docs/open-questions.md`·`docs/product/prd.md`·`docs/spec/api.md`의 기존 내용과 충돌하거나 그 문서들이 다루는 값을 바꾼다면 해당 문서도 같이 갱신합니다. 한쪽만 고치면 반드시 낡습니다.
+- **API 작업 상태 추적.** `backend/docs/work-items.md`의 엔드포인트 표에 상태(미착수/완료)를 표시하고, 엔드포인트를 구현·변경할 때마다 갱신합니다.
+- **엔드포인트 완료 시 직접 호출 검증.** 엔드포인트를 구현하면 코드만 보고 끝내지 말고 curl/Postman/브라우저 등으로 실제 호출해 정상 케이스와 대표적인 에러 케이스(최소 1개)를 확인한 뒤 완료로 표시합니다.
+- **검증 통과 → 커밋 → 다음 작업.** 위 검증이 통과하면 그 단위로 커밋하고 바로 다음 작업으로 넘어갑니다. 여러 엔드포인트를 모아뒀다가 한 번에 커밋하지 않습니다.
+- **`.env`·비밀값은 절대 커밋하지 않습니다.** `KAKAO_CLIENT_SECRET`·`JWT_SECRET` 등 실제 값은 `.env`(gitignore됨)에만 두고, `.env.example`에는 플레이스홀더만 남깁니다. 커밋 전에는 `git status`로 `.env`가 스테이징되지 않았는지 확인합니다.
+- **작업 하나가 끝날 때마다 5시간 토큰 사용량을 확인합니다.**
+  ```bash
+  node "$(ls -d ~/.claude/plugins/cache/claude-dashboard/claude-dashboard/*/dist/check-usage.js 2>/dev/null | sort -V | tail -1)" --json
+  ```
+  `claude.fiveHourPercent`가 **90%를 넘으면** 그 시점에서 작업을 멈추고, 진행 상황을 커밋·문서화한 뒤 `claude.fiveHourReset` 시각에 맞춰 `ScheduleWakeup`(또는 `CronCreate` 1회성)으로 재개를 예약합니다. 사용자의 추가 지시 없이 예약된 시간에 자동으로 다음 작업을 이어갑니다.
 
 ---
 
