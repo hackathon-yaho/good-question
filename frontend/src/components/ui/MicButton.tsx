@@ -8,6 +8,18 @@
  *   recording 녹음 중. 웨이브폼 실시간 반응
  *   busy      변환 중(TRANSCRIBING). 녹음은 끝났고 STT 대기
  *   disabled  캐릭터 발화 중. 여기서 켜면 캐릭터 음성이 녹음된다
+ *
+ * ── 공간이 좁으면 줄어든다 ──────────────────────────────────────────
+ * 설계 크기를 **상한**으로 쓰고, 부모가 좁으면 그만큼 작아진다.
+ * 예전에는 180px 고정이었는데, 미션 카드가 열려 우측 패널이 좁아지면 마이크가
+ * 줄지 않아 말풍선과 푸터 위로 삐져나와 겹쳤다. flex 중앙 정렬은 내용이 넘칠 때
+ * 위아래로 삐져나가기 때문이다.
+ *
+ * 내부 요소(펄스 링·글리프·웨이브폼)는 전부 **비율**로 잡는다. 지름과 따로
+ * 계산하면 마이크가 줄었을 때 안쪽이 원을 뚫고 나온다.
+ *
+ * 다만 §1-4의 72px 하한은 지킨다. 그보다 좁으면 부모가 잘라내는 편이,
+ * 누를 수 없는 버튼을 그리는 것보다 낫다.
  */
 
 "use client";
@@ -28,6 +40,9 @@ type Props = {
   level?: number;
 };
 
+/** 클릭 타겟 하한 — C·D 화면 72px (§1-4) */
+const MIN_TOUCH_PX = 72;
+
 const LABEL: Record<MicState, string> = {
   idle: "말하기 시작",
   recording: "말하는 중",
@@ -40,19 +55,29 @@ export function MicButton({ state, onClick, size, level = 0 }: Props) {
   const diameter = size ?? (disabled ? 96 : 180);
 
   return (
-    <div className="relative flex items-center justify-center">
-      {/* 동심원 펄스 링 2개 — idle/recording에서만 (§C-4) */}
+    // 설계 지름은 상한이다. 부모가 좁으면 그만큼 작아지고, 항상 정원을 유지한다.
+    // 펄스 링이 지름의 1.35배까지 번지므로 그만큼 안쪽으로 물러나 자리를 확보한다.
+    <div
+      style={{
+        // 높이를 먼저 정하고 aspect-square로 폭을 따라오게 한다.
+        // width와 maxHeight를 따로 주면 좁아질 때 폭만 남아 **타원**이 된다.
+        height: `min(100%, ${rem(diameter)})`,
+        maxWidth: "100%",
+        minHeight: rem(MIN_TOUCH_PX),
+      }}
+      className="relative flex aspect-square shrink-0 items-center justify-center"
+    >
+      {/* 동심원 펄스 링 2개 — idle/recording에서만 (§C-4)
+          비율(-inset-%)로 잡아야 마이크가 줄어들 때 함께 줄어든다. */}
       {!disabled ? (
         <>
           <span
             aria-hidden
-            style={{ width: rem(diameter * 1.35), height: rem(diameter * 1.35) }}
-            className="absolute animate-ping rounded-full bg-primary/20"
+            className="absolute -inset-[17.5%] animate-ping rounded-full bg-primary/20"
           />
           <span
             aria-hidden
-            style={{ width: rem(diameter * 1.15), height: rem(diameter * 1.15) }}
-            className="absolute rounded-full bg-primary/15"
+            className="absolute -inset-[7.5%] rounded-full bg-primary/15"
           />
         </>
       ) : null}
@@ -62,28 +87,25 @@ export function MicButton({ state, onClick, size, level = 0 }: Props) {
         onClick={onClick}
         disabled={disabled}
         aria-label={LABEL[state]}
-        style={{ width: rem(diameter), height: rem(diameter) }}
         className={[
-          "relative z-10 flex flex-col items-center justify-center gap-2 rounded-full transition-colors",
+          "relative z-10 flex size-full flex-col items-center justify-center gap-[4%] rounded-full transition-colors",
           disabled
             ? "cursor-not-allowed bg-border text-muted"
             : "bg-primary text-white hover:brightness-105",
         ].join(" ")}
       >
-        <MicGlyph size={rem(diameter * 0.34)} />
+        <MicGlyph />
 
-        {/* 실시간 웨이브폼 바 */}
+        {/* 실시간 웨이브폼 바. 높이를 원 지름의 비율로 잡는다. */}
         {state === "recording" ? (
-          <span aria-hidden className="flex items-end gap-1">
+          <span aria-hidden className="flex h-[18%] items-end gap-[2%]">
             {[0.4, 0.75, 1, 0.65, 0.35].map((weight, i) => (
               <span
                 key={i}
                 style={{
-                  height: rem(
-                    Math.max(4, weight * level * (diameter * 0.18)) + 4
-                  ),
+                  height: `${Math.max(18, weight * level * 100)}%`,
                 }}
-                className="w-1.5 rounded-pill bg-white/90 transition-[height] duration-75"
+                className="w-[6%] min-w-0.5 rounded-pill bg-white/90 transition-[height] duration-75"
               />
             ))}
           </span>
@@ -105,11 +127,11 @@ export function MicButton({ state, onClick, size, level = 0 }: Props) {
   );
 }
 
-function MicGlyph({ size }: { size: string }) {
+/** 글리프도 비율이다. 지름과 따로 계산하면 원을 뚫고 나온다. */
+function MicGlyph() {
   return (
     <svg
-      width={size}
-      height={size}
+      className="h-[34%] w-[34%]"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

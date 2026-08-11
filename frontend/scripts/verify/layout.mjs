@@ -10,6 +10,12 @@
  *   - 라벨이 버튼 박스를 넘침(nowrap이라 넘치면 잘린다) → 실패
  *   - 여유가 8px 미만 → 경고. 지금은 통과지만 라벨이 바뀌면 깨진다
  *   - 문서 폭이 창보다 넓음(가로 스크롤) → 실패
+ *
+ * 미션(C-10)은 따로 본다. 우측 패널 하나에 미션 카드와 마이크가 함께 들어가야 해서
+ * 겹침이 가장 잘 나는 자리다. 실제로 마이크가 말풍선·푸터 위로 삐져나와 있었다.
+ *   - 대화 패널 내용이 잘림 → 실패
+ *   - 체크리스트 4개 중 안 보이는 것 있음 → 실패
+ *   - 마이크가 정원이 아니거나 72px 미만(§1-4) → 실패
  */
 
 import { chromium } from "playwright-core";
@@ -165,6 +171,85 @@ const PROBE = () => {
 const LONG =
   "며느리가 창피해서 계속 참았던 것 같아요. 가족들에게 솔직하게 말하면 좋겠어요.";
 
+/**
+ * 미션 카드가 열린 우측 패널의 기하를 잰다.
+ *
+ * 스크롤 상자 안의 자식은 rect가 상자를 넘어가는 것이 정상이므로, "겹침"을
+ * rect 교차로 판단하면 거짓 실패가 난다. **잘림 여부**와 **보이는 개수**로 본다.
+ */
+const MISSION_PROBE = () => {
+  const card = document.querySelector("section.border-accent");
+  if (!card) return { found: false };
+
+  let panel = card.parentElement;
+  while (panel && !(panel.tagName === "SECTION" && panel.className.includes("w-[40%]"))) {
+    panel = panel.parentElement;
+  }
+  if (!panel) return { found: false };
+
+  const clipped = [...panel.children]
+    .filter((el) => el.scrollHeight > el.clientHeight + 1)
+    // 미션 카드를 감싼 상자는 의도적으로 스크롤한다. 대화 패널이 잘리면 문제다.
+    .filter((el) => !el.contains(card))
+    .map((el) => el.className.slice(0, 40));
+
+  const list = card.querySelector("ul");
+  const listBox = list?.getBoundingClientRect();
+  const hiddenItems = [...(list?.children ?? [])].filter((li) => {
+    if (!listBox) return true;
+    const r = li.getBoundingClientRect();
+    return r.top < listBox.top - 1 || r.bottom > listBox.bottom + 1;
+  }).length;
+
+  const mic = document.querySelector(
+    "button[aria-label='말하기 시작'], button[aria-label='말하는 중']"
+  );
+  const micRect = mic?.getBoundingClientRect();
+
+  // "알겠어요"가 접힌 아래로 내려가면 아이가 미션을 닫을 방법을 못 찾는다.
+  const dismiss = [...card.querySelectorAll("button")].find((b) =>
+    (b.textContent ?? "").includes("알겠어요")
+  );
+  const cardBox = card.getBoundingClientRect();
+  const dismissVisible = dismiss
+    ? dismiss.getBoundingClientRect().bottom <= cardBox.bottom + 1
+    : false;
+
+  return {
+    found: true,
+    clipped,
+    itemCount: list?.children.length ?? 0,
+    hiddenItems,
+    dismissVisible,
+    mic: micRect
+      ? { w: Math.round(micRect.width), h: Math.round(micRect.height) }
+      : null,
+  };
+};
+
+/** 미션이 뜰 때까지 /play를 몰고 간다. 장면 3의 첫 턴 뒤에 나온다. */
+async function driveToMission(page, id) {
+  await page.goto(`${BASE}/play/${id}`, { waitUntil: "networkidle" });
+  await page.getByText("탭하면 이야기가 시작돼요").click({ timeout: 8000 }).catch(() => {});
+
+  for (let step = 0; step < 90; step += 1) {
+    if (await page.locator("section.border-accent").count()) return true;
+    const body = await page.locator("body").innerText();
+    if (body.includes("계속하기")) {
+      await page.getByRole("button", { name: "계속하기" }).click().catch(() => {});
+    } else if (body.includes("이제 말해 볼까?")) {
+      await page.evaluate((t) => window.__say(t), LONG);
+    } else if (body.includes("이렇게 말한 게 맞아?")) {
+      await page.getByRole("button", { name: "보내기" }).click().catch(() => {});
+    } else if (body.includes("다음") || body.includes("이야기 시작하기")) {
+      const b = page.getByRole("button", { name: /다음|이야기 시작하기/ });
+      if (await b.count()) await b.first().click().catch(() => {});
+    }
+    await page.waitForTimeout(280);
+  }
+  return false;
+}
+
 /** /play를 원하는 상태까지 몰고 간다. */
 async function drivePlay(page, id, target) {
   await page.goto(`${BASE}/play/${id}`, { waitUntil: "networkidle" });
@@ -265,6 +350,41 @@ for (const vp of VIEWPORTS) {
       continue;
     }
     inspect(label, await page.evaluate(PROBE));
+  }
+
+  // C-10 미션 — 미션 카드와 마이크가 한 패널에 함께 들어가는 가장 좁은 상황
+  if (await driveToMission(page, `lay-${vp.w}-mission`)) {
+    inspect("C-10 미션", await page.evaluate(PROBE));
+    const m = await page.evaluate(MISSION_PROBE);
+    checked += 1;
+
+    if (!m.found) {
+      problems.push("C-10 미션: 카드를 찾지 못했다");
+    } else {
+      for (const cls of m.clipped) {
+        problems.push(`C-10 미션: 대화 패널 내용이 잘림 — ${cls}`);
+      }
+      if (m.hiddenItems > 0) {
+        problems.push(
+          `C-10 미션: 체크리스트 ${m.itemCount}개 중 ${m.hiddenItems}개가 안 보인다`
+        );
+      }
+      if (!m.dismissVisible) {
+        problems.push("C-10 미션: \"알겠어요\"가 보이지 않는다 (닫을 방법이 없다)");
+      }
+      if (!m.mic) {
+        problems.push("C-10 미션: 마이크가 없다");
+      } else {
+        if (Math.abs(m.mic.w - m.mic.h) > 1) {
+          problems.push(`C-10 미션: 마이크가 타원 ${m.mic.w}×${m.mic.h}`);
+        }
+        if (m.mic.w < 72) {
+          problems.push(`C-10 미션: 마이크 ${m.mic.w}px < 72px (§1-4)`);
+        }
+      }
+    }
+  } else {
+    problems.push("C-10 미션: 상태 도달 실패 — 검사하지 못했다");
   }
 
   if (problems.length > 0) {

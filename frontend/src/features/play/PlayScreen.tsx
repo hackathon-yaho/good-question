@@ -502,8 +502,13 @@ export function PlayScreen({
       }
       right={
         <>
+          {/* 높이를 묶어 둔다. shrink-0가 없으면 flex가 이 상자를 눌러버리고,
+              안쪽 카드는 고유 높이를 유지해 아래 패널로 넘친다.
+              50%는 실측으로 정했다. 4단계 체크리스트를 2×2로 다 보여주는 데
+              48%가 필요하고, 남은 절반으로 마이크가 120px 넘게 확보된다.
+              더 키우면 마이크가 §1-4의 72px 하한에 가까워진다. */}
           {state.mission ? (
-            <div className="border-b border-border pt-4">
+            <div className="flex max-h-[50%] shrink-0 flex-col overflow-hidden border-b border-border pt-4">
               <MissionCard
                 mission={state.mission}
                 onDismiss={() => dispatch({ type: "MISSION_DISMISS" })}
@@ -545,6 +550,8 @@ export function PlayScreen({
                 submitDisabled={
                   !state.recording && !state.interimText.trim()
                 }
+                // 미션이 함께 떠 있으면 지난 대사 줄을 접어 마이크 자리를 낸다.
+                compact={state.mission !== null}
               />
             ) : null}
 

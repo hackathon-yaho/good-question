@@ -132,6 +132,7 @@ export function ChildTurnPanel({
   onMicClick,
   onSubmit,
   submitDisabled,
+  compact = false,
 }: {
   displayName: string;
   previousText: string;
@@ -141,46 +142,58 @@ export function ChildTurnPanel({
   onMicClick: () => void;
   onSubmit: () => void;
   submitDisabled: boolean;
+  /** 미션 카드가 함께 떠 있어 공간이 좁을 때. 지난 대사 줄을 접는다. */
+  compact?: boolean;
 }) {
   return (
     <div className="flex size-full min-h-0 flex-col">
-      <header className="flex items-center gap-3 border-b border-border px-6 py-4">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border px-6 py-4">
         <CharacterPortrait displayName={displayName} size={56} />
         <p className="truncate text-parent-body font-bold text-muted">
           {displayName}
         </p>
       </header>
 
-      <div className="px-6 py-4">
-        <SpeechBubble speaker="character" dimmed>
-          {previousText}
-        </SpeechBubble>
-      </div>
+      {/* 미션 카드가 열려 있으면 이 줄을 접는다. 흐린 지난 대사는 맥락일 뿐이고,
+          아이에게 지금 필요한 것은 미션 내용과 마이크다. 둘 다 펼치면 우측 패널에
+          들어가지 않는다. */}
+      {compact ? null : (
+        <div className="shrink-0 px-6 py-4">
+          <SpeechBubble speaker="character" dimmed>
+            {previousText}
+          </SpeechBubble>
+        </div>
+      )}
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6">
-        <p className="text-center text-turn leading-tight font-bold text-primary">
+      {/* overflow-hidden이 없으면 좁아졌을 때 마이크가 위아래로 삐져나와
+          말풍선과 푸터를 덮는다. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-6">
+        <p className="shrink-0 text-center text-turn leading-tight font-bold text-primary">
           이제 말해 볼까?
         </p>
 
-        <MicButton
-          state={recording ? "recording" : "idle"}
-          size={180}
-          level={micLevel}
-          onClick={onMicClick}
-        />
+        {/* 남은 높이를 마이크가 받는다. MicButton이 그 안에서 상한까지만 커진다. */}
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+          <MicButton
+            state={recording ? "recording" : "idle"}
+            size={180}
+            level={micLevel}
+            onClick={onMicClick}
+          />
+        </div>
 
-        <p className="text-center text-parent-body text-muted">
+        <p className="shrink-0 text-center text-parent-body text-muted">
           말이 끝나면 아래 보내기를 눌러줘
         </p>
 
         {interimText ? (
-          <p className="max-w-full rounded-bubble bg-secondary-soft px-4 py-2 text-center text-kid-body text-text">
+          <p className="max-w-full shrink-0 truncate rounded-bubble bg-secondary-soft px-4 py-2 text-center text-kid-body text-text">
             {interimText}
           </p>
         ) : null}
       </div>
 
-      <footer className="flex items-center justify-end gap-3 border-t border-border px-6 py-5">
+      <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-5">
         <PillButton size="kid" onClick={onSubmit} disabled={submitDisabled}>
           보내기
         </PillButton>
