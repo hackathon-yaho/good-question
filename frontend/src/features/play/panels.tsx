@@ -84,7 +84,12 @@ export function CharacterPanel({
 }) {
   return (
     <div className="flex size-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-6 py-4">
+      {/* 헤더 아래에 구분선을 두지 않는다. 캐릭터 이름은 말풍선의 임자이므로
+          말풍선과 한 덩어리로 읽혀야 하는데, 선을 그으면 **제목 바**처럼 보인다.
+          아바타와 작은 muted 글씨로 이미 충분히 구분된다.
+          C-4와 같은 자리이므로 양쪽에서 같이 뺀다. 매 턴 C-3↔C-4를 오갈 때
+          같은 y에서 선이 생기고 사라지면 그게 더 거슬린다. */}
+      <header className="flex shrink-0 items-center gap-3 px-6 pt-4">
         <CharacterPortrait
           displayName={displayName}
           size={compact ? 56 : 72}
@@ -173,7 +178,8 @@ export function ChildTurnPanel({
 }) {
   return (
     <div className="flex size-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-6 py-4">
+      {/* 구분선 없음 — 이유는 CharacterPanel 헤더 주석 참조 */}
+      <header className="flex shrink-0 items-center gap-3 px-6 pt-4">
         <CharacterPortrait displayName={displayName} size={56} />
         <p className="truncate text-parent-body font-bold text-muted">
           {displayName}
