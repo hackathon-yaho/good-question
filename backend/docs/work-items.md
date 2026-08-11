@@ -107,10 +107,10 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
-| M-08 | 진행 중 이야기 · 이어하기 | 필수 | `GET /api/home?childId=` |
-| M-10 | 이야기 목록 | 필수 | `GET /api/stories?childId=&topic=` |
-| M-11 | 주제별 필터링 | 필수 | 〃 (`stories.topics` 기준) |
-| — | 이야기 상세 | 필수 | `GET /api/stories/{storyId}?childId=` |
+| M-08 | 진행 중 이야기 · 이어하기 | 필수 | `GET /api/home?childId=` — 미착수 |
+| M-10 | ~~이야기 목록~~ | 필수 | `GET /api/stories?childId=&topic=` — **완료** |
+| M-11 | ~~주제별 필터링~~ | 필수 | 〃 (`stories.topics` 기준) — **완료** |
+| — | ~~이야기 상세~~ | 필수 | `GET /api/stories/{storyId}?childId=` — **완료** |
 
 스키마: [api.md 3.3](../../docs/spec/api.md)
 
