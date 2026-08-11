@@ -99,16 +99,18 @@ Phase 3  세션·조회  ──────────────────�
 | 2 | ~~홈 (진행 중 + 추천)~~ | M-08 — **완료** |
 | 3 | ~~세션 생성 · 재시작~~ | `POST /api/sessions` — **완료** |
 | 4 | ~~세션 조회 (이어하기 복원)~~ | `GET /api/sessions/{id}` — **완료** |
-| 5 | **아이 이름 치환** | M-26 — 미착수 |
-| 6 | 장면 전환 — `intro`/`narrative` 완료 → 다음 장면 | M-46 — 미착수 |
-| 7 | `dialogue` 진입 시 `character_opening`을 `messages`에 저장 후 응답 | M-33 일부 — 미착수 |
+| 5 | ~~**아이 이름 치환**~~ | M-26 — **완료** |
+| 6 | ~~장면 전환 — `intro`/`narrative` 완료 → 다음 장면~~ | M-46 — **완료** |
+| 7 | ~~`dialogue` 진입 시 `character_opening`을 `messages`에 저장 후 응답~~ | M-33 일부 — **완료** |
 | 8 | ~~`sceneProgress` 화면 단위 변환~~ | D-12 — **완료** (`GET /api/home`에서 검증) |
 
 **완료 조건**
-- [ ] 세션 생성 → 도입(1) → 전개1(2) → 대화1(3)까지 장면이 넘어간다 — 세션 생성(도입 진입)까지는 확인, 장면 전환(M-46)이 아직 없음
-- [ ] 대화1 진입 시 `character_opening`에 **아이 이름이 치환되어** 저장된다 (받침 유무 반영) — M-46과 함께 구현 예정
+- [x] 세션 생성 → 도입(1) → 전개1(2) → 대화1(3)까지 장면이 넘어간다 — curl로 `POST .../scenes/{id}/complete`를 연속 호출해 확인 (2026-08-12)
+- [x] 대화1 진입 시 `character_opening`에 **아이 이름이 치환되어** 저장된다 (받침 유무 반영) — "민준"(받침 O) → "민준아", "지호"(받침 X) → "지호야" 둘 다 curl로 확인. 단위 테스트 6건 포함
 - [x] `GET /api/sessions/{id}`로 중간 상태가 복원된다 — curl로 세션 생성 → 재조회 일치 확인, restart:true로 신규 세션+기존 세션 stopped 전환 확인
 - [x] `currentSceneOrder: 5` → `sceneProgress: { current: 2, total: 4 }` — Phase 3 항목 2(`GET /api/home`)에서 검증 완료
+
+> **Phase 3 완료** (2026-08-12). 다음은 Phase 4(대화 엔진) — AI mock 스텁부터 시작한다.
 
 > **다음 작업**: 항목 5~7(이름 치환 + 장면 전환 + character_opening 저장)이 한 덩어리다.
 > `POST /api/sessions/{id}/scenes/{sceneId}/complete`에서 함께 구현한다.

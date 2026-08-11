@@ -11,11 +11,15 @@ import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.repository.MessageRepository;
 import com.goodquestion.backend.session.dto.request.SessionCreateRequest;
 import com.goodquestion.backend.session.dto.response.CurrentSceneResponse;
+import com.goodquestion.backend.session.dto.response.NextSceneResponse;
+import com.goodquestion.backend.session.dto.response.OpeningMessageResponse;
+import com.goodquestion.backend.session.dto.response.SceneCompleteResponse;
 import com.goodquestion.backend.session.dto.response.SessionMessageResponse;
 import com.goodquestion.backend.session.dto.response.SessionResponse;
 import com.goodquestion.backend.session.entity.StorySession;
 import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
+import com.goodquestion.backend.session.support.NameSubstitutor;
 import com.goodquestion.backend.story.constant.DialogueContents;
 import com.goodquestion.backend.story.entity.Story;
 import com.goodquestion.backend.story.entity.StoryScene;
@@ -80,6 +84,59 @@ public class SessionServiceImpl implements SessionService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         return toResponse(session);
+    }
+
+    /**
+     * intro/narrative 장면 재생 완료 → 다음 장면 진행 (M-46). 다음 장면이 dialogue면
+     * character_opening을 아이 이름 치환 후 messages에 저장한다 (M-26, M-33 일부).
+     * dialogue 장면 자체의 종료는 대화 엔진(Phase 4)의 몫이라 여기서 다루지 않는다.
+     */
+    @Override
+    @Transactional
+    public SceneCompleteResponse completeScene(UUID parentId, UUID sessionId, UUID sceneId) {
+        StorySession session = storySessionRepository.findById(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        if (!session.getChild().getParent().getId().equals(parentId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        StoryScene currentScene = session.getCurrentScene();
+        if (!currentScene.getId().equals(sceneId)) {
+            throw new BusinessException(ErrorCode.SCENE_ALREADY_CLOSED, "이미 다음 장면으로 넘어간 세션입니다.");
+        }
+        if (currentScene.isDialogue()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "대화 장면은 이 엔드포인트로 종료하지 않습니다.");
+        }
+
+        StoryScene nextScene = storySceneRepository.findAllByStoryOrderBySceneOrderAsc(session.getStory()).stream()
+                .filter(scene -> scene.getSceneOrder() == currentScene.getSceneOrder() + 1)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "다음 장면이 없습니다."));
+
+        session.advanceToScene(nextScene);
+
+        OpeningMessageResponse openingMessage = nextScene.isDialogue()
+                ? createOpeningMessage(session, nextScene)
+                : null;
+
+        String characterDisplayName = nextScene.isDialogue()
+                ? DialogueContents.forSceneOrder(nextScene.getSceneOrder()).characterDisplayName()
+                : null;
+
+        return new SceneCompleteResponse(new NextSceneResponse(
+                nextScene.getId(), nextScene.getSceneOrder(), nextScene.getSceneType().name().toLowerCase(),
+                nextScene.getCharacterName(), characterDisplayName, null, nextScene.getMaxTurns(), openingMessage));
+    }
+
+    private OpeningMessageResponse createOpeningMessage(StorySession session, StoryScene dialogueScene) {
+        String text = NameSubstitutor.substitute(dialogueScene.getCharacterOpening(), session.getChild().getName());
+        int nextTurnOrder = messageRepository.findAllBySessionOrderByTurnOrderAsc(session).size() + 1;
+
+        Message opening = Message.ofCharacter(session, dialogueScene, nextTurnOrder, text);
+        messageRepository.save(opening);
+
+        return new OpeningMessageResponse(
+                opening.getId(), opening.getSpeakerType().name().toLowerCase(), opening.getTurnOrder(), opening.getText());
     }
 
     private SessionResponse toResponse(StorySession session) {

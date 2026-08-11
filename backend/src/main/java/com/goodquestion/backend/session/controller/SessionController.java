@@ -1,6 +1,7 @@
 package com.goodquestion.backend.session.controller;
 
 import com.goodquestion.backend.session.dto.request.SessionCreateRequest;
+import com.goodquestion.backend.session.dto.response.SceneCompleteResponse;
 import com.goodquestion.backend.session.dto.response.SessionResponse;
 import com.goodquestion.backend.session.service.SessionService;
 import jakarta.validation.Valid;
@@ -34,5 +35,12 @@ public class SessionController {
     @GetMapping("/{sessionId}")
     public SessionResponse getSession(@AuthenticationPrincipal UUID parentId, @PathVariable UUID sessionId) {
         return sessionService.getSession(parentId, sessionId);
+    }
+
+    @PostMapping("/{sessionId}/scenes/{sceneId}/complete")
+    public SceneCompleteResponse completeScene(@AuthenticationPrincipal UUID parentId,
+                                                @PathVariable UUID sessionId,
+                                                @PathVariable UUID sceneId) {
+        return sessionService.completeScene(parentId, sessionId, sceneId);
     }
 }
