@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { parentApi } from "@/lib/api";
 import type { ParentApi, ReportListResult } from "@/lib/api/types";
 import { setSelectedChildId, useSelectedChildId } from "@/lib/client-store";
 import type { SessionStatus } from "@/lib/play-state";
@@ -25,7 +25,7 @@ const STATUS_CHIP: Record<SessionStatus, { label: string; className: string }> =
   post_activity: { label: "진행 중", className: "bg-primary-soft text-text" },
 };
 
-export function ReportListScreen({ api = mockParentApi }: { api?: ParentApi }) {
+export function ReportListScreen({ api = parentApi }: { api?: ParentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const [data, setData] = useState<ReportListResult | null>(null);

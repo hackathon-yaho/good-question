@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { SidebarShell } from "@/components/shells/SidebarShell";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { contentApi } from "@/lib/api";
 import type { ContentApi, MypageSnapshot } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { useCharacterVoice } from "@/lib/speech";
@@ -29,7 +29,7 @@ function formatDate(iso: string): string {
   ).padStart(2, "0")}`;
 }
 
-export function MypageScreen({ api = mockContentApi }: { api?: ContentApi }) {
+export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const { speak, cancel, speaking } = useCharacterVoice();

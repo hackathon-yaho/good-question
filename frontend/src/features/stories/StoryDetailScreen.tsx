@@ -21,8 +21,8 @@ import { useToast } from "@/components/ui/Toast";
 import { MicBlockedScreen } from "@/features/system/MicBlockedScreen";
 import { MicPermissionModal } from "@/features/system/MicPermissionModal";
 import { errorCodeOf } from "@/lib/api/errors";
-import { mockPlayApi } from "@/lib/api/mock";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { playApi as defaultPlayApi } from "@/lib/api";
+import { contentApi } from "@/lib/api";
 import type { ContentApi, PlayApi, StoryDetail } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { queryMicPermission } from "@/lib/mic-permission";
@@ -48,8 +48,8 @@ type StartMode = "resume" | "restart" | "new";
 
 export function StoryDetailScreen({
   storyId,
-  api = mockContentApi,
-  playApi = mockPlayApi,
+  api = contentApi,
+  playApi = defaultPlayApi,
 }: {
   storyId: string;
   api?: ContentApi;

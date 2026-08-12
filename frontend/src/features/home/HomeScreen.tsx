@@ -23,14 +23,14 @@ import { ChildAvatar } from "@/components/ui/ChildAvatar";
 import { PillButton } from "@/components/ui/PillButton";
 import { StoryCard } from "@/components/ui/StoryCard";
 import { useToast } from "@/components/ui/Toast";
-import { mockAccountApi } from "@/lib/api/mock-account";
-import { mockPlayApi } from "@/lib/api/mock";
+import { accountApi } from "@/lib/api";
+import { playApi as defaultPlayApi } from "@/lib/api";
 import type { AccountApi, HomeSnapshot, PlayApi } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 
 export function HomeScreen({
-  api = mockAccountApi,
-  playApi = mockPlayApi,
+  api = accountApi,
+  playApi = defaultPlayApi,
 }: {
   api?: AccountApi;
   playApi?: PlayApi;

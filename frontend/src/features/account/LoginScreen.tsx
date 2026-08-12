@@ -30,7 +30,7 @@ import {
   loginStartUrl,
   mockLoginRedirectPath,
 } from "@/lib/api/auth";
-import { AUTH_MODE } from "@/lib/api/http";
+import { API_MODE } from "@/lib/api/http";
 import { clearClientStore, setConsentDraft } from "@/lib/client-store";
 
 export function LoginScreen() {
@@ -43,7 +43,7 @@ export function LoginScreen() {
     setPending(true);
     setFailed(false);
 
-    if (AUTH_MODE === "backend") {
+    if (API_MODE === "backend") {
       // 여기서 페이지를 떠난다. 되돌아오는 곳은 /auth/callback이다.
       window.location.href = loginStartUrl();
       return;
@@ -152,9 +152,9 @@ export function LoginScreen() {
           {process.env.NODE_ENV === "development" ? (
             <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
               <p className="text-sm text-muted">
-                개발용 · 인증 모드 <b>{AUTH_MODE}</b>
+                개발용 · 연동 모드 <b>{API_MODE}</b>
               </p>
-              {AUTH_MODE === "backend" ? (
+              {API_MODE === "backend" ? (
                 <button
                   type="button"
                   onClick={() => void devLogin()}

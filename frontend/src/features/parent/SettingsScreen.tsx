@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { parentApi } from "@/lib/api";
 import type { ParentAccount, ParentApi } from "@/lib/api/types";
 import { authApi } from "@/lib/api/auth";
 import { clearClientStore } from "@/lib/client-store";
@@ -34,7 +34,7 @@ const TERMS = [
 
 const WITHDRAW_PHRASE = "탈퇴합니다";
 
-export function SettingsScreen({ api = mockParentApi }: { api?: ParentApi }) {
+export function SettingsScreen({ api = parentApi }: { api?: ParentApi }) {
   const router = useRouter();
   const [parent, setParent] = useState<ParentAccount | null>(null);
   const [notify, setNotify] = useState(true);

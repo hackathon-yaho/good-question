@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { parentApi } from "@/lib/api";
 import type { ParentApi, ParentSummary } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 
@@ -25,7 +25,7 @@ const TILES = [
   { href: "/parent/settings", label: "설정", icon: "⚙️" },
 ] as const;
 
-export function ParentHomeScreen({ api = mockParentApi }: { api?: ParentApi }) {
+export function ParentHomeScreen({ api = parentApi }: { api?: ParentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const [summary, setSummary] = useState<ParentSummary | null>(null);

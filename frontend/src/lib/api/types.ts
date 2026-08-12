@@ -431,7 +431,16 @@ export type ContentApi = {
       contextSentence?: string | null;
     }
   ): Promise<WordEntry>;
-  toggleWordLiked(childId: string, wordId: string): Promise<WordEntry>;
+  /**
+   * E-1 좋아요. **바꿀 목표 값을 넘긴다.**
+   * `PATCH /wordbook/{id}`가 `{ liked }`를 요구하므로 서버가 뒤집어 주지 않는다.
+   * 현재 값은 목록을 들고 있는 화면이 안다. (api-spec 9.3)
+   */
+  toggleWordLiked(
+    childId: string,
+    wordId: string,
+    liked: boolean
+  ): Promise<WordEntry>;
   getMypage(childId: string): Promise<MypageSnapshot>;
 };
 
@@ -517,9 +526,16 @@ export type NoticeItem = {
   unread: boolean;
 };
 
+/**
+ * H-1 계정 정보.
+ *
+ * ⚠️ **전용 엔드포인트가 없다.** `GET /auth/me`로 id·name·email까지만 채운다.
+ *    `provider`는 카카오 단독이라 상수로 두고(PRD M-01), `createdAt`은 어디서도
+ *    오지 않아 옵셔널이다 — 없는 값을 만들어 넣지 않는다.
+ */
 export type ParentAccount = Parent & {
   provider: AuthProvider;
-  createdAt: string;
+  createdAt?: string;
 };
 
 export type ParentApi = {

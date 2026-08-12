@@ -29,14 +29,14 @@ import {
   ReviewPanel,
 } from "@/features/activity/steps";
 
-import { mockActivityApi } from "@/lib/api/mock";
+import { activityApi } from "@/lib/api";
 import type { ActivityApi } from "@/lib/api/types";
 import { ActivityStep } from "@/lib/play-state";
 import { useCharacterVoice, useChildSpeech } from "@/lib/speech";
 
 export function ActivityScreen({
   sessionId,
-  api = mockActivityApi,
+  api = activityApi,
 }: {
   sessionId: string;
   api?: ActivityApi;

@@ -16,8 +16,8 @@ import { AVATAR_IDS, ChildAvatar } from "@/components/ui/ChildAvatar";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
-import { mockAccountApi } from "@/lib/api/mock-account";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { accountApi as defaultAccountApi } from "@/lib/api";
+import { parentApi } from "@/lib/api";
 import type { AccountApi, Child, ParentApi } from "@/lib/api/types";
 import {
   getSelectedChildId,
@@ -36,8 +36,8 @@ function formatDate(iso: string): string {
 }
 
 export function ChildrenManageScreen({
-  api = mockParentApi,
-  accountApi = mockAccountApi,
+  api = parentApi,
+  accountApi = defaultAccountApi,
 }: {
   api?: ParentApi;
   accountApi?: AccountApi;

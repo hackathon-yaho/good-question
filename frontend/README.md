@@ -41,16 +41,22 @@ npm run verify  # 브라우저 검증 (dev 서버를 먼저 띄운 상태에서)
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `NEXT_PUBLIC_BACKEND_URL` | `http://localhost:8080` | 백엔드 오리진. 여기에 `/api`가 붙습니다 |
-| `NEXT_PUBLIC_AUTH_MODE` | `mock` | `mock` = 백엔드 없이 동작 · `backend` = 카카오 리다이렉트 + JWT 쿠키 |
+| `NEXT_PUBLIC_API_MODE` | `mock` | `mock` = 목 데이터 · `backend` = 실서버 호출(인증 포함) |
 | `NEXT_PUBLIC_SPEECH_MODE` | `mock` | `mock` = 브라우저 Web Speech · `backend` = `/api/stt`·`/api/tts` ([아래](#stt--tts)) |
 
 `npm run verify`는 **`mock` 모드로** 돕니다. 검증에 백엔드를 요구하지 않기 위한 것입니다.
 
-`backend` 모드로 로그인을 실제로 확인하려면 백엔드를 8080에 띄운 뒤:
+**인증과 데이터는 한 스위치로 묶여 있습니다.** 섞으면 반드시 깨집니다 — 목 데이터는
+자체 childId(`c_mock_1`)를 쓰는데 실서버는 그런 아이를 모르고, 반대 조합은 전부 401입니다.
+음성(`SPEECH_MODE`)만 따로 둡니다. 브라우저 TTS + 실 데이터는 동작하는 조합입니다.
+
+`backend` 모드로 확인하려면 백엔드를 8080에 띄운 뒤:
 
 ```bash
-NEXT_PUBLIC_AUTH_MODE=backend npm run dev
+NEXT_PUBLIC_API_MODE=backend npm run dev
 ```
+
+개발 중에는 재시작 없이 주소에 `?api=backend`를 붙여도 됩니다.
 
 카카오 앱 등록 전이라면 `/login` 하단의 **카카오 없이 로그인 (dev-login)** 으로
 쿠키 발급 → `/auth/callback` → 온보딩 분기까지 확인할 수 있습니다.
@@ -58,7 +64,7 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 
 ## 검증
 
-`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **275개**를 확인합니다.
+`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **313개**를 확인합니다.
 `scripts/verify/`에 스위트별로 나뉘어 있습니다.
 
 | 스위트 | 범위 |
@@ -73,6 +79,7 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 | `system` | I-1 · I-3 · I-4 (오프라인 → 재시도 → 발화 복구까지) |
 | `browse` | B-2·B-3·B-4 · C-9 → 단어장 · E · F-1 |
 | `parent` | A-6 · G-1~G-4 · H-1~H-7 (완주 → 리포트 생성까지) |
+| `wiring` | **실서버 배선** — 경로·메서드·본문을 명세와 대조 (`?api=backend`) |
 | `layout` | 태블릿 5종 — 버튼 줄바꿈·넘침, C-10 미션 겹침·잘림 |
 
 단순 렌더 확인이 아니라 **요건 위반을 잡는 검사**가 섞여 있습니다. 예: 리포트에
@@ -121,7 +128,9 @@ src/
 └── lib/
     ├── thinking-elements.ts     사고 요소 8종 → 아이 화면 4그룹 매핑 (§1-7)
     ├── play-state.ts            PlayState · ActivityStep · 서버 모드 매핑
+    ├── api/index.ts             **API 입구** — 목/실서버를 여기서만 고른다
     ├── api/http.ts              fetch 래퍼 (credentials: include · 에러 코드 매핑)
+    ├── api/client*.ts           실서버 클라이언트 5종
     ├── api/auth.ts              로그인 · /auth/me · 로그아웃 (목 / 백엔드 전환)
     ├── api/speech.ts            POST /api/stt · GET /api/tts
     ├── speech/                  녹음·재생 (목 / 백엔드 전환) — mode.ts가 입구

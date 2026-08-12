@@ -250,7 +250,7 @@ export const mockContentApi: ContentApi = {
     return toWordEntry(stored, Date.now());
   },
 
-  async toggleWordLiked(childId, wordId) {
+  async toggleWordLiked(childId, wordId, liked) {
     await delay(150);
     assertOnline();
 
@@ -258,9 +258,11 @@ export const mockContentApi: ContentApi = {
     const found = store.words.find(
       (w) => w.id === wordId && w.childId === childId
     );
-    if (!found) throw new ApiError("UNKNOWN", "없는 단어입니다");
+    if (!found) throw new ApiError("NOT_FOUND", "없는 단어입니다");
 
-    found.liked = !found.liked;
+    // 넘어온 값을 그대로 쓴다. 서버가 뒤집어 주지 않으므로 목도 뒤집지 않는다.
+    // 목만 뒤집으면 두 번 누를 때 실서버와 결과가 갈린다. (api-spec 9.3)
+    found.liked = liked;
     saveWords(store);
     return toWordEntry(found, Date.now());
   },

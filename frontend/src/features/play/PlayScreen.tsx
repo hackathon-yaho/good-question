@@ -43,8 +43,8 @@ import {
 import { WordPopup } from "@/features/play/WordPopup";
 import { useNetworkError, withTimeout } from "@/features/system/NetworkErrorHost";
 import { errorCodeOf } from "@/lib/api/errors";
-import { mockPlayApi } from "@/lib/api/mock";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { playApi } from "@/lib/api";
+import { contentApi as defaultContentApi } from "@/lib/api";
 import type { ContentApi, HighlightWord, PlayApi } from "@/lib/api/types";
 import { getSelectedChildId } from "@/lib/client-store";
 import { STORY_ID } from "@/mocks/story-banggui";
@@ -61,8 +61,8 @@ import { TOTAL_SCREEN_SCENES, toScreenIndex } from "@/mocks/story-banggui";
  */
 export function PlayScreen({
   sessionId,
-  api = mockPlayApi,
-  contentApi = mockContentApi,
+  api = playApi,
+  contentApi = defaultContentApi,
 }: {
   sessionId: string;
   api?: PlayApi;

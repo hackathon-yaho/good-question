@@ -18,14 +18,14 @@ import { useRouter } from "next/navigation";
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockAccountApi } from "@/lib/api/mock-account";
+import { accountApi } from "@/lib/api";
 import type { AccountApi, Child } from "@/lib/api/types";
 import { setSelectedChildId } from "@/lib/client-store";
 import { rem } from "@/lib/rem";
 import { relativeActivity } from "@/lib/relative-date";
 
 export function ProfileSelectScreen({
-  api = mockAccountApi,
+  api = accountApi,
 }: {
   api?: AccountApi;
 }) {

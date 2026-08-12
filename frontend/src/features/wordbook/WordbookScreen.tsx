@@ -15,12 +15,12 @@ import { SidebarShell } from "@/components/shells/SidebarShell";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { contentApi } from "@/lib/api";
 import type { ContentApi, WordEntry, WordbookFilter } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { useCharacterVoice } from "@/lib/speech";
 
-export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
+export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const { speak } = useCharacterVoice();
@@ -61,9 +61,10 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
   }, [api, childId, filter, version]);
 
   const toggleLiked = useCallback(
-    async (wordId: string) => {
+    async (wordId: string, liked: boolean) => {
       if (!childId) return;
-      await api.toggleWordLiked(childId, wordId).catch(() => null);
+      // 목표 값을 넘긴다. 서버가 뒤집어 주지 않는다. (api-spec 9.3)
+      await api.toggleWordLiked(childId, wordId, liked).catch(() => null);
       setVersion((prev) => prev + 1);
     },
     [api, childId]
@@ -146,7 +147,7 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
                       : `${word.word} 좋아하는 단어로 담기`
                   }
                   aria-pressed={word.liked}
-                  onClick={() => void toggleLiked(word.id)}
+                  onClick={() => void toggleLiked(word.id, !word.liked)}
                   className="flex size-touch items-center justify-center rounded-full text-xl"
                 >
                   {word.liked ? "❤️" : "🤍"}
@@ -184,7 +185,7 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
                   open.liked ? "좋아하는 단어 해제" : "좋아하는 단어로 담기"
                 }
                 aria-pressed={open.liked}
-                onClick={() => void toggleLiked(open.id)}
+                onClick={() => void toggleLiked(open.id, !open.liked)}
                 className="flex size-14 items-center justify-center rounded-full text-3xl"
               >
                 {open.liked ? "❤️" : "🤍"}

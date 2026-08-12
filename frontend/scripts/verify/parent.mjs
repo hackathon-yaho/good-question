@@ -130,7 +130,9 @@ await page.getByRole("button", { name: "확인하기" }).click();
 await page.getByRole("button", { name: "이야기 말하기" }).waitFor({ timeout: 8000 });
 await page.getByRole("button", { name: "이야기 말하기" }).click();
 await page.getByText("이야기를 처음부터 들려줘").waitFor({ timeout: 8000 });
-await page.locator("button").filter({ hasText: "" }).first().click().catch(() => {});
+// D-5는 마이크가 자동 시작되지 않는다.
+await page.locator("button[aria-label]").first().click();
+await page.waitForTimeout(300);
 await page.evaluate(() =>
   window.__say(
     "옛날에 며느리가 방귀를 참았어요. 배나무에서 배가 떨어지고 시아버지가 미안하다고 했어요."

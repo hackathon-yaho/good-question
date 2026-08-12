@@ -27,7 +27,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { parentApi } from "@/lib/api";
 import type { ParentApi, ReportDetail } from "@/lib/api/types";
 
 const TABS = [
@@ -40,7 +40,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function ReportDetailScreen({
   sessionId,
-  api = mockParentApi,
+  api = parentApi,
 }: {
   sessionId: string;
   api?: ParentApi;

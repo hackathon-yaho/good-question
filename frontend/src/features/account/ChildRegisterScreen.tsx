@@ -21,7 +21,7 @@ import { AVATAR_IDS, ChildAvatar } from "@/components/ui/ChildAvatar";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
 import { errorCodeOf } from "@/lib/api/errors";
-import { mockAccountApi } from "@/lib/api/mock-account";
+import { accountApi } from "@/lib/api";
 import type { AccountApi } from "@/lib/api/types";
 import {
   getConsentDraft,
@@ -42,7 +42,7 @@ function birthYearOptions(): number[] {
 const NAME_MAX = 10;
 
 export function ChildRegisterScreen({
-  api = mockAccountApi,
+  api = accountApi,
 }: {
   api?: AccountApi;
 }) {

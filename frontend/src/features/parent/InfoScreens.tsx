@@ -15,7 +15,7 @@ import Link from "next/link";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { parentApi } from "@/lib/api";
 import type { NoticeItem, ParentApi } from "@/lib/api/types";
 
 const BACK = (
@@ -31,7 +31,7 @@ const CATEGORY_CLASS: Record<NoticeItem["category"], string> = {
   업데이트: "bg-secondary-soft text-text",
 };
 
-export function NoticesScreen({ api = mockParentApi }: { api?: ParentApi }) {
+export function NoticesScreen({ api = parentApi }: { api?: ParentApi }) {
   const [notices, setNotices] = useState<NoticeItem[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [read, setRead] = useState<readonly string[]>([]);
@@ -63,6 +63,12 @@ export function NoticesScreen({ api = mockParentApi }: { api?: ParentApi }) {
 
       {notices === null ? (
         <p className="mt-6 text-parent-body text-muted">불러오고 있어요…</p>
+      ) : notices.length === 0 ? (
+        // 실서버 모드에서는 공지 엔드포인트가 없어 빈 배열이 온다.
+        // 빈 <ul>을 그리면 테두리만 남은 상자가 보인다. (client-parent.ts)
+        <p className="mt-6 text-parent-body text-muted">
+          아직 공지가 없어요. 새 소식이 생기면 여기에 올려 드려요.
+        </p>
       ) : (
         <ul className="mt-6 rounded-card border border-border bg-surface px-5">
           {notices.map((notice) => {

@@ -13,14 +13,14 @@ import { useRouter } from "next/navigation";
 import { SidebarShell } from "@/components/shells/SidebarShell";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
 import { StoryCard } from "@/components/ui/StoryCard";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { contentApi } from "@/lib/api";
 import type { ContentApi, StoryListResult } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 
 /** FilterChipRow는 "전체"를 빈 문자열로 다룬다. */
 const ALL = "";
 
-export function StoryListScreen({ api = mockContentApi }: { api?: ContentApi }) {
+export function StoryListScreen({ api = contentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
 
