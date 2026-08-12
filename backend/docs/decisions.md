@@ -502,6 +502,39 @@ PRD 8.12 원 스키마(`id`, `child_id`, `word`, `meaning`, `source_scene_id`)�
 
 ---
 
+### D-23 · O-13 NORMAL soft-cue 구현 — 새 AI 필드 없이 기존 유도 필드를 재사용한다
+
+work-items.md·plan.md는 O-13을 "미구현 시 NORMAL 일반 반응으로 동작. 새 필드 불필요"로
+적어두고 사실상 스킵 대상처럼 남겨뒀습니다. 그런데 [PRD 6.14](../../docs/product/prd.md)를
+다시 읽어보니 **"새 필드가 불필요하다"는 건 맞지만 "백엔드 코드가 불필요하다"는 뜻이
+아니었습니다** — [api.md 4.2](../../docs/spec/api.md)가 이미 명시적으로 방법까지 정해뒀습니다.
+
+> ⚠️ soft-cue를 구현할 때: `responseMode = NORMAL`인데도 `remainingWorry`를 실어 보내면
+> 됩니다. 새 필드는 필요 없습니다.
+
+즉 **GUIDED와 똑같은 `guidanceTarget`/`remainingWorry`를, `responseMode`는 `NORMAL`로 둔 채
+같이 보내는 것**이 구현입니다. `story_sessions.last_guidance_target` 컬럼 설명도 처음부터
+"GUIDED **또는 soft-cue** 대상 사고 요소"였습니다 — 같은 컬럼을 공유하도록 설계돼 있었습니다.
+
+**트리거 조건은 우연이 아니라 규칙 엔진의 빈틈을 정확히 메웁니다.** `ProgressJudge`의 2단계
+"강한 유도 제한"은 신규 요소가 막 잡힌 턴을 **항상 NORMAL로 강제**합니다(축하하는 턴에 바로
+유도를 얹지 않기 위함). PRD 6.14의 soft-cue 조건("NORMAL + 신규 요소 + missing 남음")은 바로
+그 턴을 가리킵니다 — 강제로 NORMAL이 됐지만 아직 부족한 요소가 있으면, 약하게만 다음 요소를
+곁들이라는 것입니다. 두 규칙이 서로를 위해 설계된 것처럼 맞물립니다.
+
+**구현**: `GuidanceSelector.selectForTurn(mode, reactionKey, missing, hasNewlyAccumulatedElement,
+previousGuidanceTarget)`. `MessageServiceImpl`이 `reactionKey`를 계산한 직후 호출한다 —
+soft-cue 스킵 대상(`playfulUtterance`·`questionFromChild`·`unclearUtterance`)을 걸러내려면
+reactionKey가 있어야 하기 때문에, 기존에 바깥에서 미리 계산하던 `guidanceTarget`을
+`resolveCharacterResponse` 안으로 옮겼다. 대상 선택 자체는 `GuidanceSelector.select()`를
+그대로 재사용한다(직전 유도 요소 반복 회피 원칙도 soft-cue에 동일 적용).
+
+**검증**: mock 스텁으로 신규 요소가 잡히는 턴을 재현해 `responseMode: "normal"`이면서
+`story_sessions.last_guidance_target`이 채워지는 것을 DB로 직접 확인했다. `GuidanceSelector`
+단위 테스트 6건(GUIDED/소프트큐 성립·신규요소 없음·missing 없음·스킵 반응 3종·CLOSING) 추가.
+
+---
+
 ### D-24 · 보호자 리포트(O-01~O-05) — `reports`는 세션 완료 시 1회 생성해 jsonb로 저장한다
 
 **배경**: `backend/docs/reports.md`로 전달받은 자료가 저장소에 이미 있던
@@ -547,36 +580,27 @@ PRD 8.12 원 스키마(`id`, `child_id`, `word`, `meaning`, `source_scene_id`)�
 
 ---
 
-### D-23 · O-13 NORMAL soft-cue 구현 — 새 AI 필드 없이 기존 유도 필드를 재사용한다
+### D-25 · 마이페이지(F-1) — 문서 전체 점검 중 발견한 미추적 엔드포인트를 포팅으로 완료
 
-work-items.md·plan.md는 O-13을 "미구현 시 NORMAL 일반 반응으로 동작. 새 필드 불필요"로
-적어두고 사실상 스킵 대상처럼 남겨뒀습니다. 그런데 [PRD 6.14](../../docs/product/prd.md)를
-다시 읽어보니 **"새 필드가 불필요하다"는 건 맞지만 "백엔드 코드가 불필요하다"는 뜻이
-아니었습니다** — [api.md 4.2](../../docs/spec/api.md)가 이미 명시적으로 방법까지 정해뒀습니다.
+`GET /api/mypage`는 [api.md 3.9](../../docs/spec/api.md)에 스펙까지 있었는데
+`work-items.md`·`plan.md` 어느 Phase 표에도 걸린 적이 없어 계속 놓치고 있었다. 사용자 요청으로
+전체 문서 대조 점검(2026-08-12)을 하다가 발견했다. `screens.md` F-1은 이미 "✅ 구현"으로
+표시돼 있어 프론트가 화면 자체는 만들어 뒀었다 — 다만 이 엔드포인트 없이 기존 엔드포인트
+조합으로 그리고 있어서 프론트가 막혀 있지는 않았다.
 
-> ⚠️ soft-cue를 구현할 때: `responseMode = NORMAL`인데도 `remainingWorry`를 실어 보내면
-> 됩니다. 새 필드는 필요 없습니다.
+D-24와 같은 방식 — **추론하지 않고 프론트 mock(`frontend/src/lib/api/mock-content.ts`
+`getMypage()`)을 그대로 포팅했다.**
 
-즉 **GUIDED와 똑같은 `guidanceTarget`/`remainingWorry`를, `responseMode`는 `NORMAL`로 둔 채
-같이 보내는 것**이 구현입니다. `story_sessions.last_guidance_target` 컬럼 설명도 처음부터
-"GUIDED **또는 soft-cue** 대상 사고 요소"였습니다 — 같은 컬럼을 공유하도록 설계돼 있었습니다.
+- `stats.activeDays`는 세션의 **아이 발화만이 아니라 모든 메시지**(캐릭터·시스템 포함)의
+  날짜를 모아 distinct 개수를 센다 — mock 원본이 그렇게 짜여 있다. 실질적으로는 아이가
+  말한 날에만 캐릭터 응답도 생기므로 결과는 같지만, 기준 자체는 "화자 무관"이다
+- `completedAt`/`createdAt`은 보호자 리포트(api.md 3.8)와 달리 **`yyyy.MM.dd`로 가공하지
+  않은 원본 `Instant`** 그대로 내려간다 — mock도 이 두 값만은 `formatDate()`를 거치지 않는다
+- 새 테이블 없음. 전부 기존 테이블(`story_sessions`·`messages`·`wordbook`·`post_activity_results`)
+  조회로 계산한다
 
-**트리거 조건은 우연이 아니라 규칙 엔진의 빈틈을 정확히 메웁니다.** `ProgressJudge`의 2단계
-"강한 유도 제한"은 신규 요소가 막 잡힌 턴을 **항상 NORMAL로 강제**합니다(축하하는 턴에 바로
-유도를 얹지 않기 위함). PRD 6.14의 soft-cue 조건("NORMAL + 신규 요소 + missing 남음")은 바로
-그 턴을 가리킵니다 — 강제로 NORMAL이 됐지만 아직 부족한 요소가 있으면, 약하게만 다음 요소를
-곁들이라는 것입니다. 두 규칙이 서로를 위해 설계된 것처럼 맞물립니다.
-
-**구현**: `GuidanceSelector.selectForTurn(mode, reactionKey, missing, hasNewlyAccumulatedElement,
-previousGuidanceTarget)`. `MessageServiceImpl`이 `reactionKey`를 계산한 직후 호출한다 —
-soft-cue 스킵 대상(`playfulUtterance`·`questionFromChild`·`unclearUtterance`)을 걸러내려면
-reactionKey가 있어야 하기 때문에, 기존에 바깥에서 미리 계산하던 `guidanceTarget`을
-`resolveCharacterResponse` 안으로 옮겼다. 대상 선택 자체는 `GuidanceSelector.select()`를
-그대로 재사용한다(직전 유도 요소 반복 회피 원칙도 soft-cue에 동일 적용).
-
-**검증**: mock 스텁으로 신규 요소가 잡히는 턴을 재현해 `responseMode: "normal"`이면서
-`story_sessions.last_guidance_target`이 채워지는 것을 DB로 직접 확인했다. `GuidanceSelector`
-단위 테스트 6건(GUIDED/소프트큐 성립·신규요소 없음·missing 없음·스킵 반응 3종·CLOSING) 추가.
+**검증**: 완료 세션 2건·단어 1건이 있는 아이로 조회 → 통계·목록 값 확인. 활동이 없는 아이로
+조회 → 에러 없이 전부 0/빈 배열. 다른 보호자 접근 → 403, 없는 `childId` → 404.
 
 ---
 

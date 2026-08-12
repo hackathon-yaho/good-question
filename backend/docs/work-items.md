@@ -469,3 +469,34 @@ CLOSING).
 | 구글·네이버 로그인 | 요건은 "1개 이상". 카카오로 충족 (D-06) |
 | 결제 | [PRD 2.3](../../docs/product/prd.md) MVP 범위 밖 |
 | 힌트 기능 | [PRD 5.4](../../docs/product/prd.md) MVP 범위 밖. GUIDED가 같은 역할 |
+
+---
+
+## 13. 마이페이지 (F-1)
+
+| ID | 항목 | 등급 | 엔드포인트 |
+| --- | --- | --- | --- |
+| — | ~~아이 마이페이지~~ | api.md에 "(선택) ⚪"로 표기 | `GET /api/mypage?childId=` — **완료** |
+
+api.md 3.9에 스펙까지 있었는데 어느 Phase 표에도 걸리지 않아 놓치고 있던 것을 문서 전체
+점검(2026-08-12) 중 발견했다. `screens.md` F-1이 이미 "✅ 구현"으로 표시돼 있어 프론트가
+이 화면을 이미 만들어 뒀다는 것도 함께 확인했다 — 다만 이 엔드포인트 없이 다른 기존
+엔드포인트를 조합해 그리고 있어서 프론트가 막혀 있진 않았다.
+
+`mypage/{controller,service,dto}` 신규. 계산 로직은 프론트 mock(`mock-content.ts`
+`getMypage()`)을 그대로 포팅했다 — 새로 설계하지 않았다.
+
+| 값 | 계산 |
+| --- | --- |
+| `stats.completedStories` | `status = COMPLETED` 세션 수 |
+| `stats.savedWords` | 이 아이의 `wordbook` 전체 개수 (필터 없음) |
+| `stats.activeDays` | 이 아이의 **모든** 세션의 **모든** 메시지(화자 무관) `created_at`을 날짜(YYYY-MM-DD)로 뭉친 distinct 개수 — mock과 동일 기준 |
+| `completedStories[]` | 완료 세션마다 1건. `completedAt`은 항상 값이 있음(완료 세션이므로) |
+| `retellings[]` | `post_activity_results.retelling_text`가 있는 세션마다 1건(완료 여부 무관) |
+
+`completedAt`/`createdAt`은 리포트(api.md 3.8)와 달리 **가공하지 않은 `Instant`** 그대로
+내려간다 — 프론트 mock도 이 값들만은 `formatDate()`를 거치지 않는다.
+
+**검증**: 완료 세션 2건·저장 단어 1건이 있는 아이로 조회 → `completedStories:2`,
+`savedWords:1`, `activeDays:1`, 목록 2건 전부 확인. 활동이 전혀 없는 아이로 조회 →
+전부 0/빈 배열로 에러 없이 응답. 다른 보호자 접근 → 403, 없는 `childId` → 404.
