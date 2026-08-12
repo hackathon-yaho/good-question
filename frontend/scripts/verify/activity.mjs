@@ -157,6 +157,91 @@ ok(bannedFinal.length === 0, `평가·미정의 표현 없음${bannedFinal.lengt
 console.log("  통계: " + finalBody.split("\n").filter((l) => /번$|명$|개$/.test(l.trim())).join(" / "));
 
 await page.screenshot({ path: SHOT("activity-shot") });
+
+/* ── D-10 카드 재시도 3회 제한 ───────────────────────────────────────
+ * 3회째 오답에 서버가 정답 순서를 실어 보내고, 화면은 그걸 보여주며 다음
+ * 단계로 넘긴다. 무한 재시도로 아이가 활동에 갇히지 않게 하는 규칙이다.
+ * 실패를 지적하지 않는 것이 조건이다. (백엔드 D-10 · Q-15)
+ *
+ * 새 세션이 필요하다 — 위에서 이미 시도 횟수를 썼다.
+ */
+console.log("\n=== D-10 재시도 3회 제한 ===");
+await page.evaluate(() => {
+  localStorage.removeItem("gq.mock.sessions");
+});
+await page.goto("http://localhost:3000/activity/demo", { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "시작하기" }).click();
+await page.getByText("이야기 순서대로 놓아볼까?").waitFor({ timeout: 5000 });
+
+/**
+ * 정답의 **역순**으로 놓고 제출한다. 셔플 순서에 기대면 우연히 정답이 나올 수 있어
+ * 3회를 채우지 못한다. 역순은 항상 오답이다.
+ *
+ * "다시 해보기"로 돌아오면 슬롯이 그대로 차 있으므로 먼저 비운다.
+ */
+async function fillWrong() {
+  for (let i = 3; i >= 0; i -= 1) {
+    const slot = page.locator(`[data-slot-index="${i}"]`);
+    if ((await slot.innerText()).trim() !== "여기에 놓아줘") await slot.click();
+    await page.waitForTimeout(80);
+  }
+  for (const text of [...ORDER].reverse()) {
+    await page.locator("button.touch-none", { hasText: text }).first().click();
+    await page.waitForTimeout(100);
+  }
+  await page.getByRole("button", { name: "확인하기" }).click();
+  await page.waitForTimeout(900);
+}
+
+let reachedLimit = false;
+for (let attempt = 1; attempt <= 3; attempt += 1) {
+  await fillWrong();
+  const body = await page.locator("body").innerText();
+
+  if (body.includes("순서를 맞췄어!")) {
+    console.log(`  info ${attempt}회째에 우연히 정답 — 이 판정은 건너뛴다`);
+    reachedLimit = true; // 아래 단정들을 건너뛴다
+    break;
+  }
+
+  const revealed = body.includes("이런 순서였어!");
+  if (attempt < 3) {
+    ok(!revealed, `${attempt}회째에는 정답을 보여주지 않음`);
+    ok(body.includes("거의 다 왔어!"), `${attempt}회째 → D-3 오답 피드백`);
+    await page.getByRole("button", { name: "다시 해보기" }).click();
+    await page.waitForTimeout(300);
+    continue;
+  }
+
+  // 3회째
+  ok(revealed, "3회째 → 정답 순서 공개");
+  ok(!body.includes("거의 다 왔어!"), "3회째에는 '다시 해보기'로 되돌리지 않음");
+  ok(
+    (await page.getByRole("button", { name: "다시 해보기" }).count()) === 0,
+    "다음 시도가 없으므로 재시도 버튼 없음"
+  );
+  ok(
+    !body.includes("순서를 맞췄어!"),
+    "맞혔다고 하지 않음 (아이도 아는 거짓말)"
+  );
+  const banned = ["틀렸", "실패", "오답", "정답은", "점수"].filter((w) =>
+    body.includes(w)
+  );
+  ok(banned.length === 0, `실패 지적 표현 없음${banned.length ? " → " + banned : ""}`);
+  ok(
+    (await page.getByRole("button", { name: "이야기 말하기" }).count()) === 1,
+    "다음 단계로 나갈 길 있음 (활동에 갇히지 않음)"
+  );
+  // 정답 순서로 카드가 다시 그려졌는지. 1번 칸이 정답 1번이어야 한다.
+  const firstCard = (await page.locator("ol li").first().innerText()).trim();
+  ok(
+    firstCard.startsWith("며느리는 방귀를 꾹 참고"),
+    "카드가 정답 순서로 다시 배치됨"
+  );
+  reachedLimit = true;
+}
+ok(reachedLimit, "3회 안에 판정에 도달");
+
 if (errs.length) { console.log("\n=== pageerror ==="); errs.slice(0, 6).forEach((e) => console.log("  " + e)); }
 console.log("\n스크린샷: activity-shot.png");
 await browser.close();

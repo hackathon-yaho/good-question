@@ -58,7 +58,7 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 
 ## 검증
 
-`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **258개**를 확인합니다.
+`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **270개**를 확인합니다.
 `scripts/verify/`에 스위트별로 나뉘어 있습니다.
 
 | 스위트 | 범위 |
@@ -67,7 +67,7 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 | `turn` | C-3~C-6 대화 1턴 · NORMAL/GUIDED/CLOSING |
 | `speech` | **2안 STT/TTS** — 실제 녹음·multipart 업로드·오디오 재생 (`?speech=backend`) |
 | `handoff` | `/play` 완주 → `/activity` 인계 (장면 4개 전부 닫히는지) |
-| `activity` | D-1~D-7 · 키워드 실시간 점등 |
+| `activity` | D-1~D-7 · 키워드 점등 · 카드 재시도 3회 제한 |
 | `drag` | D-2 카드 드래그 (마우스 · 터치) |
 | `account` | A-1~A-5 · B-1 · 로그인 콜백 · 새로고침 유지 · 라우트 가드 · 정원 초과 |
 | `system` | I-1 · I-3 · I-4 (오프라인 → 재시도 → 발화 복구까지) |
@@ -77,7 +77,8 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 
 단순 렌더 확인이 아니라 **요건 위반을 잡는 검사**가 섞여 있습니다. 예: 리포트에
 점수·등급·백분위 표현이 없는지, 내부 사고 요소 태그가 보호자 화면에 새지 않는지,
-F-1에 "내 목소리로" 문구가 없는지, 미션이 전체 화면 모달이 아닌지.
+F-1에 "내 목소리로" 문구가 없는지, 미션이 전체 화면 모달이 아닌지,
+카드 3회째에 실패를 지적하는 표현이 없는지.
 
 Chromium을 못 찾으면 `npx playwright install chromium`, 또는 `GQ_CHROME`으로
 크롬 실행 파일을 직접 지정하세요.

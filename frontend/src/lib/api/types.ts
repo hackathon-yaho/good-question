@@ -145,10 +145,22 @@ export type ActivitySnapshot = {
 export type OrderResult = {
   isCorrect: boolean;
   attemptCount: number;
-  /** 정답일 때만 채워진다. */
+  /** 정답이거나 3회째일 때 채워진다. */
   retellingKeywords: string[] | null;
   /** 오답일 때 D-3 "힌트 보기"가 강조할 카드 1장 */
   hintCardId: string | null;
+  /**
+   * 정답 순서. **3회째 오답에만 실려 온다.** (백엔드 D-10 · Q-15)
+   *
+   * `attempt_count`는 재시도를 전제하지만 제한 규칙이 없어 무한 재시도가 된다.
+   * 아이가 활동에 갇혀 세션이 완료되지 않고, D-3의 "실패를 지적하지 않는다"
+   * 원칙과도 어긋난다. 그래서 3회째에 정답을 보여주고 다음 단계로 넘긴다.
+   *
+   * ⚠️ **프론트가 시도 횟수를 세서 판단하지 않는다.** 이 필드가 있으면 넘기고,
+   *    없으면 D-3으로 돌린다. 제한 규칙은 서버 소관이다. (§0-2)
+   *    api.md 3.6의 "정답 순서를 내려주지 않는다"는 **처음에** 주지 말라는 뜻이다.
+   */
+  correctOrder: string[] | null;
 };
 
 /** POST /api/sessions/{sessionId}/activity/retelling */

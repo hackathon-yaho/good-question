@@ -23,6 +23,11 @@ export type ActivityState = {
   attemptCount: number;
   /** D-3에서 강조할 카드. 서버가 알려준다 */
   hintCardId: string | null;
+  /**
+   * 3회 시도 후 정답 순서를 보여주고 넘어온 경우. (D-10)
+   * D-4를 "맞췄어!"가 아니라 "이런 순서였어"로 그린다. 실패를 지적하지는 않는다.
+   */
+  orderRevealed: boolean;
   retellingKeywords: string[];
   /** D-5에서 아이가 실제로 말한 키워드 */
   spokenKeywords: string[];
@@ -41,6 +46,7 @@ export const initialActivityState: ActivityState = {
   slots: [null, null, null, null],
   attemptCount: 0,
   hintCardId: null,
+  orderRevealed: false,
   retellingKeywords: [],
   spokenKeywords: [],
   retellingText: "",
@@ -85,6 +91,23 @@ function detectKeywords(
     (kw) => transcript.includes(kw) && !already.includes(kw)
   );
   return found.length ? [...already, ...found] : [...already];
+}
+
+/**
+ * 카드 id 순서를 슬롯 배열로 바꾼다. 하나라도 못 찾으면 null을 준다 —
+ * 반쯤 채워진 슬롯을 보여주는 것보다 제출한 그대로 두는 게 낫다.
+ */
+function arrangeBy(
+  order: readonly string[],
+  state: ActivityState
+): (ActivityCard | null)[] | null {
+  const byId = new Map<string, ActivityCard>();
+  for (const card of [...state.tray, ...state.slots]) {
+    if (card) byId.set(card.id, card);
+  }
+  const arranged = order.map((id) => byId.get(id) ?? null);
+  if (arranged.length !== state.slots.length) return null;
+  return arranged.some((card) => card === null) ? null : arranged;
 }
 
 export function activityReducer(
@@ -148,8 +171,35 @@ export function activityReducer(
           attemptCount: result.attemptCount,
           retellingKeywords: result.retellingKeywords ?? [],
           hintCardId: null,
+          orderRevealed: false,
         };
       }
+
+      /**
+       * 서버가 정답 순서를 실어 보냈다 = 재시도 한도에 닿았다. (D-10 · 3회)
+       *
+       * ⚠️ **횟수를 세서 판단하지 않는다.** `attemptCount >= 3`으로 분기하면 서버가
+       *    한도를 바꿀 때 화면이 어긋난다. 이 필드의 유무가 서버의 통보다.
+       *
+       * D-3(오답 피드백)으로 보내지 않는다. 거기에는 "다시 해보기"가 있는데
+       * 다음 시도가 없다. 정답 순서를 보여주고 곧바로 다음 단계로 넘긴다 —
+       * 실패를 지적하지 않으면서 아이를 활동에 갇히게 두지도 않는 길이다.
+       */
+      if (result.correctOrder) {
+        return {
+          ...state,
+          step: ActivityStep.KEYWORDS,
+          attemptCount: result.attemptCount,
+          retellingKeywords: result.retellingKeywords ?? [],
+          hintCardId: null,
+          orderRevealed: true,
+          // 화면에 보여줄 순서를 정답으로 바꾼다. 돌아갈 길이 없으므로
+          // 슬롯을 덮어써도 안전하고, 화면이 실제로 그 순서를 그린다.
+          slots: arrangeBy(result.correctOrder, state) ?? state.slots,
+          tray: [],
+        };
+      }
+
       return {
         ...state,
         step: ActivityStep.FEEDBACK,
@@ -159,7 +209,11 @@ export function activityReducer(
     }
 
     case "RETRY_ORDER":
-      return { ...state, step: ActivityStep.CARD_ORDERING };
+      return {
+        ...state,
+        step: ActivityStep.CARD_ORDERING,
+        orderRevealed: false,
+      };
 
     case "GO_RETELLING":
       return {

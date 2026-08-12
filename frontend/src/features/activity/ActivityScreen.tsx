@@ -181,6 +181,8 @@ export function ActivityScreen({
         <KeywordReveal
           slots={orderedSlots}
           keywords={state.retellingKeywords}
+          // 3회 시도 후 정답을 보여주며 넘어온 경우. (D-10)
+          revealed={state.orderRevealed}
           onNext={() => dispatch({ type: "GO_RETELLING" })}
         />
       ) : null}

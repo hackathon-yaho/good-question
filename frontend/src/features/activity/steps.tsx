@@ -85,26 +85,55 @@ export function FeedbackModal({
   );
 }
 
-/** D-4 정답 → 핵심 단어 공개 */
+/**
+ * D-4 정답 → 핵심 단어 공개
+ *
+ * ── 3회 시도 후에도 이 화면이다 ─────────────────────────────────────
+ * 재시도가 3회로 제한되고(D-10), 3회째에는 서버가 정답 순서를 실어 보낸다.
+ * 그때 **별도 화면을 만들지 않고 이 화면을 쓴다.** 배너 문구와 카드 테두리만
+ * 바뀐다(`revealed`).
+ *
+ * 화면을 따로 만들면 그 자체가 "너는 다른 길로 왔다"는 표시가 된다.
+ * D-3의 원칙은 실패를 **지적하지 않는** 것이고, 여기서는 순서를 알려 주고
+ * 같은 다음 단계로 보내는 것이 그 원칙을 지키는 방법이다.
+ *
+ * 그렇다고 "맞췄어!"라고 하지도 않는다. 그건 거짓이고, 아이도 자기가 맞히지
+ * 않았다는 걸 안다.
+ */
 export function KeywordReveal({
   slots,
   keywords,
+  revealed = false,
   onNext,
 }: {
   slots: readonly (ActivityCard | null)[];
   keywords: readonly string[];
+  /** 3회 시도 후 정답 순서를 보여주는 경우 (D-10) */
+  revealed?: boolean;
   onNext: () => void;
 }) {
   return (
     <div className="flex size-full flex-col items-center justify-center gap-7 px-10">
-      <p className="rounded-pill bg-secondary px-6 py-2 text-kid-button font-bold text-white">
-        순서를 맞췄어!
+      <p
+        className={[
+          "rounded-pill px-6 py-2 text-kid-button font-bold",
+          revealed ? "bg-accent-soft text-text" : "bg-secondary text-white",
+        ].join(" ")}
+      >
+        {revealed ? "이런 순서였어!" : "순서를 맞췄어!"}
       </p>
 
       <ol className="flex items-center gap-3">
         {slots.map((card, index) => (
           <li key={card?.id ?? index} className="flex items-center gap-3">
-            <div className="flex h-[10rem] w-[13.75rem] items-center justify-center rounded-card border-2 border-secondary bg-secondary-soft p-3 text-center">
+            <div
+              className={[
+                "flex h-[10rem] w-[13.75rem] items-center justify-center rounded-card border-2 p-3 text-center",
+                revealed
+                  ? "border-accent bg-accent-soft"
+                  : "border-secondary bg-secondary-soft",
+              ].join(" ")}
+            >
               <span className="text-parent-body leading-snug font-bold text-text">
                 {card?.text}
               </span>
