@@ -1,5 +1,6 @@
 package com.goodquestion.backend.message.service.ai;
 
+import com.goodquestion.backend.message.enums.CharacterState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -42,13 +43,24 @@ public class AiRespondClientImpl implements AiRespondClient {
             if (body == null || body.text() == null || body.text().isBlank()) {
                 return RespondAiResult.failure();
             }
-            return new RespondAiResult(true, body.text());
+            return new RespondAiResult(true, body.text(), parseCharacterState(body.characterState()));
         } catch (Exception e) {
             log.warn("[AiRespondClient] /respond 호출 실패: {}", e.getMessage());
             return RespondAiResult.failure();
         }
     }
 
-    private record RespondAiResponseBody(String text) {
+    /** O-12. AI가 값을 안 주거나 5종 밖의 값을 주면 null로 폴백한다 — 프론트가 이전 상태를 유지한다. */
+    private CharacterState parseCharacterState(String raw) {
+        if (raw == null) return null;
+        try {
+            return CharacterState.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            log.warn("[AiRespondClient] 알 수 없는 characterState: {}", raw);
+            return null;
+        }
+    }
+
+    private record RespondAiResponseBody(String text, String characterState) {
     }
 }

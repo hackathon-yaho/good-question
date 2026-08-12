@@ -630,6 +630,38 @@ CORS(GET 메서드·`allowCredentials`)는 이미 충족돼 있어 변경 없음
 
 ---
 
+### D-27 · O-12 캐릭터 마음 변화 — `characterState` 필드를 AI 응답에서 직접 받는다
+
+PRD 11.3 O-12(주최측 추가 요건 A-03, "아이의 발화 내용에 따라 캐릭터 표정 또는 태도
+변화")는 원래 담당이 "프론트·AI"로만 적혀 있어 백엔드 문서 어디에도 추적되지 않고
+있었다(D-25 마이페이지와 같은 종류의 누락). 이번에 이미지 에셋을 AI로 재생성하는
+작업([docs/request/ai/story-image-assets.md](../../docs/request/ai/story-image-assets.md))을
+정리하면서 함께 설계했다.
+
+**상태값을 백엔드가 `reactionKey`로 미리 분류하지 않고 AI가 직접 판단해서 준다.**
+백엔드가 발화 성격으로 미리 분류해 둔 값(예: `reactionKey`)과 AI가 실제로 생성한
+문장의 뉘앙스가 어긋날 수 있어서다 — 대사를 실제로 쓴 쪽(AI)이 그 대사에 맞는
+표정을 고르는 게 더 정확하다는 판단.
+
+- 상태값 5종 고정(모든 캐릭터 공통): `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED`
+  (`message/enums/CharacterState.java`)
+- `AiRespondClientImpl`이 `/respond` 응답의 `characterState` 문자열을 파싱한다. 없거나
+  5종 밖의 값이면 **예외를 던지지 않고 `null`로 폴백**한다 — 실제 AI 서버가 아직 이
+  필드를 안 보내는 과도기에도 기존 흐름(캐릭터 대사 자체)이 깨지면 안 되기 때문이다
+- `CLOSING`(장면 마무리, `character_closing` 고정 문구 사용)과 `/respond` 실패 폴백은
+  애초에 AI를 안 부르므로 `characterState`가 항상 `null`이다 — 프론트는 이 두 경우 이전
+  상태를 유지하거나 기본 이미지를 쓰면 된다
+- 로컬 `AiMockController`도 `characterState: "MOVED"`를 같이 내려주도록 갱신 — 실제 AI
+  서버가 붙기 전에도 필드 배관을 끝까지 검증할 수 있게
+
+이미지 파일(캐릭터 3명 × 상태 5종 = 15장) 자체는 아직 없다 — 이번 작업은 필드
+배관까지만이고, 프론트가 이 값으로 실제 이미지를 바꾸는 것은 이미지 도착 후 별도 작업이다.
+
+**검증**: 대화 중 턴(`normal`/`guided`) 응답에 `characterState: "MOVED"`(목 서버 고정값)
+확인 → 마지막 턴(`closing`) 응답에 `characterState: null` 확인.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

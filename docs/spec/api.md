@@ -8,6 +8,14 @@
 
 ## 수정 이력
 
+### 2026-08-13 — O-12 캐릭터 마음 변화 필드 추가
+
+근거: [request/ai/story-image-assets.md](../request/ai/story-image-assets.md), [backend/docs/decisions.md D-27](../../backend/docs/decisions.md)
+
+| 절 | 변경 |
+| --- | --- |
+| 3.5 | `POST /messages` 응답에 `characterState` 신규 — 대화 중 캐릭터 이미지 전환용 상태값(5종), AI가 판단해 내려줌. `CLOSING`이면 `null` |
+
 ### 2026-08-13 — 프론트 통합 검증 결과 반영 (TTS 계약 정정)
 
 근거: [request/backend/tts-audio-contract.md](../request/backend/tts-audio-contract.md), [backend/docs/decisions.md D-26](../../backend/docs/decisions.md)
@@ -570,7 +578,9 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
   "missionTriggered": null,
   "highlightWords": [
     { "word": "구박", "meaning": "누군가를 못마땅해하며 자꾸 나무라는 것" }
-  ]
+  ],
+  "messageId": "d82d423b-e4af-43c6-b99c-3b34e1941cfc",
+  "characterState": "WORRIED"
 }
 ```
 
@@ -586,6 +596,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `missionTriggered` | 미션 노출 신호. 없으면 `null` |
 | `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. 장면별 후보 단어가 **이번 턴 `characterMessage`에 실제로 있을 때만** 채워진다. 없는 턴은 빈 배열 `[]` ([D-11](../../backend/docs/decisions.md) · [D-22](../../backend/docs/decisions.md)) |
 | `messageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)). 필드명 `characterMessageId`→`messageId` 정정은 [D-26](../../backend/docs/decisions.md) |
+| `characterState` | **신규 (O-12).** 대화 중 캐릭터 이미지 전환용 상태값. AI가 대사 내용에 맞춰 판단해 내려줌. `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 중 하나, `CLOSING`이면 항상 `null` ([D-27](../../backend/docs/decisions.md)). 상태별 캐릭터 이미지는 [request/ai/story-image-assets.md](../request/ai/story-image-assets.md) 도착 대기 중 |
 
 **프론트가 하지 말아야 할 것**
 
