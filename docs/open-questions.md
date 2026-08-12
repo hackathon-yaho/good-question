@@ -256,7 +256,7 @@ AI 분석 5초 + AI 응답 5초 = 10초
 >
 > ⚠️ **남은 것: 실측.** 배포 후 각 구간을 측정해 프론트에 공유하고, 15초 유지 여부를 그때 정합니다.
 
-### Q-18 · soft-cue와 `/respond` 입력 🟢
+### Q-18 · soft-cue와 `/respond` 입력 ✅ 구현 완료 (2026-08-12)
 
 [PRD 6.14](product/prd.md)는 `NORMAL` soft-cue의 재료를 `softRemainingWorry`라는 별도 값으로 정의하지만,
 [작업 분장 4.2](team/roles.md)의 입력 스키마에는 `remainingWorry` 하나뿐이고
@@ -266,6 +266,12 @@ responseMode 표의 `NORMAL` 항목은 유도 재료 사용을 언급하지 않�
 구현할 때 `responseMode = NORMAL`에 `remainingWorry`를 실어 보내고,
 프롬프트에서 "NORMAL + remainingWorry면 **약하게만** 드러낸다"를 명시하면 됩니다.
 미구현이면 `NORMAL` 일반 반응으로 동작하므로 문제없습니다.
+
+**구현 완료** ([backend/docs/decisions.md D-23](../backend/docs/decisions.md)): 백엔드가 판단한
+대로 새 필드 없이 `GuidanceSelector.selectForTurn()`이 GUIDED와 같은
+`guidanceTarget`/`remainingWorry`를 `responseMode: NORMAL`에도 함께 실어 보낸다. AI 프롬프트
+쪽에 "NORMAL + remainingWorry면 약하게만" 지시를 넣는 건 AI 담당 몫으로 남아 있다 — 백엔드는
+mock 스텁 기준으로 필드 전달까지만 검증했다.
 
 ### Q-21 · A-4 진입 경로에 동의 화면이 없다 ✅ 해결 (2026-08-10)
 
