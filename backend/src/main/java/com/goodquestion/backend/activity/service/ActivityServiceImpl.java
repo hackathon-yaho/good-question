@@ -13,6 +13,7 @@ import com.goodquestion.backend.common.global.ErrorCode;
 import com.goodquestion.backend.common.global.exception.BusinessException;
 import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.repository.MessageRepository;
+import com.goodquestion.backend.parent.service.ParentReportService;
 import com.goodquestion.backend.session.entity.StorySession;
 import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
@@ -45,6 +46,7 @@ public class ActivityServiceImpl implements ActivityService {
     private final StorySessionRepository storySessionRepository;
     private final PostActivityResultRepository postActivityResultRepository;
     private final MessageRepository messageRepository;
+    private final ParentReportService parentReportService;
 
     @Override
     @Transactional(readOnly = true)
@@ -108,6 +110,9 @@ public class ActivityServiceImpl implements ActivityService {
         if (!alreadyCompleted) {
             session.getChild().addStarDust(STORY_COMPLETION_STAR_DUST);
         }
+        // O-01~O-05, D-24: 리포트는 완료 시점에 한 번만 생성한다 — 계산 로직이 나중에 바뀌어도
+        // 이미 만든 리포트는 그대로 남는다. star_dust와 같은 이유로 별가루 지급 지점에 얹는다.
+        parentReportService.generateReportIfAbsent(session);
 
         long childUtteranceCount = messageRepository.countBySessionAndSpeakerType(session, SpeakerType.CHILD);
         long characterCount = messageRepository.findAllBySessionAndSpeakerType(session, SpeakerType.CHARACTER).stream()
@@ -119,7 +124,7 @@ public class ActivityServiceImpl implements ActivityService {
                 session.getStatus().name().toLowerCase(),
                 session.getCompletedAt(),
                 new ActivityStatsResponse((int) childUtteranceCount, (int) characterCount, 0),
-                false);
+                true);
     }
 
     private PostActivityResult getOrCreateResult(StorySession session) {

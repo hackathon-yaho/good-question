@@ -502,6 +502,51 @@ PRD 8.12 원 스키마(`id`, `child_id`, `word`, `meaning`, `source_scene_id`)�
 
 ---
 
+### D-24 · 보호자 리포트(O-01~O-05) — `reports`는 세션 완료 시 1회 생성해 jsonb로 저장한다
+
+**배경**: `backend/docs/reports.md`로 전달받은 자료가 저장소에 이미 있던
+[리포트 가이드](../../docs/reference/guardian-report-guide.md)(주최측 원문)와 같은 내용이었고,
+프론트가 이 가이드를 기준으로 `frontend/src/lib/api/{types.ts, mock-parent.ts}`에 응답 형태와
+계산 로직을 이미 구현해 둔 상태였다. **추론하지 않고 이 두 자료를 그대로 따랐다.**
+
+**저장 시점 — 세션 완료(M-57) 시 1회.** 조회할 때마다 다시 계산하는 방식(테이블 없이)도
+검토했으나, 계산 로직을 나중에 바꿔도 이미 만들어진 리포트가 그대로 남아야 한다는 이유로
+저장 방식을 택했다(PRD 8.12 원안과도 일치). `ActivityServiceImpl.submitRetelling`에서
+`child.addStarDust()`와 같은 자리에 `parentReportService.generateReportIfAbsent(session)`을
+얹었다 — 이미 있으면 아무것도 하지 않는다.
+
+**스키마 — PRD 8.12(`summary`·`strengths`·`next_focus` 3컬럼)를 그대로 쓰지 않는다.**
+가이드가 요구하는 구조(어휘 집계, 역량 5개 카드, 사고 요소 4그룹 집계, 대표 발화, 가정 가이드)를
+3개의 평평한 컬럼에 담을 수 없어, `summary`(text)만 남기고 나머지는 jsonb 5개로 확장했다
+(`vocabulary`·`competencies`·`element_counts`·`representative`·`guide`). `tts_cache`·`wordbook`과
+같은 이유 — 원안이 실제 요구사항보다 먼저 쓰였다.
+
+**계산 로직은 새로 설계하지 않고 `mock-parent.ts`를 그대로 포팅했다** (`parent/report/ReportGenerator.java`):
+
+| 값 | 알고리즘 |
+| --- | --- |
+| `vocabulary` | 아이 발화 원문을 공백·문장부호로 분리, 2글자 이상만, 빈도순 상위 6개가 주요 어휘, 2회 이상이 반복 표현 |
+| `competencies` | 역량 5개 **항상 전부** 반환. 해당 사고 요소가 세션 어디에든 있으면 "있음" 문구+가장 긴 발화를 근거로, 없으면 "없음" 문구(부정적이지 않게)+근거 `null` |
+| `elementCounts` | 사고 요소 8종 → 아이 화면과 같은 4그룹(마음/이유/생각/방법)으로 집계. **장면 초기화와 무관하게 세션 전체**를 본다 — `story_sessions.accumulated_elements`(장면 전환 시 초기화)가 아니라 `utterance_analyses`를 세션 전체로 훑는다 |
+| `representative` | 문장 수 많은 순 → 길이 순으로 1개만 선정 (가이드 5절, Q-08) |
+| `guide` | 평균 발화 길이 15자 미만이면 SHORT, 아니면 표현·논리 사고 요소 개수 비교로 4가지 질문 세트 중 하나 선택 (가이드 7절) |
+
+**대표 발화·질문 세트 선택 알고리즘은 가이드 원문이 아니라 프론트가 정한 휴리스틱이다** — 가이드는
+"무엇을 볼지"만 정하고 "어떻게 계산할지"는 안 정했다. 사용자 확인 후 **프론트와 동일하게** 가기로
+했다 — 프론트/백엔드가 각자 다른 기준으로 리포트를 만들면 나중에 프론트가 서버 응답을 그대로
+쓰도록 바꿀 때 결과가 달라진다.
+
+**AI를 호출하지 않는다.** 근거는 이미 저장된 `utterance_analyses.detected_elements`뿐이고,
+문구도 전부 역량별로 미리 써둔 고정 텍스트(있음/없음 두 버전)를 조건에 따라 골라 쓴다.
+새 LLM 호출 경로가 생기지 않는다.
+
+**검증**: 세션을 대화4까지 완주 → `POST .../retelling` → `reports` 테이블에 행 1개 생성,
+`reportAvailable: true` 확인. `GET /api/parent/{summary,reports,reports/{sessionId}}` 3개
+전부 curl로 응답 형태 확인. 완료 전 세션의 `reports/{sessionId}` → 404, 다른 보호자 접근 → 403.
+`ReportGeneratorTest` 18건(포화 케이스 포함) 단위 테스트.
+
+---
+
 ### D-23 · O-13 NORMAL soft-cue 구현 — 새 AI 필드 없이 기존 유도 필드를 재사용한다
 
 work-items.md·plan.md는 O-13을 "미구현 시 NORMAL 일반 반응으로 동작. 새 필드 불필요"로
