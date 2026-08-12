@@ -381,7 +381,48 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | --- | --- | --- | --- |
 | B-20 | ~~별가루 (`star_dust`)~~ | **요건 외 팀 추가** (D-09) | **완료.** 이야기 완료 시 +100. 사용처·차감 없음 |
 | O-06~O-10 | ~~단어장 (`wordbook` + API 3개)~~ | 주최측 추가 요건 A-02 | **완료.** `GET`/`POST`/`PATCH /api/wordbook` (D-11, D-22) |
-| O-01~O-05 | 보호자 리포트 + `reports` 테이블 | 주최측 추가 요건 A-01 | 응답 스키마 미결. 내부 분석 태그를 보호자 화면에 노출 금지 |
+| O-01~O-05 | 보호자 리포트 + `reports` 테이블 | 주최측 추가 요건 A-01 | **계획 수립 완료, 구현 미착수** — 아래 참조 |
+
+### 보호자 리포트 작업 계획 (2026-08-12, 계획만 — 구현 전)
+
+**근거 자료 3종** (추론 없이 이것만 따른다):
+[리포트 가이드](../../docs/reference/guardian-report-guide.md) (주최측 원문, 평가 기준),
+`frontend/src/lib/api/types.ts`(응답 타입 3종 — [api.md 3.8](../../docs/spec/api.md)에 그대로 옮김),
+`frontend/src/lib/api/mock-parent.ts` + `frontend/src/lib/thinking-elements.ts`(계산 로직·문구, 프론트가 이미 구현).
+
+**엔드포인트 3개** — `parent/{controller,service,dto}` 신규 (기존 `parent` 패키지에 Parent 엔티티만 있음):
+
+| 엔드포인트 | 화면 | 소유권 검증 |
+| --- | --- | --- |
+| `GET /api/parent/summary?childId=` | A-6 | `childId`가 요청 보호자 소유인지 |
+| `GET /api/parent/reports?childId=` | G-1 | 〃 |
+| `GET /api/parent/reports/{sessionId}` | G-2~G-4 | 세션의 아이가 요청 보호자 소유인지 |
+
+**포팅해야 할 계산 로직** (전부 `mock-parent.ts`에 이미 구현돼 있음 — 알고리즘을 새로 설계하지 않고 그대로 옮긴다):
+
+| 계산 | 근거 함수(mock) | 데이터 출처 |
+| --- | --- | --- |
+| `avgChildSentences`·`thisWeekCount`·`hasRecords` | `sentenceCount()`, `getSummary()` | `messages` (speaker=child) |
+| `weeklyTrend`(4주)·`trendMessage` | `listReports()` | 〃. 직전 주 대비 증가 시에만 문구, 아니면 `null` |
+| `vocabulary` | `vocabularyOf()` | 아이 발화 원문 단순 분리 — 형태소 분석기 안 씀 |
+| `competencies`(5개 고정) | `COMPETENCY_DEFS`, `competenciesOf()` | `utterance_analyses.detected_elements` 존재 여부로 매칭, evidence는 가장 긴 발화 |
+| `elementCounts`(4그룹) | `KID_LABEL`(`thinking-elements.ts`) | `ThoughtElement` → 마음/이유/생각/방법 매핑을 백엔드에도 둬야 함 (지금은 프론트만 갖고 있음) |
+| `representative`(1개) | `representativeOf()` | 문장수 많은 순 → 길이 순 |
+| `guide`(질문 세트) | `pickQuestionKind()`, `STORY_QUESTIONS`/`DAILY_QUESTIONS` | 평균 발화 길이 + 표현/논리 사고 요소 개수 비교 |
+
+**새 코드 상수 필요**: `COMPETENCY_DEFS` 5개(이름·영역·사고요소·문구 4종)와 `STORY_QUESTIONS`/`DAILY_QUESTIONS` 4세트를 `mock-parent.ts`에서 그대로 옮겨 온다 — `DialogueContents`·`HighlightWords`와 같은 이유(팀 창작 콘텐츠)로 코드 상수, DB 아님.
+
+### 구현 착수 전 확인 필요 (사용자에게 물어볼 것)
+
+- **O-05 `reports` 테이블이 실제로 필요한가?** PRD 8.12는 저장 테이블로 정의했지만, 프론트
+  mock은 **저장하지 않고 조회 시점마다 다시 계산**한다 (LLM 호출 없는 순수 집계라 비용이
+  적음). `messages`·`utterance_analyses`가 삭제되지 않는 한 재계산 결과는 항상 같다(순수
+  함수) — 저장 없이 매번 계산해도 충분할 수 있다. 저장하면 계산 이력이 남고 재계산 비용이
+  없는 대신 스키마·동기화 부담이 생긴다.
+- **대표 발화·질문 세트 선택 알고리즘은 가이드 원문이 아니라 프론트의 자체 휴리스틱이다.**
+  가이드는 "무엇을 기준으로 볼지"만 정하고 "어떻게 계산할지"는 안 정했다(예: "가장 완성도
+  높은 발화" → 프론트는 "문장수 많은 순 → 길이 순"으로 구체화). 백엔드도 이 휴리스틱을
+  그대로 따를지, 팀이 한 번은 합의해두는 게 안전하다.
 | O-13 | ~~NORMAL soft-cue~~ | [PRD 6.14](../../docs/product/prd.md) | **완료.** `session/engine/GuidanceSelector.selectForTurn()` (D-23) |
 | O-14 | `analysis_versions` | 확장 테이블 | 문자열 `mvp_v1` 저장으로 대체 가능 |
 

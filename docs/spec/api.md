@@ -21,6 +21,7 @@
 | **3.5** | **발화 전송을 요청 3개로 분리.** `POST /api/stt` · `GET /api/tts` 신규 (D-02) |
 | 3.6 | 카드 재시도 3회 제한, 3회째 `correctOrder` 공개 (D-10) |
 | 3.7 | `highlightWords`는 장면별 후보 단어가 실제 대사에 있을 때만 채워짐, `wordbook` API 3개 구현 완료 (D-11 · D-22) |
+| 3.8 | 보호자 리포트 3개 엔드포인트 응답 형태 확정 (프론트 mock 그대로 반영) |
 | 4.3 | 타임아웃·재시도·실패 동작 확정 (D-03) |
 | 5 | 미결 항목 갱신 |
 
@@ -786,7 +787,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 - `stats`에 점수·등급을 넣지 않습니다. 활동량만입니다 ([PRD 10.1](../product/prd.md))
 - "별가루" 필드는 만들지 않습니다 → [Q-12](../open-questions.md)
 
-### 3.8 보호자 (선택) ⚪
+### 3.8 보호자 (선택) ✅ 응답 형태 확정 (2026-08-12)
 
 | 엔드포인트 | 화면 | 비고 |
 | --- | --- | --- |
@@ -794,10 +795,121 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 | `GET /api/parent/reports?childId={id}` | G-1 | 리포트 목록 + 최근 4주 추이 |
 | `GET /api/parent/reports/{sessionId}` | G-2~G-4 | 역량 분석 / 대표 발화 / 가정 가이드 |
 
+> 아래 응답 형태는 프론트가 [리포트 가이드](../reference/guardian-report-guide.md) 기준으로 이미
+> mock 구현해 둔 `frontend/src/lib/api/{types.ts, mock-parent.ts}`를 그대로 옮긴 것입니다.
+> 필드명·구조를 새로 정의하지 않았습니다 — 백엔드는 이 mock의 계산 로직을 실제 DB
+> (`messages`·`utterance_analyses`) 기준으로 옮기기만 하면 됩니다.
+
 리포트 응답 설계 시 주의:
 
-- **내부 분석 태그(`DECISION`, `REASON` 등)를 보호자 화면에 노출하지 않습니다.** API 레벨에서 사람이 읽는 문구로 변환해 내려주는 편이 안전합니다 ([리포트 가이드 4절](../reference/guardian-report-guide.md))
+- **내부 분석 태그(`DECISION`, `REASON` 등)를 보호자 화면에 노출하지 않습니다.** API 레벨에서 사람이 읽는 문구로 변환해 내려줍니다 ([리포트 가이드 4절](../reference/guardian-report-guide.md))
 - 점수·등급·백분위를 만들지 않습니다 ([리포트 가이드 8절](../reference/guardian-report-guide.md))
+- **4점 dot 인디케이터는 넣지 않습니다.** 산출 기준이 없어 프론트가 2026-08-10에 스스로 뺐습니다 ([화면 명세 §7-2 #14](screens.md)). 대신 리포트 가이드 4절의 5단(역량명→특징→근거 발화→잘한 점→보완할 부분) 구조를 그대로 씁니다
+- `trendMessage`는 **근거 없는 추세를 말하지 않습니다.** 실제로 발화 수가 늘었을 때만 문구를 채우고, 판단할 데이터가 없으면 `null`
+
+#### `GET /api/parent/summary?childId={id}` · A-6
+
+**Response 200**
+
+```json
+{
+  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "age": 8 },
+  "thisWeekCount": 2,
+  "completedStories": 1,
+  "avgChildSentences": 1.4,
+  "hasRecords": true
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| `thisWeekCount` | 최근 7일 이내 완료된 세션 수 |
+| `avgChildSentences` | 아이 발화 1건당 평균 문장 수 (전체 세션 합산) |
+| `hasRecords` | `false`면 화면은 "0" 대신 "아직 기록이 없어요"를 보여줍니다. 기록이 아예 없을 때 `0`을 늘어놓지 않기 위한 필드입니다 |
+
+#### `GET /api/parent/reports?childId={id}` · G-1
+
+**Response 200**
+
+```json
+{
+  "children": [{ "id": "uuid", "name": "민준" }],
+  "weeklyTrend": [
+    { "weekLabel": "3주 전", "utteranceCount": 0 },
+    { "weekLabel": "2주 전", "utteranceCount": 0 },
+    { "weekLabel": "1주 전", "utteranceCount": 5 },
+    { "weekLabel": "이번 주", "utteranceCount": 8 }
+  ],
+  "trendMessage": "말하기 문장 수가 늘고 있어요",
+  "reports": [
+    { "sessionId": "uuid", "storyTitle": "방귀 뀌는 며느리", "coverImageUrl": "...", "date": "2026.08.12", "status": "completed" }
+  ]
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| `children` | 이 보호자의 아이 전환 칩 목록 (`childId` 파라미터와 무관하게 전체) |
+| `weeklyTrend` | 최근 4주, 주별 아이 발화 수. 오늘부터 7일 단위로 역산 |
+| `trendMessage` | 직전 주보다 발화 수가 늘었을 때만 문구 제공. 판단 근거가 없으면 `null` |
+| `reports` | 발화가 1건 이상 있는 세션만 (빈 세션은 목록에서 제외) |
+
+#### `GET /api/parent/reports/{sessionId}` · G-2~G-4
+
+**Response 200**
+
+```json
+{
+  "sessionId": "uuid",
+  "storyTitle": "방귀 뀌는 며느리",
+  "date": "2026.08.12",
+  "summary": "이번 이야기에서 아이가 18번 말했어요. 아래는 그 말들을 바탕으로 정리한 내용입니다.",
+  "vocabulary": {
+    "mainWords": ["며느리", "방귀", "창피해서", "배나무", "시아버지"],
+    "repeated": ["방귀", "창피해서"],
+    "feedback": "자주 쓴 말이 있어요. 비슷한 뜻의 다른 낱말도 함께 알려주면 표현이 넓어져요."
+  },
+  "competencies": [
+    {
+      "name": "관점과 공감",
+      "feature": "다른 인물의 처지를 헤아려 말한 부분이 있었어요.",
+      "evidence": "며느리가 속상했을 것 같아.",
+      "strength": "상대가 왜 그렇게 느꼈을지 먼저 생각해 본 점이 좋았어요.",
+      "next": "\"그 사람은 어떤 마음이었을까?\"처럼 상대의 입장을 묻는 질문을 해보세요."
+    }
+  ],
+  "elementCounts": [
+    { "label": "마음", "count": 3 },
+    { "label": "이유", "count": 2 },
+    { "label": "생각", "count": 4 },
+    { "label": "방법", "count": 1 }
+  ],
+  "representative": {
+    "text": "며느리가 속상했을 것 같아. 시아버지가 먼저 미안하다고 해야 해.",
+    "sceneLabel": "장면 2",
+    "reason": "생각과 그 까닭이 한 번에 이어져, 아이의 말하기 강점이 가장 잘 드러난 발화예요."
+  },
+  "guide": {
+    "intro": "학습 과제가 아니라, 오늘 나눈 이야기를 자연스럽게 이어가기 위한 질문이에요.",
+    "storyQuestions": [
+      "시아버지는 처음에 왜 며느리를 집에서 내보내려고 했을까?",
+      "시아버지는 며느리에게 어떤 말을 해주면 좋을까?"
+    ],
+    "dailyQuestions": [
+      "친구가 자신의 특징 때문에 부끄러워한다면 어떤 기분일까?",
+      "그 친구에게 어떤 말을 해주고 싶어?"
+    ]
+  }
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| `vocabulary` | 리포트 가이드 3-1. `mainWords`(주요 어휘)·`repeated`(반복 표현)는 발화 원문에서 집계. 특징이 뚜렷하지 않아도 `feedback`은 항상 긍정적으로 |
+| `competencies` | 리포트 가이드 3-2·3-3의 5개 역량(관점과 공감·감정 표현·상호작용·생각과 이유·결과와 해결)을 **항상 5개 모두** 반환 — 위 예시는 1개만 표기. `evidence`는 그 역량에 해당하는 사고 요소가 이번 세션에 있으면 실제 발화, 없으면 `null` |
+| `elementCounts` | `accumulatedElements`를 §1-7과 같은 4그룹(마음/이유/생각/방법)으로 집계 |
+| `representative` | 리포트 가이드 5절 — **1개만.** 화면 명세 G-3의 "카드 3개" 초안과 다릅니다 ([Q-08](../open-questions.md), 프론트가 가이드 기준으로 확정) |
+| `guide.storyQuestions` / `dailyQuestions` | 리포트 가이드 6·7절의 질문 세트 중 이번 세션의 강점·보완점에 맞는 세트 1개를 선택해 반환 |
 - 대표 발화는 가이드상 **1개**입니다. 화면 명세 G-3의 3개 카드와 다릅니다 → [Q-08](../open-questions.md)
 
 ---
