@@ -80,11 +80,32 @@ POST /api/auth/dev-login
 
 ## 완료 조건
 
-- [ ] 로그인 버튼이 `window.location.href`로 `/api/oauth2/authorization/kakao`로 이동한다
-- [ ] `/auth/callback` 페이지가 `hasCompletedOnboarding` 쿼리로 올바르게 분기한다
-- [ ] `error=login_failed` 케이스가 처리된다
-- [ ] 이후 모든 API 호출에 `credentials: 'include'`가 설정되어 있다
+- [x] 로그인 버튼이 `window.location.href`로 `/api/oauth2/authorization/kakao`로 이동한다
+- [x] `/auth/callback` 페이지가 `hasCompletedOnboarding` 쿼리로 올바르게 분기한다
+- [x] `error=login_failed` 케이스가 처리된다
+- [x] 이후 모든 API 호출에 `credentials: 'include'`가 설정되어 있다
 - [ ] `dev-login`으로 로그인 흐름을 먼저 검증했다 (카카오 앱 등록 전)
+
+### 프론트 구현 상태 (2026-08-12)
+
+| 항목 | 파일 |
+| --- | --- |
+| 로그인 시작 (URL 이동) | `frontend/src/features/account/LoginScreen.tsx` |
+| 콜백 분기 | `frontend/src/features/account/AuthCallbackScreen.tsx` |
+| `/auth/me` · `/auth/logout` · `/auth/dev-login` | `frontend/src/lib/api/auth.ts` |
+| `credentials: "include"` | `frontend/src/lib/api/http.ts` — 실 fetch가 여기 한 곳뿐 |
+
+`NEXT_PUBLIC_AUTH_MODE`로 목/백엔드를 전환합니다. 기본값 `mock`은 백엔드 없이
+같은 콜백 URL을 태워 분기 로직을 그대로 실행합니다. `npm run verify`의 `account`
+스위트가 콜백 4가지 경우(true·false·error·쿼리 없음)를 확인합니다.
+
+**마지막 항목은 백엔드 로컬 구동이 필요해 아직 못 했습니다.** 8080이 떠 있으면
+`NEXT_PUBLIC_AUTH_MODE=backend npm run dev` → `/login`의 "카카오 없이 로그인"으로
+쿠키 발급까지 확인하겠습니다. 이때 백엔드에서 확인이 필요한 것:
+
+- CORS `allowedOrigins`에 `http://localhost:3000`이 있고 `allowCredentials=true`인지
+- 302 목적지의 프론트 오리진이 `http://localhost:3000`인지
+- 로컬은 쿠키 `SameSite=Lax`, 배포는 `None; Secure`인지 (오리진이 달라짐)
 
 ## 아직 못 정한 것
 

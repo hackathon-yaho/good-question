@@ -16,6 +16,7 @@ import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { mockParentApi } from "@/lib/api/mock-parent";
 import type { ParentAccount, ParentApi } from "@/lib/api/types";
+import { authApi } from "@/lib/api/auth";
 import { clearClientStore } from "@/lib/client-store";
 
 const PROVIDER_LABEL: Record<string, string> = { kakao: "카카오" };
@@ -57,16 +58,26 @@ export function SettingsScreen({ api = mockParentApi }: { api?: ParentApi }) {
     };
   }, [api]);
 
-  const logout = useCallback(() => {
+  // 쿠키를 지우는 것은 서버만 할 수 있다(HttpOnly). 반드시 호출해야 한다.
+  // 실패해도 화면은 로그인으로 보낸다. 여기서 아이를 붙잡아 둘 이유가 없다.
+  const logout = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await authApi.logout();
+    } catch {
+      // 무시 — 쿠키가 남아도 다음 요청에서 401로 정리된다
+    }
     clearClientStore();
     router.replace("/login");
-  }, [router]);
+  }, [busy, router]);
 
   const withdraw = useCallback(async () => {
     if (phrase !== WITHDRAW_PHRASE || busy) return;
     setBusy(true);
     try {
       await api.withdraw();
+      await authApi.logout().catch(() => {});
       clearClientStore();
       router.replace("/login");
     } catch {
@@ -137,7 +148,7 @@ export function SettingsScreen({ api = mockParentApi }: { api?: ParentApi }) {
       </Group>
 
       <div className="mt-8 flex flex-col gap-3">
-        <PillButton variant="outlined" fullWidth onClick={logout}>
+        <PillButton variant="outlined" fullWidth onClick={() => void logout()}>
           로그아웃
         </PillButton>
         <button

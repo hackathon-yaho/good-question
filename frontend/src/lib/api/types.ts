@@ -173,15 +173,13 @@ export type ActivityApi = {
 /** MVP 소셜 로그인은 카카오만이다. (PRD M-01, open-questions Q-02) */
 export type AuthProvider = "kakao";
 
-export type Parent = { id: string; name: string; email: string };
+export type Parent = { id: string; name: string; email: string | null };
 
-/** POST /api/auth/{provider} */
-export type AuthResult = {
-  accessToken: string;
-  /** false → /onboarding/consent, true → /profiles. A-2 분기 판단용 확정 필드 */
-  hasCompletedOnboarding: boolean;
-  parent: Parent;
-};
+/**
+ * ⚠️ `POST /api/auth/{provider}`(프론트가 인가 코드를 전달하는 원안)는 **폐기됐다.**
+ * 백엔드 리다이렉트 방식으로 바뀌어 프론트는 토큰을 다루지 않는다.
+ * 인증 타입은 `lib/api/auth.ts`에 있다. (백엔드 D-18)
+ */
 
 /* ── 아이 프로필 — api.md 3.2 ────────────────────────────────────── */
 
@@ -477,10 +475,6 @@ export type ParentApi = {
 };
 
 export type AccountApi = {
-  signIn(
-    provider: AuthProvider,
-    body: { authorizationCode: string }
-  ): Promise<AuthResult>;
   listChildren(): Promise<ChildListResult>;
   createChild(body: {
     name: string;

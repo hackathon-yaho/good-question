@@ -34,9 +34,30 @@ npm run lint
 npm run verify  # 브라우저 검증 (dev 서버를 먼저 띄운 상태에서)
 ```
 
+## 환경 변수
+
+`.env.local.example`을 `.env.local`로 복사해 씁니다. 둘 다 없어도 목으로 동작합니다.
+
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `NEXT_PUBLIC_BACKEND_URL` | `http://localhost:8080` | 백엔드 오리진. 여기에 `/api`가 붙습니다 |
+| `NEXT_PUBLIC_AUTH_MODE` | `mock` | `mock` = 백엔드 없이 동작 · `backend` = 카카오 리다이렉트 + JWT 쿠키 |
+
+`npm run verify`는 **`mock` 모드로** 돕니다. 검증에 백엔드를 요구하지 않기 위한 것입니다.
+
+`backend` 모드로 로그인을 실제로 확인하려면 백엔드를 8080에 띄운 뒤:
+
+```bash
+NEXT_PUBLIC_AUTH_MODE=backend npm run dev
+```
+
+카카오 앱 등록 전이라면 `/login` 하단의 **카카오 없이 로그인 (dev-login)** 으로
+쿠키 발급 → `/auth/callback` → 온보딩 분기까지 확인할 수 있습니다.
+(백엔드 `POST /api/auth/dev-login` · 시연 배포 전 제거됩니다)
+
 ## 검증
 
-`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **236개**를 확인합니다.
+`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **241개**를 확인합니다.
 `scripts/verify/`에 스위트별로 나뉘어 있습니다.
 
 | 스위트 | 범위 |
@@ -46,7 +67,7 @@ npm run verify  # 브라우저 검증 (dev 서버를 먼저 띄운 상태에서)
 | `handoff` | `/play` 완주 → `/activity` 인계 (장면 4개 전부 닫히는지) |
 | `activity` | D-1~D-7 · 키워드 실시간 점등 |
 | `drag` | D-2 카드 드래그 (마우스 · 터치) |
-| `account` | A-1~A-5 · B-1 · 새로고침 유지 · 라우트 가드 · 정원 초과 |
+| `account` | A-1~A-5 · B-1 · 로그인 콜백 · 새로고침 유지 · 라우트 가드 · 정원 초과 |
 | `system` | I-1 · I-3 · I-4 (오프라인 → 재시도 → 발화 복구까지) |
 | `browse` | B-2·B-3·B-4 · C-9 → 단어장 · E · F-1 |
 | `parent` | A-6 · G-1~G-4 · H-1~H-7 |
@@ -96,7 +117,9 @@ src/
 └── lib/
     ├── thinking-elements.ts     사고 요소 8종 → 아이 화면 4그룹 매핑 (§1-7)
     ├── play-state.ts            PlayState · ActivityStep · 서버 모드 매핑
-    ├── client-store.ts          토큰 · 선택한 아이 (localStorage)
+    ├── api/http.ts              fetch 래퍼 (credentials: include · 에러 코드 매핑)
+    ├── api/auth.ts              로그인 · /auth/me · 로그아웃 (목 / 백엔드 전환)
+    ├── client-store.ts          선택한 아이 · 동의 임시값 (localStorage)
     └── relative-date.ts         A-5 "최근 활동" 상대 표기 규칙
 ```
 
@@ -159,6 +182,7 @@ npm run dev
 | --- | --- |
 | `/` | A-1 스플래시 (인증 확인 후 replace 이동) |
 | `/login` | A-2 로그인 |
+| `/auth/callback` | 로그인 콜백 — 백엔드가 302로 보내는 곳 |
 | `/onboarding/consent` · `/onboarding/child` | A-3 동의 · A-4 아이 등록 |
 | `/profiles` | A-5 아이 선택 |
 | `/home` | B-1 홈 |
@@ -199,7 +223,8 @@ src/lib/api/types.ts          PlayApi · ActivityApi · AccountApi 계약 (유�
 src/lib/api/errors.ts          에러 코드 (유지 — 문구가 아니라 코드로 분기한다)
 src/lib/api/mock.ts            /play · /activity 목 (버릴 것)
 src/lib/api/mock-account.ts    계정 · 아이 · 홈 목 (버릴 것)
-src/lib/client-store.ts        토큰 · 선택한 아이 (서버 세션으로 옮길 것)
+src/lib/api/auth.ts            AUTH_MODE=backend면 이미 실서버를 호출한다 (완료)
+src/lib/client-store.ts        선택한 아이 (서버 세션으로 옮길 것)
 화면 컴포넌트                   api 기본값만 교체
 ```
 
@@ -220,6 +245,7 @@ prop으로 넘기면 `Functions cannot be passed directly to Client Components`�
 - **`/play`, `/activity`는 페이지 이동이 없다.** 단일 페이지의 상태·단계 전환이다. 새로 그리면 TTS가 끊긴다
 - **미션을 전체 화면 모달로 만들지 않는다.** 주최측 요건이다 (open-questions Q-04)
 - **평가 표현을 쓰지 않는다.** 점수·등급·퍼센트·"틀렸어요" 금지
+- **토큰을 프론트가 보관하지 않는다.** JWT는 HttpOnly 쿠키다. 로그인 여부는 `GET /api/auth/me`가 답한다
 - 클릭 타겟은 C·D 화면 72px, 그 외 44px
 
 ## STT / TTS
