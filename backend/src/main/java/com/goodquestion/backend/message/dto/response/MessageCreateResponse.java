@@ -14,6 +14,6 @@ public record MessageCreateResponse(
         UUID nextSceneId,
         MissionTriggeredResponse missionTriggered,
         List<HighlightWordResponse> highlightWords,
-        UUID characterMessageId
+        UUID messageId
 ) {
 }

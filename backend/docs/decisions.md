@@ -604,6 +604,32 @@ D-24와 같은 방식 — **추론하지 않고 프론트 mock(`frontend/src/lib
 
 ---
 
+### D-26 · TTS 계약 정정 — 프론트 통합 검증 결과를 반영해 `?text=` 추가, 응답 필드명 수정
+
+프론트가 실제 구현·헤드리스 브라우저 검증(17건)을 마친 뒤 보낸
+[tts-audio-contract.md](../../docs/request/backend/tts-audio-contract.md) 3개 항목 중
+2개가 실제로 어긋나 있었다. `api.md`·`api-spec.md`는 백엔드가 설계·구현한 시점의 기록이라
+이 문서보다 오래됐고, **이 요청 문서 쪽이 실제 통합 결과를 반영한 최신 사실**이라 이 문서를
+기준으로 고쳤다.
+
+1. **`GET /api/tts?text=` 추가.** 기존엔 `messageId`만 필수 파라미터였는데, 도입/전개
+   내레이션(`story_scenes.scene_description`)·단어 발음처럼 `messages` 행이 아닌 텍스트는
+   요청할 방법이 없었다. `TtsServiceImpl`이 이미 텍스트 해시로 캐싱하고 있어서(D-05) 서비스
+   계층은 그대로 두고 `getAudioForText(text)`만 추가, 컨트롤러가 `messageId`/`text` 중 있는
+   쪽으로 분기하도록 했다. 둘 다 없으면 400 `INVALID_REQUEST`.
+2. **`MessageCreateResponse.characterMessageId` → `messageId`로 필드명 변경.** 프론트
+   타입(`frontend/src/lib/api/types.ts`)과 실제 fetch 코드가 `messageId`를 읽도록 이미
+   구현·검증까지 끝나 있었다 — 백엔드가 다른 이름으로 보내고 있어서 실제로 연동하면 이 값이
+   `undefined`가 되는 상태였다(조용히 깨지는 버그). 프론트를 바꾸는 대신 백엔드 필드명을
+   프론트가 이미 검증한 이름에 맞췄다.
+
+CORS(GET 메서드·`allowCredentials`)는 이미 충족돼 있어 변경 없음.
+
+**검증**: `POST /messages` 응답에 `messageId` 확인 → `GET /tts?messageId=`(200, 오디오) →
+`GET /tts?text=`(200, 오디오) → 파라미터 둘 다 없음(400) → 비로그인(401).
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

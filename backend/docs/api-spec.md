@@ -1012,7 +1012,7 @@ Content-Type: application/json
 | highlightWords[] | 이번 턴 `characterMessage`에 **실제로 등장한** 밑줄 단어 후보. 없으면 빈 배열 | array | N | [] |
 | highlightWords[].word | 밑줄 칠 단어 | String | N | "부끄러워" |
 | highlightWords[].meaning | 아이 눈높이 뜻풀이 | String | N | "남에게 보이기 부끄럽고 수줍은 마음" |
-| characterMessageId | 방금 저장된 캐릭터 메시지의 id. **`GET /tts?messageId=`로 이 대사를 음성 재생할 때 사용** | UUID(string) | N | "d82d423b-..." |
+| messageId | 방금 저장된 캐릭터 메시지의 id. **`GET /tts?messageId=`로 이 대사를 음성 재생할 때 사용**. (필드명 `characterMessageId`→`messageId` 정정: D-26) | UUID(string) | N | "d82d423b-..." |
 
 **"사고 요소"(thought element)란**: 아이 발화에서 AI가 감지하는 8가지 분류입니다 — `DECISION`, `REASON`, `PERSPECTIVE`, `SOLUTION`, `RESULT`, `EMOTION`, `EMPATHY`, `REQUEST`. **화면에 영문 코드를 그대로 노출하지 마세요.** 아이 화면용으로는 4그룹(마음=EMOTION·EMPATHY, 이유=REASON, 생각=PERSPECTIVE·DECISION·RESULT, 방법=SOLUTION·REQUEST)으로 묶어 표시하는 걸 권장합니다.
 
@@ -1043,7 +1043,7 @@ Content-Type: application/json
   "nextSceneId": null,
   "missionTriggered": null,
   "highlightWords": [],
-  "characterMessageId": "586f5bcb-3a06-40ec-a133-55b9fa317c5d"
+  "messageId": "586f5bcb-3a06-40ec-a133-55b9fa317c5d"
 }
 ```
 
@@ -1070,7 +1070,7 @@ Content-Type: application/json
     ]
   },
   "highlightWords": [],
-  "characterMessageId": "070547b1-9fd1-49ae-b9b8-5ec1534ce1e4"
+  "messageId": "070547b1-9fd1-49ae-b9b8-5ec1534ce1e4"
 }
 ```
 
@@ -1088,7 +1088,7 @@ Content-Type: application/json
   "nextSceneId": "6598de7d-d217-4ea4-944f-1ce3662f2595",
   "missionTriggered": null,
   "highlightWords": [],
-  "characterMessageId": "6aecabad-0d8e-44f2-ab6d-093e3e266165"
+  "messageId": "6aecabad-0d8e-44f2-ab6d-093e3e266165"
 }
 ```
 
@@ -1106,7 +1106,7 @@ Content-Type: application/json
   "nextSceneId": null,
   "missionTriggered": null,
   "highlightWords": [{ "word": "부끄러워", "meaning": "남에게 보이기 부끄럽고 수줍은 마음" }],
-  "characterMessageId": "d82d423b-e4af-43c6-b99c-3b34e1941cfc"
+  "messageId": "d82d423b-e4af-43c6-b99c-3b34e1941cfc"
 }
 ```
 
@@ -1190,9 +1190,12 @@ Content-Type: audio/webm
 
 ### 7.2 `GET /tts` — 텍스트 → 음성 변환/재생
 
-**설명**: 이미 저장된 메시지(캐릭터 대사, 내레이션 등)의 텍스트를 오디오로 변환해 반환합니다. **응답이 JSON이 아니라 오디오 바이너리(`audio/mpeg`)입니다.** 같은 문장은 내부적으로 캐싱되어 있어 고정 대사는 거의 즉시 응답합니다.
+**설명**: 텍스트를 오디오로 변환해 반환합니다. **응답이 JSON이 아니라 오디오 바이너리(`audio/mpeg`)입니다.** 같은 문장은 내부적으로 텍스트 해시로 캐싱되어 있어 고정 대사는 거의 즉시 응답합니다. `messageId` / `text` 둘 중 하나로 요청합니다(D-26 — 최초엔 `messageId`만 있었으나, `messages` 행이 아닌 텍스트도 있어서 `text` 경로를 추가했습니다).
 
-**사전 조건**: 로그인 필요. `messageId`는 `POST /sessions/{id}/messages`의 `characterMessageId`, `POST .../scenes/{id}/complete`의 `openingMessage.id` 등 **이미 저장된 메시지의 id**여야 합니다 — 임의의 텍스트를 직접 넘겨 변환하는 API가 아닙니다.
+- **`messageId`가 있는 경우** (캐릭터 대사, opening 등 이미 저장된 메시지): `messageId`로 요청. 소유권 검증(이 메시지가 속한 세션이 로그인한 보호자 것인지) 후 재생합니다.
+- **`messageId`가 없는 경우** (도입/전개 내레이션 = `story_scenes.scene_description`, 단어 발음, 재구성 발화 다시 듣기 등): `text`로 요청. 소유권 검증 없이(로그인만 되어 있으면) 텍스트를 그대로 음성으로 변환합니다.
+
+**사전 조건**: 로그인 필요. `messageId`를 쓸 경우 `POST /sessions/{id}/messages`의 `messageId`, `POST .../scenes/{id}/complete`의 `openingMessage.id` 등 **이미 저장된 메시지의 id**여야 합니다.
 
 **Request**
 
@@ -1200,10 +1203,17 @@ Content-Type: audio/webm
 
 | key | 설명 | value 타입 | 필수 | 예시 |
 | --- | --- | --- | --- | --- |
-| messageId | 재생할 메시지 id | UUID(string) | Y | "d82d423b-e4af-43c6-b99c-3b34e1941cfc" |
+| messageId | 재생할 메시지 id. `text`와 동시 사용 시 `messageId`가 우선 | UUID(string) | 둘 중 하나 | "d82d423b-e4af-43c6-b99c-3b34e1941cfc" |
+| text | 재생할 텍스트 (URL 인코딩) | String | 둘 중 하나 | "옛날 어느 마을에" |
+
+**Request Example**
 
 ```
 GET /tts?messageId=d82d423b-e4af-43c6-b99c-3b34e1941cfc
+```
+
+```
+GET /tts?text=%EC%98%9B%EB%82%A0%20%EC%96%B4%EB%8A%90%20%EB%A7%88%EC%9D%84%EC%97%90
 ```
 
 **Response**
@@ -1217,8 +1227,9 @@ GET /tts?messageId=d82d423b-e4af-43c6-b99c-3b34e1941cfc
 | status | response content |
 | --- | --- |
 | 200 | 오디오 바이너리 (`audio/mpeg`) |
+| 400 | `messageId`·`text` 둘 다 없음 |
 | 401 | 로그인 안 됨 |
-| 403 | 이 메시지가 속한 세션이 다른 보호자의 것 |
+| 403 | (`messageId` 사용 시) 이 메시지가 속한 세션이 다른 보호자의 것 |
 | 404 | 존재하지 않는 `messageId` |
 | 500 | TTS 서버 오류/타임아웃 |
 

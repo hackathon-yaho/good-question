@@ -40,6 +40,12 @@ public class TtsServiceImpl implements TtsService {
 
     @Override
     @Transactional
+    public byte[] getAudioForText(String text) {
+        return getOrGenerate(text);
+    }
+
+    @Override
+    @Transactional
     public boolean ensureCached(String text) {
         String hash = hash(text);
         if (ttsCacheRepository.findByTextHash(hash).isPresent()) return false;

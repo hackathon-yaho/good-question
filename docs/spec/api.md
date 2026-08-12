@@ -3,10 +3,19 @@
 | 항목 | 내용 |
 | --- | --- |
 | 작성일 | 2026-08-10 |
-| 최종 수정 | 2026-08-12 |
+| 최종 수정 | 2026-08-13 |
 | 기준 문서 | [../product/prd.md](../product/prd.md), [screens.md](screens.md) 5장, [../team/roles.md](../team/roles.md) 4장 |
 
 ## 수정 이력
+
+### 2026-08-13 — 프론트 통합 검증 결과 반영 (TTS 계약 정정)
+
+근거: [request/backend/tts-audio-contract.md](../request/backend/tts-audio-contract.md), [backend/docs/decisions.md D-26](../../backend/docs/decisions.md)
+
+| 절 | 변경 |
+| --- | --- |
+| 3.5 | `POST /messages` 응답 필드명 `characterMessageId` → `messageId` 정정 (프론트가 이미 이 이름으로 구현·검증) |
+| 3.5 | `GET /api/tts`에 `?text=` 경로 추가 — `messageId`가 없는 내레이션·단어 발음용 |
 
 ### 2026-08-12 — 백엔드 결정 반영
 
@@ -576,7 +585,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `nextSceneId` | `sceneEnded=true`일 때 채움. 마지막 장면이면 `null` → `/activity`로 |
 | `missionTriggered` | 미션 노출 신호. 없으면 `null` |
 | `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. 장면별 후보 단어가 **이번 턴 `characterMessage`에 실제로 있을 때만** 채워진다. 없는 턴은 빈 배열 `[]` ([D-11](../../backend/docs/decisions.md) · [D-22](../../backend/docs/decisions.md)) |
-| `characterMessageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)) |
+| `messageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)). 필드명 `characterMessageId`→`messageId` 정정은 [D-26](../../backend/docs/decisions.md) |
 
 **프론트가 하지 말아야 할 것**
 
@@ -610,10 +619,14 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 
 ---
 
-#### ③ `GET /api/tts?messageId={id}` ✅ · C-3 음성 재생
+#### ③ `GET /api/tts?messageId={id}` (또는 `?text={text}`) ✅ · C-3 음성 재생
 
 캐릭터 대사·내레이션의 오디오를 반환합니다. 응답은 `audio/mpeg` 바이트입니다.
 
+- **`messageId`**: `messages` 행으로 저장된 대사(캐릭터 응답, opening 등)
+- **`text`**: `messages` 행이 없는 텍스트(도입·전개 내레이션, 단어 발음 등)에 사용. 캐시는
+  어느 경로든 텍스트 해시 기준이라 동일 문장이면 같은 캐시를 씁니다 ([D-26](../../backend/docs/decisions.md))
+- 둘 다 없으면 400 `INVALID_REQUEST`
 - 캐시에 있으면 즉시, 없으면 생성 후 반환합니다
 - **고정 대사 11건은 애플리케이션 기동 시 미리 생성**되어 거의 즉시 옵니다 ([D-05](../../backend/docs/decisions.md))
 - 캐시는 `tts_cache` 테이블에 저장합니다. **파일시스템에 두지 않습니다** — Render 무료 티어는 재배포 시 초기화됩니다
