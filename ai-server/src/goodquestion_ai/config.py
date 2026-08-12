@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,13 +39,6 @@ class Settings(BaseSettings):
         validation_alias="RESPOND_MAX_OUTPUT_TOKENS",
     )
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
-
-    @field_validator("openai_reasoning_effort", mode="before")
-    @classmethod
-    def upgrade_unsupported_none_reasoning(cls, value: object) -> object:
-        """Keep older local .env files compatible with the selected model."""
-        return "minimal" if value == "none" else value
-
 
 @lru_cache
 def get_settings() -> Settings:

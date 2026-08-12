@@ -21,6 +21,8 @@ AI 서버는 이미지 생성·선택을 하지 않는다.
 - 아이 발화에 실제 있는 근거만 통과시킨다.
 - `SHORT`·`UNCLEAR`·`OFF_TOPIC`·`PLAYFUL`은 요소와 요약을 강제로 비운다.
 - 교사·채점 말투와 조기 종결 문장은 서버에서 거부한다.
+- 현재 OpenAI 크레딧은 **$5만** 사용한다. 운영 측의 비용 지원 예상액은 포함하지 않는다.
+- STT/TTS는 이 서버 범위가 아니다. 무료 Azure Speech F0 전환 요청은 백엔드 문서로 분리한다.
 
 ## 로컬 설정
 
@@ -64,6 +66,10 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```powershell
 .venv\Scripts\python.exe evals/run_live.py --live --limit 2
 ```
+
+`--limit 2`는 분석·응답 각각 최대 2건, 즉 최대 4회만 호출한다. 자동 테스트·CI에서는
+라이브 평가를 실행하지 않는다. 실제 $5의 지출 상한·알림은 AI 키가 속한 OpenAI 프로젝트에서
+설정하고, 이 서버의 `OPENAI_API_KEY`는 그 프로젝트 키만 사용한다.
 
 ## 오류 처리
 
