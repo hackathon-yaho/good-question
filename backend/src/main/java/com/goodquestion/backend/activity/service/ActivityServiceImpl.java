@@ -14,6 +14,7 @@ import com.goodquestion.backend.common.global.exception.BusinessException;
 import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.repository.MessageRepository;
 import com.goodquestion.backend.session.entity.StorySession;
+import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
 import com.goodquestion.backend.story.entity.PostActivityCard;
 import com.goodquestion.backend.story.entity.PostActivityConfig;
@@ -38,6 +39,8 @@ public class ActivityServiceImpl implements ActivityService {
 
     /** B-19, decisions.md D-10. */
     private static final int MAX_ATTEMPTS = 3;
+    /** B-20, decisions.md D-09. 이야기 완료 시 1회만 지급 — 이미 completed면 건너뛴다. */
+    private static final int STORY_COMPLETION_STAR_DUST = 100;
 
     private final StorySessionRepository storySessionRepository;
     private final PostActivityResultRepository postActivityResultRepository;
@@ -100,7 +103,11 @@ public class ActivityServiceImpl implements ActivityService {
         PostActivityResult result = getOrCreateResult(session);
 
         result.completeRetelling(request.retellingText());
+        boolean alreadyCompleted = session.getStatus() == SessionStatus.COMPLETED;
         session.complete();
+        if (!alreadyCompleted) {
+            session.getChild().addStarDust(STORY_COMPLETION_STAR_DUST);
+        }
 
         long childUtteranceCount = messageRepository.countBySessionAndSpeakerType(session, SpeakerType.CHILD);
         long characterCount = messageRepository.findAllBySessionAndSpeakerType(session, SpeakerType.CHARACTER).stream()

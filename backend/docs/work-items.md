@@ -313,7 +313,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | — | ~~재구성 발화 수신~~ | 필수 | `POST /api/sessions/{id}/activity/retelling` — **완료** |
 | M-56 | ~~`post_activity_results` 저장~~ | 필수 | 세션당 1건 — **완료** |
 | M-57 | ~~세션 완료 처리 (`status = completed`)~~ | 필수 | **완료** |
-| B-20 | 별가루 지급 +100 | 선택-후순위 | 완료 시 `children.star_dust` 증가 (D-09) — 미착수 (Phase 7) |
+| B-20 | ~~별가루 지급 +100~~ | 선택-후순위 | **완료** (Phase 7 착수). 완료 시 `children.star_dust` +100 (D-09). 이미 `completed`인 세션에 재요청하면 건너뜀 |
 
 스키마: [api.md 3.6](../../docs/spec/api.md) · 정답 순서는 [PRD 7.8](../../docs/product/prd.md) `post_activity_config`
 
@@ -342,6 +342,10 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 - `imageUrl`은 아직 항상 `null` — 카드 이미지 에셋 미수령(U-03)
 - `newWordCount`는 항상 0 — 단어장(wordbook)이 선택-후순위라 아직 없음
 - `reportAvailable`은 항상 `false` — 보호자 리포트(O-01)가 선택 항목이라 아직 없음
+- **B-20 (별가루)**: 지급 지점은 `ActivityServiceImpl.submitRetelling` 한 곳뿐이다. 세션이
+  이미 `COMPLETED`면 `session.complete()`는 다시 호출해도 무해하지만 별가루는 건너뛴다 —
+  같은 세션에 재구성 발화를 실수로 두 번 보내도 중복 지급되지 않는다. 이미 완료된 세션에
+  재요청 → `star_dust` 불변, 새 세션 완료 → `star_dust` +100을 둘 다 curl+DB로 확인했다
 
 ---
 
@@ -372,7 +376,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 근거 | 비고 |
 | --- | --- | --- | --- |
-| B-20 | 별가루 (`star_dust`) | **요건 외 팀 추가** (D-09) | 이야기 완료 시 +100. 사용처·차감 없음 |
+| B-20 | ~~별가루 (`star_dust`)~~ | **요건 외 팀 추가** (D-09) | **완료.** 이야기 완료 시 +100. 사용처·차감 없음 |
 | O-06~O-10 | 단어장 (`wordbook` + API 3개) | 주최측 추가 요건 A-02 | `GET`/`POST`/`PATCH /api/wordbook` (D-11) |
 | O-01~O-05 | 보호자 리포트 + `reports` 테이블 | 주최측 추가 요건 A-01 | 응답 스키마 미결. 내부 분석 태그를 보호자 화면에 노출 금지 |
 | O-13 | NORMAL soft-cue | [PRD 6.14](../../docs/product/prd.md) | 미구현 시 NORMAL 일반 반응으로 동작. **새 필드 불필요** |
