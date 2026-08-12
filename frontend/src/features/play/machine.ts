@@ -7,6 +7,10 @@
  *     → TRANSCRIBING → CONFIRM → THINKING
  *     → (NORMAL) CHARACTER_SPEAKING  |  (GUIDED) GUIDED  |  (CLOSING) SCENE_TRANSITION
  *
+ * TRANSCRIBING(①·최대 8초)과 THINKING(②·최대 10초)은 **서로 다른 구간**이다.
+ * 2안에서 발화 1회가 요청 3개로 나뉘기 때문이다.
+ * (docs/request/frontend/stt-tts-integration.md)
+ *
  * 원칙 (§0-2): 진행 모드는 서버가 확정해 내려준다. 여기서 발화 내용을 보고 판단하지 않는다.
  * 이 파일에 등장하는 판단은 "서버가 준 값을 어떤 화면 상태로 옮길지"뿐이다.
  */
@@ -33,6 +37,11 @@ export type PlayMachineState = {
 
   /** 현재 캐릭터 대사 (말풍선 + TTS 대상) */
   characterText: string;
+  /**
+   * 그 대사의 메시지 id. `GET /api/tts?messageId=`로 음성을 받는 열쇠다.
+   * 도입·전개 자막에는 없다(메시지가 아니다) — 그때는 텍스트로 음성을 요청한다.
+   */
+  characterMessageId: string | null;
   /** C-5에서 아이가 확인·수정하는 텍스트 */
   draftText: string;
   /** STT 최초 변환 결과. 편집해도 원문을 보존한다. (PRD 8.9) */
@@ -63,6 +72,7 @@ export const initialPlayState: PlayMachineState = {
   sentences: [],
   sentenceIndex: 0,
   characterText: "",
+  characterMessageId: null,
   draftText: "",
   sttRawText: "",
   interimText: "",
@@ -133,6 +143,8 @@ export function playReducer(
         status: entryStatus(scene),
         characterText:
           scene.sceneType === "dialogue" ? (opening?.text ?? "") : "",
+        characterMessageId:
+          scene.sceneType === "dialogue" ? (opening?.id ?? null) : null,
         turnCount: snapshot.turnCount,
         maxTurns: snapshot.maxTurns,
         accumulatedElements: snapshot.accumulatedElements,
@@ -158,6 +170,7 @@ export function playReducer(
         sentenceIndex: 0,
         status: entryStatus(scene),
         characterText: openingMessage?.text ?? "",
+        characterMessageId: openingMessage?.id ?? null,
         messages: openingMessage
           ? [...state.messages, openingMessage]
           : state.messages,
@@ -196,6 +209,14 @@ export function playReducer(
     case "INTERIM":
       return { ...state, interimText: action.text };
 
+    /**
+     * 녹음이 끝나고 텍스트를 기다리는 구간(①). 2안으로 넘어오면서 **실제 구간이
+     * 되었다** — 오디오를 올리고 최대 8초를 기다린다. 1안에서는 사실상 0이었다.
+     *
+     * 화면은 C-4 틀을 유지하고 마이크만 끈다. 여기서 레이아웃을 바꾸면 브라우저
+     * 모드(구간이 짧다)에서 화면이 번쩍인다.
+     * (docs/request/frontend/stt-tts-integration.md "상태별 처리")
+     */
     case "TRANSCRIBING":
       return { ...state, status: PlayState.TRANSCRIBING, recording: false };
 
@@ -237,6 +258,7 @@ export function playReducer(
         // 서버가 확정한 모드를 화면 상태로 옮기는 것이 전부다.
         status: toPlayState(result.responseMode),
         characterText: result.characterMessage,
+        characterMessageId: result.messageId,
         turnCount: result.turnCount,
         maxTurns: result.maxTurns,
         accumulatedElements: result.accumulatedElements,

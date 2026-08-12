@@ -483,7 +483,8 @@ export const mockPlayApi: PlayApi = {
             session.turnCount
           );
 
-    pushMessage(session, scene.id, "character", characterText);
+    // 방금 만든 메시지의 id가 ③ GET /api/tts?messageId= 의 열쇠다.
+    const characterMessage = pushMessage(session, scene.id, "character", characterText);
 
     // --- 미션 노출 판정 — 백엔드가 결정한다. AI가 정하지 않는다 ----------
     let missionTriggered: UtteranceResponse["missionTriggered"] = null;
@@ -509,6 +510,7 @@ export const mockPlayApi: PlayApi = {
     const response: UtteranceResponse = {
       responseMode: mode,
       characterMessage: characterText,
+      messageId: characterMessage.id,
       characterName: scene.characterDisplayName ?? "",
       accumulatedElements: [...session.accumulatedElements],
       turnCount: session.turnCount,

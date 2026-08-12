@@ -169,13 +169,49 @@ STT/TTS 외에 백엔드에서 확정된 것 중 프론트 작업에 영향을 �
 
 ## 완료 조건
 
-- [ ] `SpeechRecognition` · `SpeechSynthesis` 호출이 코드에 남아 있지 않다
-- [ ] 녹음 → `POST /api/stt` → 텍스트 표시 → 편집 → `POST /messages` 흐름이 동작한다
-- [ ] STT 결과가 비면 `/messages`를 호출하지 않는다
-- [ ] 캐릭터 음성이 `GET /api/tts` 오디오로 재생된다
-- [ ] iPad 실기에서 오디오 자동 재생이 동작한다 (또는 첫 탭으로 열어둔다)
-- [ ] "변환 중"과 "응답 대기"가 화면에서 구분된다
-- [ ] D-5가 최종 결과 일괄 점등으로 동작한다
+- [ ] `SpeechRecognition` · `SpeechSynthesis` 호출이 코드에 남아 있지 않다 — **아래 참조**
+- [x] 녹음 → `POST /api/stt` → 텍스트 표시 → 편집 → `POST /messages` 흐름이 동작한다
+- [x] STT 결과가 비면 `/messages`를 호출하지 않는다
+- [x] 캐릭터 음성이 `GET /api/tts` 오디오로 재생된다
+- [ ] iPad 실기에서 오디오 자동 재생이 동작한다 (또는 첫 탭으로 열어둔다) — 처리는 넣었고 **실기 확인 대기**
+- [x] "변환 중"과 "응답 대기"가 화면에서 구분된다
+- [x] D-5가 최종 결과 일괄 점등으로 동작한다
+
+### 프론트 구현 상태 (2026-08-12)
+
+`NEXT_PUBLIC_SPEECH_MODE`로 두 경로를 전환합니다.
+
+| 모드 | STT | TTS |
+| --- | --- | --- |
+| `backend` | `MediaRecorder` → `POST /api/stt` | `GET /api/tts` → `<audio>` |
+| `mock` (기본) | 브라우저 `SpeechRecognition` | 브라우저 `SpeechSynthesis` |
+
+| 파일 | 역할 |
+| --- | --- |
+| `frontend/src/lib/speech/mode.ts` | 모드 전환. 왜 두 경로인지 |
+| `frontend/src/lib/speech/backend-stt.ts` | 녹음 → 업로드 → 텍스트 |
+| `frontend/src/lib/speech/backend-tts.ts` | 오디오 수신 → 재생 → iOS 잠금 해제 |
+| `frontend/src/lib/api/speech.ts` | `POST /api/stt` · `GET /api/tts` |
+| `frontend/scripts/verify/speech.mjs` | 백엔드 경로 검증 17건 |
+
+**첫 항목이 아직 안 된 이유**: 백엔드의 `POST /api/stt`·`GET /api/tts`가 아직
+없습니다([work-items.md B-13~B-18](../../../backend/docs/work-items.md) 미완).
+지금 브라우저 경로를 지우면 **08-20 발표 시연에 음성이 아예 없습니다.** 시연 기기가
+노트북 Chrome이라 Web Speech가 동작하고, iPad가 필요한 시점은 주최측 10월 테스트입니다.
+
+두 엔드포인트가 올라오면 `.env.local`에 `NEXT_PUBLIC_SPEECH_MODE=backend`를 넣고,
+`browser-stt.ts`·`browser-tts.ts`와 `mode.ts`의 분기를 지우면 이 항목이 충족됩니다.
+그때까지도 **백엔드 모드가 실제로 도는지는 검증**하고 있습니다 — `speech` 스위트가
+`?speech=backend`로 진짜 녹음·업로드·재생을 태우고, 그 모드에서
+**브라우저 음성 API 호출이 0회인지**까지 확인합니다.
+
+**인터페이스는 2안 계약으로 맞췄습니다.** 요청 3분리, "변환 중/응답 대기" 구간 분리,
+`messageId` 기반 오디오 요청이 목 모드에서도 그대로 흐릅니다. 백엔드를 붙일 때
+처음 실행되는 코드가 생기지 않게 하려는 것입니다.
+
+**백엔드에 확인 요청 3건**을 남겼습니다 →
+[request/backend/tts-audio-contract.md](../backend/tts-audio-contract.md)
+(`?text=` 경로 · CORS credentials · `messageId` 필드)
 
 ## 아직 못 정한 것
 

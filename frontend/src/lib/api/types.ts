@@ -63,6 +63,15 @@ export type SceneInfo = {
 export type UtteranceResponse = {
   responseMode: ResponseMode;
   characterMessage: string;
+  /**
+   * 방금 만들어진 캐릭터 메시지의 id. `GET /api/tts?messageId=`로 음성을 받는다.
+   *
+   * 요청 문서: *"응답에 `messageId`가 포함되며, 이 값으로 ③을 호출합니다"*
+   * (docs/request/frontend/stt-tts-integration.md · api.md 3.5에는 없는 필드다)
+   *
+   * null이면 텍스트로 음성을 요청한다. 그래도 재생은 된다.
+   */
+  messageId: string | null;
   characterName: string;
   accumulatedElements: string[];
   turnCount: number;

@@ -143,15 +143,24 @@ export function KeywordReveal({
 /**
  * D-5 이야기 재구성 말하기
  *
- * 키워드 실시간 점등이 이 화면의 핵심 인터랙션이다.
- * Web Speech API의 interimResults로 부분 전사를 받아 즉시 점등한다.
- * STT를 Whisper(파일 업로드)로 바꾸면 최종 결과 일괄 점등으로 폴백해야 한다.
+ * ── 점등 시점이 모드에 따라 다르다 ──────────────────────────────────
+ * 이 화면의 핵심 인터랙션은 키워드 점등이다. 그런데 2안(백엔드 Whisper)에는
+ * **interim result가 없어서 실시간 점등이 불가능하다.** 최종 결과가 도착할 때
+ * 한 번에 켜진다. (docs/request/frontend/stt-tts-integration.md "D-5")
+ *
+ *   브라우저 모드 — 말하는 동안 하나씩 켜진다
+ *   백엔드 모드   — 변환이 끝나면 한 번에 켜진다
+ *
+ * 화면 코드는 같다. `spokenKeywords`가 언제 늘어나느냐만 다르다.
+ * 그래서 "아직 안 켜진 키워드"가 아이 잘못으로 읽히지 않아야 한다 — 회색이지
+ * 빨간색이 아니고, "아직 안 말했어요"까지만 말한다.
  */
 export function Retelling({
   cards,
   keywords,
   spokenKeywords,
   recording,
+  transcribing = false,
   interimText,
   micLevel,
   errorCode,
@@ -162,6 +171,8 @@ export function Retelling({
   keywords: readonly string[];
   spokenKeywords: readonly string[];
   recording: boolean;
+  /** ① 변환 중. 마이크를 끄고 문구를 바꾼다. */
+  transcribing?: boolean;
   interimText: string;
   micLevel: number;
   errorCode: string | null;
@@ -212,7 +223,7 @@ export function Retelling({
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
         <MicButton
-          state={recording ? "recording" : "idle"}
+          state={transcribing ? "disabled" : recording ? "recording" : "idle"}
           size={200}
           level={micLevel}
           onClick={onMicClick}
@@ -223,8 +234,12 @@ export function Retelling({
             잘 안 들렸어. 다시 말해줄래?
           </p>
         ) : (
-          <p className="text-parent-body text-muted">
-            {recording ? "듣고 있어요…" : "마이크를 누르고 이야기해줘"}
+          <p aria-live="polite" className="text-parent-body text-muted">
+            {transcribing
+              ? "네 이야기를 글로 옮기고 있어…"
+              : recording
+                ? "듣고 있어요…"
+                : "마이크를 누르고 이야기해줘"}
           </p>
         )}
 
@@ -235,7 +250,11 @@ export function Retelling({
         ) : null}
       </div>
 
-      <PillButton size="kid" onClick={onDone} disabled={!recording}>
+      <PillButton
+        size="kid"
+        onClick={onDone}
+        disabled={!recording || transcribing}
+      >
         말 다 했어요
       </PillButton>
     </div>

@@ -9,7 +9,7 @@
 
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
-import type { TtsRate } from "@/lib/speech/useSpeechSynthesis";
+import type { TtsRate } from "@/lib/speech";
 
 export type FontScale = 1 | 1.15 | 1.3;
 

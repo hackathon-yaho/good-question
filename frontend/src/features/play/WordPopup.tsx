@@ -17,7 +17,7 @@ import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
 import type { HighlightWord } from "@/lib/api/types";
-import type { TtsRate } from "@/lib/speech/useSpeechSynthesis";
+import type { TtsRate } from "@/lib/speech";
 
 export function WordPopup({
   word,

@@ -1,12 +1,15 @@
 /**
- * STT — Web Speech API
+ * STT (mock 구현) — 브라우저 `SpeechRecognition`
  *
- * 2026-08-10에 1안(Web Speech API)으로 확정했다. 시연 기기가 노트북 Chrome이다.
- * (PRD 9.3)
+ * ⚠️ **이 파일은 임시다.** 2안(백엔드 Whisper)이 확정됐고 iOS Safari에서 이 API가
+ *    불안정하다. 백엔드 `POST /api/stt`가 올라오면 `SPEECH_MODE=backend`로 바꾸고
+ *    이 파일을 지운다. (`speech/mode.ts`의 설명 참조)
  *
- * ⚠️ 주최측 10월 테스트는 태블릿 대상이고 iOS Safari에서 이 API가 불안정하다.
- *    그래서 **이 훅 하나만 갈아끼우면 Whisper로 옮길 수 있게** 인터페이스를 좁게 뒀다.
- *    화면 코드는 { start, stop, finalText, interimText } 만 쓴다.
+ * 그때까지 이게 필요한 이유: 08-20 발표 시연이 노트북 Chrome이고, 지금 이걸 지우면
+ * 백엔드가 올라올 때까지 음성이 아예 없다.
+ *
+ * **인터페이스는 백엔드 쪽 계약(`ChildSpeech`)에 맞췄다.** 이 API에는 없는 "변환 중"
+ * 구간도 `onTranscribeStart`로 알린다. 화면이 두 모드에서 같은 길을 타야 한다.
  *
  * 원본 음성은 저장하지 않는다. 이 API는 애초에 오디오 버퍼를 노출하지 않으므로
  * 요건(PRD 10.3)을 구조적으로 지킨다.
@@ -14,27 +17,24 @@
 
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useBrowserCapability } from "@/lib/speech/supported";
+
 import {
   getSpeechRecognitionCtor,
+  type ChildSpeech,
+  type ChildSpeechOptions,
   type SpeechRecognitionLike,
+  type SttStatus,
 } from "@/lib/speech/types";
-
-/** 지원 여부는 바뀌지 않으므로 구독할 것이 없다. */
-const noopSubscribe = () => () => {};
 
 /** 무음이 이만큼 이어지면 자동 종료 — screens.md C-4 */
 const SILENCE_STOP_MS = 2000;
 /** 발화 최대 길이. C-4는 30초, D-5는 60초 */
 const DEFAULT_MAX_MS = 30_000;
 
-export type SttStatus = "idle" | "recording" | "stopping" | "error";
+const hasRecognition = () => getSpeechRecognitionCtor() !== null;
 
 /**
  * 인식 1회분. 인스턴스가 아니라 이 객체를 기준으로 판단한다.
@@ -52,29 +52,19 @@ type SttTake = {
   abandoned: boolean;
 };
 
-type Options = {
-  /** 최대 녹음 시간(ms). C-4 30000, D-5 60000 */
-  maxDurationMs?: number;
-  /** 부분 전사가 갱신될 때마다 호출. D-5 키워드 실시간 점등에 쓴다. */
-  onInterim?: (text: string) => void;
-  onFinal?: (text: string) => void;
-  /** 인식 실패 — I-2로 보낸다 */
-  onError?: (code: string) => void;
-};
-
-export function useSpeechRecognition(options: Options = {}) {
-  const { maxDurationMs = DEFAULT_MAX_MS, onInterim, onFinal, onError } = options;
+export function useBrowserStt(options: ChildSpeechOptions = {}): ChildSpeech {
+  const {
+    maxDurationMs = DEFAULT_MAX_MS,
+    onTranscribeStart,
+    onInterim,
+    onFinal,
+    onError,
+    enabled = true,
+  } = options;
 
   const [status, setStatus] = useState<SttStatus>("idle");
-  const [finalText, setFinalText] = useState("");
   const [interimText, setInterimText] = useState("");
-
-  // SSR에서는 false, 클라이언트에서는 실제 지원 여부. 하이드레이션 불일치가 없다.
-  const supported = useSyncExternalStore(
-    noopSubscribe,
-    () => getSpeechRecognitionCtor() !== null,
-    () => false
-  );
+  const supported = useBrowserCapability(hasRecognition);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const takeRef = useRef<SttTake | null>(null);
@@ -82,9 +72,9 @@ export function useSpeechRecognition(options: Options = {}) {
   const maxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 최신 콜백을 재구독 없이 쓰기 위한 ref. 렌더 중이 아니라 커밋 후에 갱신한다.
-  const cb = useRef({ onInterim, onFinal, onError });
+  const cb = useRef({ onTranscribeStart, onInterim, onFinal, onError });
   useEffect(() => {
-    cb.current = { onInterim, onFinal, onError };
+    cb.current = { onTranscribeStart, onInterim, onFinal, onError };
   });
 
   const clearTimers = useCallback(() => {
@@ -98,7 +88,12 @@ export function useSpeechRecognition(options: Options = {}) {
     clearTimers();
     const recognition = recognitionRef.current;
     if (!recognition) return;
-    setStatus("stopping");
+    const take = takeRef.current;
+    // 이미 결과를 보낸 회차에 다시 stop이 들어오면 "변환 중"으로 되돌리면 안 된다.
+    if (take && !take.delivered && !take.abandoned) {
+      setStatus("transcribing");
+      cb.current.onTranscribeStart?.();
+    }
     try {
       recognition.stop();
     } catch {
@@ -123,13 +118,11 @@ export function useSpeechRecognition(options: Options = {}) {
     const take: SttTake = { final: "", delivered: false, abandoned: false };
     takeRef.current = take;
 
-    setFinalText("");
     setInterimText("");
 
     const recognition = new Ctor();
     recognition.lang = "ko-KR";
     recognition.continuous = false;
-    // D-5 키워드 실시간 점등이 이 옵션에 달려 있다.
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
@@ -149,7 +142,6 @@ export function useSpeechRecognition(options: Options = {}) {
         }
       }
 
-      setFinalText(take.final);
       setInterimText(interim);
       cb.current.onInterim?.(`${take.final} ${interim}`.trim());
 
@@ -161,7 +153,7 @@ export function useSpeechRecognition(options: Options = {}) {
     recognition.onerror = (event) => {
       if (take.abandoned) return;
       clearTimers();
-      // no-speech / aborted는 사용자가 그냥 말을 안 한 경우다. 에러로 취급하지 않는다.
+      // aborted는 사용자가 그냥 말을 안 한 경우다. 에러로 취급하지 않는다.
       if (event.error === "aborted") return;
       setStatus("error");
       // 에러로 끝난 회차는 end에서 다시 전달하지 않는다.
@@ -202,5 +194,23 @@ export function useSpeechRecognition(options: Options = {}) {
     };
   }, [clearTimers]);
 
-  return { status, finalText, interimText, supported, start, stop };
+  const noop = useCallback(() => {}, []);
+
+  if (!enabled) {
+    return {
+      status: "idle",
+      interimText: "",
+      supported: false,
+      start: noop,
+      stop: noop,
+    };
+  }
+
+  return {
+    status,
+    interimText,
+    supported,
+    start,
+    stop,
+  };
 }

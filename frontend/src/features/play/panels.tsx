@@ -62,7 +62,6 @@ export function CharacterPanel({
   accumulatedElements,
   guided,
   onReplay,
-  replayDisabled,
   highlightWords = [],
   onWordClick,
   compact = false,
@@ -74,8 +73,14 @@ export function CharacterPanel({
   messages: readonly Message[];
   accumulatedElements: readonly string[];
   guided: boolean;
+  /**
+   * "다시 듣기". **재생 중에도 누를 수 있어야 한다.**
+   *
+   * 이 패널은 캐릭터가 말하는 동안만 떠 있고, 재생이 끝나면 곧바로 아이 차례(C-4)로
+   * 바뀐다. 재생 중을 막으면 **누를 수 있는 순간이 아예 없다.** 실제로 그랬다.
+   * 눌리면 처음부터 다시 재생한다.
+   */
   onReplay: () => void;
-  replayDisabled: boolean;
   /** 서버가 지정한 밑줄 단어. 탭하면 C-9가 열린다. */
   highlightWords?: readonly HighlightWord[];
   onWordClick?: (word: HighlightWord) => void;
@@ -122,11 +127,7 @@ export function CharacterPanel({
           )}
         </SpeechBubble>
         <div className="mt-3 flex justify-end">
-          <PillButton
-            variant="outlined"
-            onClick={onReplay}
-            disabled={replayDisabled}
-          >
+          <PillButton variant="outlined" onClick={onReplay}>
             다시 듣기
           </PillButton>
         </div>
@@ -153,11 +154,25 @@ export function CharacterPanel({
   );
 }
 
-/** C-4 — 내 차례. 이 화면의 시각 신호가 약하면 서비스 전체가 작동하지 않는다. */
+/**
+ * C-4 — 내 차례. 이 화면의 시각 신호가 약하면 서비스 전체가 작동하지 않는다.
+ *
+ * ── "변환 중"도 이 컴포넌트다 ────────────────────────────────────────
+ * 2안에서 녹음 종료와 텍스트 도착 사이에 최대 8초가 생겼다
+ * (docs/request/frontend/stt-tts-integration.md). 그 구간을 **별도 화면으로 만들지
+ * 않는다.** 틀을 그대로 두고 마이크를 끄고 문구만 바꾼다. 이유 둘:
+ *
+ *   1. 레이아웃이 바뀌면 브라우저 모드(구간이 짧다)에서 화면이 번쩍인다
+ *   2. 아이 입장에서 "내가 말한 게 넘어가는 중"이라 같은 장면의 연속이다
+ *
+ * "응답 대기"(②)는 캐릭터가 생각하는 구간이라 화면이 완전히 다르다.
+ * → `ThinkingPanel`
+ */
 export function ChildTurnPanel({
   displayName,
   previousText,
   recording,
+  transcribing = false,
   interimText,
   micLevel,
   onMicClick,
@@ -168,6 +183,8 @@ export function ChildTurnPanel({
   displayName: string;
   previousText: string;
   recording: boolean;
+  /** ① 변환 중. 마이크를 끄고 문구를 바꾼다. */
+  transcribing?: boolean;
   interimText: string;
   micLevel: number;
   onMicClick: () => void;
@@ -176,6 +193,12 @@ export function ChildTurnPanel({
   /** 미션 카드가 함께 떠 있어 공간이 좁을 때. 지난 대사 줄을 접는다. */
   compact?: boolean;
 }) {
+  const micState = transcribing
+    ? "disabled"
+    : recording
+      ? "recording"
+      : "idle";
+
   return (
     <div className="flex size-full min-h-0 flex-col">
       {/* 구분선 없음 — 이유는 CharacterPanel 헤더 주석 참조 */}
@@ -201,14 +224,14 @@ export function ChildTurnPanel({
           말풍선과 푸터를 덮는다. */}
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-6">
         <p className="shrink-0 text-center text-turn leading-tight font-bold text-primary">
-          이제 말해 볼까?
+          {transcribing ? "잘 들었어!" : "이제 말해 볼까?"}
         </p>
 
         {/* 남은 높이를 마이크가 받는다. 이 칸은 flex-1로 높이가 확정되므로
             adaptive를 켜도 안전하다. MicButton 주석의 경고 참조. */}
         <div className="flex min-h-0 w-full flex-1 items-center justify-center">
           <MicButton
-            state={recording ? "recording" : "idle"}
+            state={micState}
             size={180}
             level={micLevel}
             onClick={onMicClick}
@@ -216,9 +239,28 @@ export function ChildTurnPanel({
           />
         </div>
 
-        <p className="shrink-0 text-center text-parent-body text-muted">
-          말이 끝나면 아래 보내기를 눌러줘
-        </p>
+        {/* "변환 중"은 아이에게 기술 용어다. 무슨 일이 일어나는지로 쓴다. */}
+        {transcribing ? (
+          <p
+            aria-live="polite"
+            className="flex shrink-0 items-center gap-2 text-center text-parent-body text-muted"
+          >
+            <span aria-hidden className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                  className="size-1.5 animate-bounce rounded-full bg-muted"
+                />
+              ))}
+            </span>
+            네 말을 글로 옮기고 있어…
+          </p>
+        ) : (
+          <p className="shrink-0 text-center text-parent-body text-muted">
+            말이 끝나면 아래 보내기를 눌러줘
+          </p>
+        )}
 
         {interimText ? (
           <p className="max-w-full shrink-0 truncate rounded-bubble bg-secondary-soft px-4 py-2 text-center text-kid-body text-text">
@@ -289,7 +331,14 @@ export function ConfirmPanel({
   );
 }
 
-/** C-6 — 분석 중. 기술적인 스피너를 쓰지 않는다. "캐릭터가 생각하고 있다"로 읽혀야 한다. */
+/**
+ * C-6 — 응답 대기(②). 기술적인 스피너를 쓰지 않는다.
+ * "캐릭터가 생각하고 있다"로 읽혀야 한다.
+ *
+ * ①(변환 중)과 **다른 화면이다.** ①은 아이 차례 틀에서 마이크만 꺼지고,
+ * 여기는 캐릭터 초상화가 나온다. 요청 문서가 두 구간을 구분해 달라고 요구한다.
+ * 예산은 10초. (docs/request/frontend/stt-tts-integration.md)
+ */
 export function ThinkingPanel({
   displayName,
   childText,
@@ -299,8 +348,8 @@ export function ThinkingPanel({
   childText: string;
   elapsedMs: number;
 }) {
-  const hint =
-    elapsedMs > 8000 ? "조금만 더 기다려줘" : "음… 생각 중이야";
+  // 예산이 10초이므로 6초에서 문구를 바꾼다. 8초에 바꾸면 남은 2초에만 보인다.
+  const hint = elapsedMs > 6000 ? "조금만 더 기다려줘" : "음… 생각 중이야";
 
   return (
     <div className="flex size-full min-h-0 flex-col">

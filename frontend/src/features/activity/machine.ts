@@ -29,6 +29,8 @@ export type ActivityState = {
   retellingText: string;
   interimText: string;
   recording: boolean;
+  /** ① 변환 중 — 오디오를 올리고 텍스트를 기다린다 (최대 8초) */
+  transcribing: boolean;
   result: RetellingResult | null;
   errorCode: string | null;
 };
@@ -44,6 +46,7 @@ export const initialActivityState: ActivityState = {
   retellingText: "",
   interimText: "",
   recording: false,
+  transcribing: false,
   result: null,
   errorCode: null,
 };
@@ -58,6 +61,7 @@ export type ActivityAction =
   | { type: "RETRY_ORDER" }
   | { type: "GO_RETELLING" }
   | { type: "RECORDING_START" }
+  | { type: "TRANSCRIBING" }
   | { type: "INTERIM"; text: string }
   | { type: "TRANSCRIBED"; text: string }
   | { type: "RETELL_AGAIN" }
@@ -65,7 +69,13 @@ export type ActivityAction =
   | { type: "RETELLING_RESULT"; result: RetellingResult }
   | { type: "STT_FAILED"; code: string };
 
-/** 부분 전사에서 아직 안 나온 키워드를 찾아 점등 목록에 더한다. */
+/**
+ * 전사에서 아직 안 나온 키워드를 찾아 점등 목록에 더한다.
+ *
+ * 부분 전사(브라우저 모드)에서도, 최종 결과(백엔드 모드)에서도 같은 함수를 쓴다.
+ * 이미 점등된 것은 다시 넣지 않으므로 **몇 번 불려도 결과가 같다.**
+ * 그래서 2안의 일괄 점등이 별도 코드 없이 성립한다.
+ */
 function detectKeywords(
   transcript: string,
   keywords: readonly string[],
@@ -158,16 +168,34 @@ export function activityReducer(
         spokenKeywords: [],
         retellingText: "",
         interimText: "",
+        transcribing: false,
       };
 
     case "RECORDING_START":
-      return { ...state, recording: true, interimText: "", errorCode: null };
+      return {
+        ...state,
+        recording: true,
+        transcribing: false,
+        interimText: "",
+        errorCode: null,
+      };
 
+    /**
+     * 변환 중(①). D-5도 대화와 같은 구간을 갖는다.
+     * 마이크를 끄고 문구를 바꾼다. 단계는 RETELLING 그대로다.
+     */
+    case "TRANSCRIBING":
+      return { ...state, recording: false, transcribing: true };
+
+    /**
+     * 부분 전사. **브라우저 모드에서만 온다.** 백엔드 모드(2안)에는 interim result가
+     * 없어서 실시간 점등이 불가능하고, 최종 결과 일괄 점등으로 폴백한다.
+     * (docs/request/frontend/stt-tts-integration.md "D-5 키워드 실시간 점등")
+     */
     case "INTERIM":
       return {
         ...state,
         interimText: action.text,
-        // 실시간 점등 — Web Speech API의 interimResults가 있어서 가능하다. (D-5)
         spokenKeywords: detectKeywords(
           action.text,
           state.retellingKeywords,
@@ -178,15 +206,22 @@ export function activityReducer(
     case "TRANSCRIBED": {
       const text = action.text.trim();
       if (!text) {
-        return { ...state, recording: false, errorCode: "no-speech" };
+        return {
+          ...state,
+          recording: false,
+          transcribing: false,
+          errorCode: "no-speech",
+        };
       }
       return {
         ...state,
         recording: false,
+        transcribing: false,
         step: ActivityStep.REVIEW,
         retellingText: text,
         interimText: "",
-        // 최종 결과로 한 번 더 훑는다. 부분 전사에서 놓친 키워드를 보정한다.
+        // 최종 결과로 훑는다. 백엔드 모드에서는 점등이 **여기서 처음** 일어나고,
+        // 브라우저 모드에서는 부분 전사에서 놓친 것을 보정한다.
         spokenKeywords: detectKeywords(
           text,
           state.retellingKeywords,
@@ -200,6 +235,7 @@ export function activityReducer(
         ...state,
         step: ActivityStep.RETELLING,
         recording: false,
+        transcribing: false,
         retellingText: "",
         interimText: "",
         spokenKeywords: [],
@@ -216,7 +252,12 @@ export function activityReducer(
       };
 
     case "STT_FAILED":
-      return { ...state, recording: false, errorCode: action.code };
+      return {
+        ...state,
+        recording: false,
+        transcribing: false,
+        errorCode: action.code,
+      };
 
     default:
       return state;

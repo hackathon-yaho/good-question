@@ -18,12 +18,12 @@ import { PillButton } from "@/components/ui/PillButton";
 import { mockContentApi } from "@/lib/api/mock-content";
 import type { ContentApi, WordEntry, WordbookFilter } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
-import { useSpeechSynthesis } from "@/lib/speech/useSpeechSynthesis";
+import { useCharacterVoice } from "@/lib/speech";
 
 export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
-  const { speak } = useSpeechSynthesis();
+  const { speak } = useCharacterVoice();
 
   const [filter, setFilter] = useState("");
   const [words, setWords] = useState<WordEntry[] | null>(null);
@@ -133,7 +133,7 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
                 <button
                   type="button"
                   aria-label={`${word.word} 발음 듣기`}
-                  onClick={() => speak(word.word)}
+                  onClick={() => speak({ text: word.word })}
                   className="flex size-touch items-center justify-center rounded-full bg-primary-soft text-xl"
                 >
                   🔊
@@ -173,7 +173,7 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
               <button
                 type="button"
                 aria-label={`${open.word} 발음 듣기`}
-                onClick={() => speak(open.word)}
+                onClick={() => speak({ text: open.word })}
                 className="flex size-touch-kid items-center justify-center rounded-full bg-primary-soft text-3xl"
               >
                 🔊

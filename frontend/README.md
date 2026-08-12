@@ -42,6 +42,7 @@ npm run verify  # 브라우저 검증 (dev 서버를 먼저 띄운 상태에서)
 | --- | --- | --- |
 | `NEXT_PUBLIC_BACKEND_URL` | `http://localhost:8080` | 백엔드 오리진. 여기에 `/api`가 붙습니다 |
 | `NEXT_PUBLIC_AUTH_MODE` | `mock` | `mock` = 백엔드 없이 동작 · `backend` = 카카오 리다이렉트 + JWT 쿠키 |
+| `NEXT_PUBLIC_SPEECH_MODE` | `mock` | `mock` = 브라우저 Web Speech · `backend` = `/api/stt`·`/api/tts` ([아래](#stt--tts)) |
 
 `npm run verify`는 **`mock` 모드로** 돕니다. 검증에 백엔드를 요구하지 않기 위한 것입니다.
 
@@ -57,13 +58,14 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 
 ## 검증
 
-`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **241개**를 확인합니다.
+`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **258개**를 확인합니다.
 `scripts/verify/`에 스위트별로 나뉘어 있습니다.
 
 | 스위트 | 범위 |
 | --- | --- |
 | `play` | C-1 도입 · 자동재생 게이트 · TTS |
 | `turn` | C-3~C-6 대화 1턴 · NORMAL/GUIDED/CLOSING |
+| `speech` | **2안 STT/TTS** — 실제 녹음·multipart 업로드·오디오 재생 (`?speech=backend`) |
 | `handoff` | `/play` 완주 → `/activity` 인계 (장면 4개 전부 닫히는지) |
 | `activity` | D-1~D-7 · 키워드 실시간 점등 |
 | `drag` | D-2 카드 드래그 (마우스 · 터치) |
@@ -119,6 +121,8 @@ src/
     ├── play-state.ts            PlayState · ActivityStep · 서버 모드 매핑
     ├── api/http.ts              fetch 래퍼 (credentials: include · 에러 코드 매핑)
     ├── api/auth.ts              로그인 · /auth/me · 로그아웃 (목 / 백엔드 전환)
+    ├── api/speech.ts            POST /api/stt · GET /api/tts
+    ├── speech/                  녹음·재생 (목 / 백엔드 전환) — mode.ts가 입구
     ├── client-store.ts          선택한 아이 · 동의 임시값 (localStorage)
     └── relative-date.ts         A-5 "최근 활동" 상대 표기 규칙
 ```
@@ -224,6 +228,7 @@ src/lib/api/errors.ts          에러 코드 (유지 — 문구가 아니라 코
 src/lib/api/mock.ts            /play · /activity 목 (버릴 것)
 src/lib/api/mock-account.ts    계정 · 아이 · 홈 목 (버릴 것)
 src/lib/api/auth.ts            AUTH_MODE=backend면 이미 실서버를 호출한다 (완료)
+ src/lib/speech/               SPEECH_MODE=backend면 이미 실서버를 호출한다 (완료)
 src/lib/client-store.ts        선택한 아이 (서버 세션으로 옮길 것)
 화면 컴포넌트                   api 기본값만 교체
 ```
@@ -250,11 +255,47 @@ prop으로 넘기면 `Functions cannot be passed directly to Client Components`�
 
 ## STT / TTS
 
-**Web Speech API**로 확정했습니다 (2026-08-10). 시연 기기가 노트북 Chrome입니다.
+**2안(백엔드 OpenAI)으로 확정**됐습니다 (2026-08-12,
+[stt-tts-integration.md](../docs/request/frontend/stt-tts-integration.md)).
+MVP 지원 기기 1순위가 iPad인데 iOS Safari에서 Web Speech API가 불안정합니다.
 
-- STT: `SpeechRecognition` — `interimResults`로 D-5 키워드 실시간 점등까지 구현
-- TTS: `SpeechSynthesis` — 백엔드 음성 API 없음
-- 발화 제출은 `application/json`으로 **텍스트만** 전송
+**발화 1회가 요청 3개로 나뉩니다.** 한 요청에 합칠 수 없습니다.
 
-> 주최측 10월 테스트는 태블릿 대상이고 iOS Safari에서 Web Speech API가 불안정합니다.
-> **STT 호출부를 인터페이스로 분리**해 나중에 Whisper로 교체할 수 있게 둘 것.
+```
+① POST /api/stt   녹음 오디오 → 텍스트        최대 8초   "변환 중"
+   아이가 화면에서 확인·수정                              ← 요청이 갈리는 지점
+② POST /messages  텍스트 → 분석·응답          최대 10초  "응답 대기"
+③ GET  /api/tts   대사 → 오디오
+```
+
+②를 ①과 합치면 [PRD F-05](../docs/product/prd.md)의 "변환된 텍스트를 표시하고
+보내기로 제출"을 못 맞춥니다. 확인 단계가 두 요청 **사이**에 들어갑니다.
+
+### 두 경로를 둔 이유
+
+`NEXT_PUBLIC_SPEECH_MODE`로 전환합니다.
+
+| 모드 | STT | TTS | 언제 |
+| --- | --- | --- | --- |
+| `mock` (기본) | `SpeechRecognition` | `SpeechSynthesis` | 지금. 노트북 Chrome에서 들린다 |
+| `backend` | `MediaRecorder` → `/api/stt` | `/api/tts` → `<audio>` | 백엔드가 올라오면. iPad 안전 |
+
+백엔드의 두 엔드포인트가 **아직 없습니다**(backend work-items B-13~B-18 미완).
+지금 브라우저 경로를 지우면 08-20 발표 시연에 음성이 아예 없습니다.
+올라오면 `.env.local`에 `NEXT_PUBLIC_SPEECH_MODE=backend`를 넣고
+`browser-stt.ts`·`browser-tts.ts`와 `mode.ts`의 분기를 지웁니다.
+
+**인터페이스는 backend 계약으로 맞췄습니다.** 요청 3분리와 "변환 중/응답 대기" 구간
+분리가 `mock` 모드에서도 그대로 흐릅니다. 화면 코드는 모드를 모릅니다 —
+`useChildSpeech`·`useCharacterVoice` 두 개만 봅니다.
+
+### 조심할 것
+
+- **`<audio src="{백엔드}/api/tts">`로 직접 물리면 401이 난다.** 오리진이 다르고 쿠키
+  인증인데 엘리먼트가 보내는 요청에는 `credentials`를 지정할 방법이 없다.
+  `fetch(..., { credentials: "include" })` → blob URL로 받는다
+- **D-5 키워드 실시간 점등은 backend 모드에서 불가능하다.** interim result가 없다.
+  최종 결과 일괄 점등으로 폴백한다 (같은 함수를 쓰므로 화면 코드는 동일)
+- **원본 오디오를 저장하지 않는다.** 업로드 후 참조를 즉시 끊는다. 저장 경로가 없다
+- **iOS는 조작 없는 자동 재생을 막는다.** C-1 첫 탭에서 `unlock()`으로 오디오
+  엘리먼트를 열어 둔다. **실기 확인 대기**

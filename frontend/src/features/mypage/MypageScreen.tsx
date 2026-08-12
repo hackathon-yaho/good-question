@@ -19,7 +19,7 @@ import { PillButton } from "@/components/ui/PillButton";
 import { mockContentApi } from "@/lib/api/mock-content";
 import type { ContentApi, MypageSnapshot } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
-import { useSpeechSynthesis } from "@/lib/speech/useSpeechSynthesis";
+import { useCharacterVoice } from "@/lib/speech";
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
@@ -32,7 +32,7 @@ function formatDate(iso: string): string {
 export function MypageScreen({ api = mockContentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
-  const { speak, cancel, speaking } = useSpeechSynthesis();
+  const { speak, cancel, speaking } = useCharacterVoice();
 
   const [data, setData] = useState<MypageSnapshot | null>(null);
 
@@ -157,7 +157,7 @@ export function MypageScreen({ api = mockContentApi }: { api?: ContentApi }) {
                   type="button"
                   aria-label={`${item.storyTitle} 다시 들어보기`}
                   disabled={speaking}
-                  onClick={() => speak(item.text)}
+                  onClick={() => speak({ text: item.text })}
                   className="flex size-touch shrink-0 items-center justify-center rounded-full bg-primary-soft text-xl disabled:opacity-50"
                 >
                   🔊

@@ -1,8 +1,8 @@
 /**
- * TTS — Web Speech API SpeechSynthesis
+ * TTS (mock 구현) — 브라우저 `SpeechSynthesis`
  *
- * 캐릭터 음성은 제공되는 음성 파일이 아니라 TTS를 쓴다. (PRD F-04, 주최측 확정)
- * 자동 재생하고, 다시 듣기 버튼을 별도로 제공한다. (작업 분장 2.2)
+ * ⚠️ **이 파일은 임시다.** `browser-stt.ts`와 같은 이유로 남아 있다.
+ *    백엔드 `GET /api/tts`가 올라오면 `SPEECH_MODE=backend`로 바꾸고 지운다.
  *
  * ⚠️ 가장 위험한 지점: **재생 종료 감지가 실패하면 아이가 영원히 기다린다.**
  *    (screens.md C-3 체크리스트) onend가 안 오는 브라우저 버그가 실제로 있어서
@@ -10,20 +10,21 @@
  *
  * TTS가 아예 실패해도 텍스트는 보이고 다음 상태로 넘어가야 한다. 그래서
  * 실패도 "종료"로 취급해 onDone을 호출한다.
+ *
+ * `VoiceCue.messageId`는 무시한다. 여기서는 텍스트로 읽는 것이 전부다.
  */
 
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-/** 지원 여부는 바뀌지 않으므로 구독할 것이 없다. */
-const noopSubscribe = () => () => {};
+import { useBrowserCapability } from "@/lib/speech/supported";
+import type {
+  CharacterVoice,
+  SpeakOptions,
+  TtsRate,
+  VoiceCue,
+} from "@/lib/speech/types";
 
 /** 한국어 대략 분당 320자 기준 + 여유 2.5초 */
 function estimateDurationMs(text: string, rate: number): number {
@@ -31,22 +32,20 @@ function estimateDurationMs(text: string, rate: number): number {
   return text.length * perChar + 2500;
 }
 
-export type TtsRate = "slow" | "normal" | "fast";
-
 const RATE_VALUE: Record<TtsRate, number> = {
   slow: 0.8,
   normal: 1,
   fast: 1.2,
 };
 
-export function useSpeechSynthesis() {
-  const [speaking, setSpeaking] = useState(false);
+const hasSynthesis = () =>
+  typeof window !== "undefined" && "speechSynthesis" in window;
 
-  const supported = useSyncExternalStore(
-    noopSubscribe,
-    () => typeof window !== "undefined" && "speechSynthesis" in window,
-    () => false
-  );
+export function useBrowserTts(
+  { enabled = true }: { enabled?: boolean } = {}
+): CharacterVoice {
+  const [speaking, setSpeaking] = useState(false);
+  const supported = useBrowserCapability(hasSynthesis);
 
   const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doneRef = useRef<(() => void) | null>(null);
@@ -62,7 +61,7 @@ export function useSpeechSynthesis() {
   // Chrome은 getVoices()가 처음 호출에서 빈 배열을 준다. voiceschanged 이후에 채워진다.
   // 이걸 놓치면 한국어 음성을 못 찾고 기본 음성으로 읽는다.
   useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (!enabled || !hasSynthesis()) return;
 
     const load = () => {
       voicesRef.current = window.speechSynthesis.getVoices();
@@ -71,7 +70,7 @@ export function useSpeechSynthesis() {
     window.speechSynthesis.addEventListener("voiceschanged", load);
     return () =>
       window.speechSynthesis.removeEventListener("voiceschanged", load);
-  }, []);
+  }, [enabled]);
 
   /** onend와 폴백 타이머 중 먼저 온 쪽만 처리한다. */
   const settle = useCallback(() => {
@@ -86,7 +85,7 @@ export function useSpeechSynthesis() {
   }, []);
 
   const cancel = useCallback(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (!hasSynthesis()) return;
     genRef.current += 1;
     window.speechSynthesis.cancel();
     if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
@@ -97,17 +96,11 @@ export function useSpeechSynthesis() {
   }, []);
 
   const speak = useCallback(
-    (
-      text: string,
-      opts: { rate?: TtsRate; volume?: number; onDone?: () => void } = {}
-    ) => {
-      const { rate = "normal", volume = 1, onDone } = opts;
+    (cue: VoiceCue, options: SpeakOptions = {}) => {
+      const { rate = "normal", volume = 1, onDone } = options;
+      const text = cue.text;
 
-      if (
-        typeof window === "undefined" ||
-        !("speechSynthesis" in window) ||
-        !text.trim()
-      ) {
+      if (!hasSynthesis() || !text.trim()) {
         // TTS를 못 쓰더라도 흐름은 멈추지 않는다.
         onDone?.();
         return;
@@ -169,5 +162,18 @@ export function useSpeechSynthesis() {
 
   useEffect(() => cancel, [cancel]);
 
-  return { speak, cancel, speaking, supported };
+  const noop = useCallback(() => {}, []);
+
+  if (!enabled) {
+    return {
+      speak: noop,
+      cancel: noop,
+      speaking: false,
+      supported: false,
+      unlock: noop,
+    };
+  }
+
+  // SpeechSynthesis는 열어 둘 것이 없다. 제스처 게이트는 화면(C-1)이 맡는다.
+  return { speak, cancel, speaking, supported, unlock: noop };
 }
