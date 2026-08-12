@@ -187,23 +187,28 @@ AI 서버 완성을 기다리지 않고 전체 흐름을 검증할 수 있습니
 
 | 순서 | 작업 | 항목 |
 | --- | --- | --- |
-| 1 | 카드 조회 (셔플 고정) | `GET /activity` |
-| 2 | 순서 정답 판정 + `attempt_count` 누적 | M-53 |
-| 3 | **3회 제한** — 3회째 `correctOrder` 공개 | B-19 |
-| 4 | 정답 시 `retellingKeywords` 응답 | M-54 |
-| 5 | 재구성 발화 수신 · `post_activity_results` 저장 | M-56 |
-| 6 | 세션 완료 처리 | M-57 |
-| 7 | **AI 서버 실주소로 교체** (mock → 실서버) | U-01 |
+| 1 | ~~카드 조회 (셔플 고정)~~ | `GET /activity` — **완료** |
+| 2 | ~~순서 정답 판정 + `attempt_count` 누적~~ | M-53 — **완료** |
+| 3 | ~~**3회 제한** — 3회째 `correctOrder` 공개~~ | B-19 — **완료** |
+| 4 | ~~정답 시 `retellingKeywords` 응답~~ | M-54 — **완료** |
+| 5 | ~~재구성 발화 수신 · `post_activity_results` 저장~~ | M-56 — **완료** |
+| 6 | ~~세션 완료 처리~~ | M-57 — **완료** |
+| 7 | **AI 서버 실주소로 교체** (mock → 실서버) | U-01 — 미결(주소 미수령), mock으로 우회 중 |
 | 8 | Supabase Postgres 연결 전환 | B-21 |
 | 9 | Render 배포 | M-59 |
 | 10 | 헬스체크 + 외부 크론 10분 핑 | B-22, B-23 |
 | 11 | **응답 시간 실측** → 프론트에 공유 | U-02 |
 
 **완료 조건**
-- 이야기 1편을 처음부터 끝까지 완주해 `status = completed`가 된다
-- 3회 오답 후에도 다음 단계로 넘어간다 (`is_order_correct = false`로 저장)
-- 배포 환경에서 15분 방치 후에도 첫 요청이 응답한다
-- STT / 발화 전송 / TTS 각 구간의 실측 시간을 프론트에 전달했다
+- [x] 이야기 1편을 처음부터 끝까지 완주해 `status = completed`가 된다 — 세션 2건을 인트로~대화4까지 curl로 완주, `story_sessions.status=COMPLETED` DB 확인
+- [x] 3회 오답 후에도 다음 단계로 넘어간다 (`is_order_correct = false`로 저장) — 3회 오답 세션에서 `attempt_count=3, is_order_correct=f` DB 확인, 응답은 계속 200으로 진행 가능
+- [ ] 배포 환경에서 15분 방치 후에도 첫 요청이 응답한다 — 배포 전이라 미착수
+- [ ] STT / 발화 전송 / TTS 각 구간의 실측 시간을 프론트에 전달했다 — 배포 전이라 미착수
+
+> **후속 활동(항목 1~6) 완료** (2026-08-12). `activity/{controller,service,dto}` 신규.
+> `PostActivityResult`·`PostActivityConfig`는 Phase 1에서 이미 만들어둔 엔티티를 그대로 썼다.
+> 남은 항목(7~11)은 배포·실 AI 서버 연동으로, 둘 다 팀 외부 요인(U-01 AI 주소, Supabase/Render
+> 계정)에 막혀 있다 — 상세는 work-items.md 10·11장.
 
 ---
 

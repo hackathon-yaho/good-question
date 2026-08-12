@@ -306,23 +306,42 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
-| — | 카드 조회 (셔플 고정) | 필수 | `GET /api/sessions/{id}/activity` |
-| M-53 | **정답 판정 서버 계산** | 필수 | `POST /api/sessions/{id}/activity/order` |
-| M-54 | 정답 시 `retellingKeywords` 응답 | 필수 | 〃 |
-| B-19 | **재시도 3회 제한** | 필수 | 3회째에 `correctOrder` 공개 (D-10) |
-| — | 재구성 발화 수신 | 필수 | `POST /api/sessions/{id}/activity/retelling` |
-| M-56 | `post_activity_results` 저장 | 필수 | 세션당 1건 |
-| M-57 | 세션 완료 처리 (`status = completed`) | 필수 | |
-| B-20 | 별가루 지급 +100 | 선택-후순위 | 완료 시 `children.star_dust` 증가 (D-09) |
+| — | ~~카드 조회 (셔플 고정)~~ | 필수 | `GET /api/sessions/{id}/activity` — **완료** |
+| M-53 | ~~**정답 판정 서버 계산**~~ | 필수 | `POST /api/sessions/{id}/activity/order` — **완료** |
+| M-54 | ~~정답 시 `retellingKeywords` 응답~~ | 필수 | 〃 — **완료** |
+| B-19 | ~~**재시도 3회 제한**~~ | 필수 | 3회째에 `correctOrder` 공개 (D-10) — **완료** |
+| — | ~~재구성 발화 수신~~ | 필수 | `POST /api/sessions/{id}/activity/retelling` — **완료** |
+| M-56 | ~~`post_activity_results` 저장~~ | 필수 | 세션당 1건 — **완료** |
+| M-57 | ~~세션 완료 처리 (`status = completed`)~~ | 필수 | **완료** |
+| B-20 | 별가루 지급 +100 | 선택-후순위 | 완료 시 `children.star_dust` 증가 (D-09) — 미착수 (Phase 7) |
 
 스키마: [api.md 3.6](../../docs/spec/api.md) · 정답 순서는 [PRD 7.8](../../docs/product/prd.md) `post_activity_config`
+
+구현: `activity/{controller,service,dto}`. `PostActivityResult`·`PostActivityConfig`·`PostActivityCard`는
+이미 있던 엔티티를 그대로 썼다.
+
+### 검증 (2026-08-12)
+
+세션 2건을 인트로부터 대화4까지 실제로 완주시켜(각 대화 장면 `max_turns`만큼 발화 전송 →
+`CLOSING` 강제) `POST_ACTIVITY` 상태까지 도달한 뒤 curl로 확인했다.
+
+- **셔플 고정**: `GET /activity`를 두 번 호출해도 카드 순서가 동일함을 확인
+- **오답 응답 형태**: `{"isCorrect":false,"attemptCount":1}` — `correctOrder`·`retellingKeywords` 키 자체가 없음(생략, null 아님)이 api.md 예시와 정확히 일치
+- **정답(3회째) 응답 형태**: `{"isCorrect":true,"attemptCount":3,"retellingKeywords":[...]}` — `correctOrder` 없음
+- **3회 오답 응답 형태**: `{"isCorrect":false,"attemptCount":3,"correctOrder":[...],"retellingKeywords":[...]}` — 둘 다 실림
+- **정직한 기록**: 3회 오답으로 "통과"한 세션의 DB를 직접 조회 — `attempt_count=3`, `is_order_correct=f`로 정확히 저장됨 (화면에는 실패를 안 보여주지만 기록은 사실대로)
+- **재구성 발화 → 세션 완료**: `POST .../retelling` 응답 `sessionStatus:"completed"`, DB `story_sessions.status=COMPLETED` 확인. `stats.childUtteranceCount`가 실제 보낸 발화 수(4+5+5+4=18)와 정확히 일치, `characterCount`는 세션에서 실제 만난 캐릭터 수(며느리·시아버지·마을이장=3)와 일치
+- **인증/소유권**: 다른 보호자 JWT로 조회 시 403 `FORBIDDEN`, 존재하지 않는 `sessionId`는 404 `NOT_FOUND`
 
 ### 주의
 
 - **프론트 판정을 허용하지 않습니다** ([PRD 8.11](../../docs/product/prd.md))
-- **셔플 순서를 서버가 고정해 내려줍니다.** 매 시도마다 다시 섞으면 아이가 혼란스러움
+- **셔플 순서를 서버가 고정해 내려줍니다.** 세션 id를 시드로 매번 같은 순서를 재현한다 — 별도 컬럼에 저장하지 않음
 - 3회 실패로 통과시켜도 `is_order_correct = false`로 저장. 기록은 사실대로 남기되 **아이 화면에는 실패를 표시하지 않음** (화면 명세 D-3 원칙)
-- `correctOrder`는 **처음에는 내려주지 않음.** 3회째에만 실어 보냄
+- `correctOrder`는 **처음에는 내려주지 않음.** 3회째에만 실어 보냄. `retellingKeywords`도 정답이거나 3회째일 때만 응답에 실림 — api.md 예시가 필드를 `null`이 아니라 **생략**으로 표현하므로 `@JsonInclude(NON_NULL)`을 씀
+- `imageUrl`은 아직 항상 `null` — 카드 이미지 에셋 미수령(U-03)
+- `newWordCount`는 항상 0 — 단어장(wordbook)이 선택-후순위라 아직 없음
+- `reportAvailable`은 항상 `false` — 보호자 리포트(O-01)가 선택 항목이라 아직 없음
 
 ---
 
