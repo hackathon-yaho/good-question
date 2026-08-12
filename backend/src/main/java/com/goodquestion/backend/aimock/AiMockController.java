@@ -21,10 +21,17 @@ import java.util.Map;
 @RequestMapping("/mock-ai")
 public class AiMockController {
 
+    /**
+     * childIntent만 발화 내용에 따라 갈라준다. 미션 노출 조건(PRD 7.6)이 childIntent를 보기 때문에
+     * 고정값만 돌려주면 그 경로를 호출로 검증할 수 없어서다. 나머지 필드는 여전히 고정이다.
+     */
     @PostMapping("/analyze")
     public Map<String, Object> analyze(@RequestBody(required = false) Map<String, Object> request) {
+        String childUtterance = request == null ? "" : String.valueOf(request.getOrDefault("childUtterance", ""));
+        boolean looksLikeProposal = childUtterance.contains("방귀") || childUtterance.contains("장대");
+
         return Map.of(
-                "childIntent", "PERSPECTIVE",
+                "childIntent", looksLikeProposal ? "SOLUTION" : "PERSPECTIVE",
                 "mainPoint", "며느리가 창피해서 참았던 것 같다",
                 "detectedElements", List.of(
                         Map.of("type", "PERSPECTIVE", "evidence", "창피해서 계속 참았던 것 같아요")

@@ -9,7 +9,6 @@ import com.goodquestion.backend.message.dto.response.MissionTriggeredResponse;
 import com.goodquestion.backend.message.entity.DetectedElement;
 import com.goodquestion.backend.message.entity.Message;
 import com.goodquestion.backend.message.entity.UtteranceAnalysis;
-import com.goodquestion.backend.message.enums.ChildIntent;
 import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.enums.UtteranceValidity;
 import com.goodquestion.backend.message.repository.MessageRepository;
@@ -25,6 +24,7 @@ import com.goodquestion.backend.session.engine.AccumulatedElementsCalculator;
 import com.goodquestion.backend.session.engine.AnalysisPostProcessor;
 import com.goodquestion.backend.session.engine.GuidanceSelector;
 import com.goodquestion.backend.session.engine.MissionTrigger;
+import com.goodquestion.backend.session.engine.MissionTriggerContext;
 import com.goodquestion.backend.session.engine.ProgressDecision;
 import com.goodquestion.backend.session.engine.ProgressInput;
 import com.goodquestion.backend.session.engine.ProgressJudge;
@@ -109,15 +109,20 @@ public class MessageServiceImpl implements MessageService {
         boolean isLowInformation = isLowInformation(analysis.utteranceValidity());
         int lowInformationTurns = isLowInformation ? session.getConsecutiveLowInformationTurns() + 1 : 0;
 
+        // 세션에 이번 턴 결과를 반영하기 전에 "직전 턴" 값을 붙잡아 둔다 —
+        // 진행 판단(강한 유도 제한)과 미션 조건 4가 둘 다 직전 턴 기준이다.
+        ResponseMode previousMode = session.getLastResponseMode();
+        ThoughtElement previousGuidanceTarget = session.getLastGuidanceTarget();
+
         // ③ 진행 판단 (M-38, M-39) — 판단 순서를 바꾸지 않는다.
         ProgressDecision decision = ProgressJudge.judge(new ProgressInput(
                 turnCount, scene.getPreferredTurns(), scene.getMaxTurns(), missing,
-                !newlyAccumulated.isEmpty(), session.getLastResponseMode(),
+                !newlyAccumulated.isEmpty(), previousMode,
                 turnsWithoutNewElement, lowInformationTurns));
 
         // ④ 유도 정보 구성 (M-41)
         String guidanceTarget = decision.mode() == ResponseMode.GUIDED
-                ? GuidanceSelector.select(missing, previousGuidanceTargetName(session))
+                ? GuidanceSelector.select(missing, previousGuidanceTarget == null ? null : previousGuidanceTarget.name())
                 : null;
         String remainingWorry = guidanceTarget == null
                 ? null
@@ -150,7 +155,9 @@ public class MessageServiceImpl implements MessageService {
 
         MissionTriggeredResponse missionTriggered = characterTurn.sceneEnded()
                 ? null
-                : judgeMission(session, scene, turnCount, analysis.childIntent(), missing, accumulated, nextTurnOrder + 1);
+                : judgeMission(session, scene, new MissionTriggerContext(
+                        turnCount, analysis.childIntent(), request.text(), accumulated, missing,
+                        previousMode, previousGuidanceTarget), nextTurnOrder + 1);
 
         String characterDisplayName = DialogueContents.forSceneOrder(scene.getSceneOrder()).characterDisplayName();
 
@@ -220,16 +227,15 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /** 대화3(미션1)·대화4(미션2)에서만 판정한다. 이미 노출됐으면 다시 노출하지 않는다 (PRD I-07). */
-    private MissionTriggeredResponse judgeMission(StorySession session, StoryScene scene, int turnCount,
-                                                    ChildIntent childIntent, List<String> missing, List<String> accumulated,
-                                                    int systemMessageTurnOrder) {
+    private MissionTriggeredResponse judgeMission(StorySession session, StoryScene scene,
+                                                    MissionTriggerContext context, int systemMessageTurnOrder) {
         MissionDefinition mission = Missions.forSceneOrder(scene.getSceneOrder());
         if (mission == null) return null;
         if (messageRepository.existsBySessionAndSceneAndSpeakerType(session, scene, SpeakerType.SYSTEM)) return null;
 
         boolean shouldReveal = mission == Missions.MISSION_1
-                ? MissionTrigger.shouldRevealMission1(turnCount, childIntent, missing)
-                : MissionTrigger.shouldRevealMission2(turnCount, accumulated);
+                ? MissionTrigger.shouldRevealMission1(context)
+                : MissionTrigger.shouldRevealMission2(context);
         if (!shouldReveal) return null;
 
         messageRepository.save(Message.ofSystem(session, scene, systemMessageTurnOrder, mission.id()));
