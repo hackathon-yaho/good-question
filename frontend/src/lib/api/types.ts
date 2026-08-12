@@ -63,6 +63,15 @@ export type SceneInfo = {
 export type UtteranceResponse = {
   responseMode: ResponseMode;
   characterMessage: string;
+  /**
+   * 방금 만들어진 캐릭터 메시지의 id. `GET /api/tts?messageId=`로 음성을 받는다.
+   *
+   * 요청 문서: *"응답에 `messageId`가 포함되며, 이 값으로 ③을 호출합니다"*
+   * (docs/request/frontend/stt-tts-integration.md · api.md 3.5에는 없는 필드다)
+   *
+   * null이면 텍스트로 음성을 요청한다. 그래도 재생은 된다.
+   */
+  messageId: string | null;
   characterName: string;
   accumulatedElements: string[];
   turnCount: number;
@@ -136,10 +145,22 @@ export type ActivitySnapshot = {
 export type OrderResult = {
   isCorrect: boolean;
   attemptCount: number;
-  /** 정답일 때만 채워진다. */
+  /** 정답이거나 3회째일 때 채워진다. */
   retellingKeywords: string[] | null;
   /** 오답일 때 D-3 "힌트 보기"가 강조할 카드 1장 */
   hintCardId: string | null;
+  /**
+   * 정답 순서. **3회째 오답에만 실려 온다.** (백엔드 D-10 · Q-15)
+   *
+   * `attempt_count`는 재시도를 전제하지만 제한 규칙이 없어 무한 재시도가 된다.
+   * 아이가 활동에 갇혀 세션이 완료되지 않고, D-3의 "실패를 지적하지 않는다"
+   * 원칙과도 어긋난다. 그래서 3회째에 정답을 보여주고 다음 단계로 넘긴다.
+   *
+   * ⚠️ **프론트가 시도 횟수를 세서 판단하지 않는다.** 이 필드가 있으면 넘기고,
+   *    없으면 D-3으로 돌린다. 제한 규칙은 서버 소관이다. (§0-2)
+   *    api.md 3.6의 "정답 순서를 내려주지 않는다"는 **처음에** 주지 말라는 뜻이다.
+   */
+  correctOrder: string[] | null;
 };
 
 /** POST /api/sessions/{sessionId}/activity/retelling */
@@ -173,15 +194,13 @@ export type ActivityApi = {
 /** MVP 소셜 로그인은 카카오만이다. (PRD M-01, open-questions Q-02) */
 export type AuthProvider = "kakao";
 
-export type Parent = { id: string; name: string; email: string };
+export type Parent = { id: string; name: string; email: string | null };
 
-/** POST /api/auth/{provider} */
-export type AuthResult = {
-  accessToken: string;
-  /** false → /onboarding/consent, true → /profiles. A-2 분기 판단용 확정 필드 */
-  hasCompletedOnboarding: boolean;
-  parent: Parent;
-};
+/**
+ * ⚠️ `POST /api/auth/{provider}`(프론트가 인가 코드를 전달하는 원안)는 **폐기됐다.**
+ * 백엔드 리다이렉트 방식으로 바뀌어 프론트는 토큰을 다루지 않는다.
+ * 인증 타입은 `lib/api/auth.ts`에 있다. (백엔드 D-18)
+ */
 
 /* ── 아이 프로필 — api.md 3.2 ────────────────────────────────────── */
 
@@ -477,10 +496,6 @@ export type ParentApi = {
 };
 
 export type AccountApi = {
-  signIn(
-    provider: AuthProvider,
-    body: { authorizationCode: string }
-  ): Promise<AuthResult>;
   listChildren(): Promise<ChildListResult>;
   createChild(body: {
     name: string;

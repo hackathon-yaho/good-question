@@ -43,7 +43,11 @@ const reset = page.getByRole("button", { name: /데모 상태 초기화/ });
 if (await reset.count()) { await reset.click(); await page.waitForTimeout(300); }
 
 await page.getByRole("button", { name: "카카오로 시작하기" }).click();
-await page.waitForURL("**/onboarding/consent", { timeout: 8000 }).catch(() => {});
+// /login → /auth/callback → /onboarding/consent 두 단계를 거친다. 목 모드에서도
+// 백엔드가 만들 콜백 URL을 그대로 태우기 때문이다. (lib/api/auth.ts)
+// dev 서버는 /auth/callback을 이 시점에 처음 컴파일하므로 여유를 크게 준다.
+await page.waitForURL("**/auth/callback**", { timeout: 25000 }).catch(() => {});
+await page.waitForURL("**/onboarding/consent", { timeout: 10000 }).catch(() => {});
 ok(path() === "/onboarding/consent", "신규 → A-3 동의", path());
 
 console.log("\n=== A-3 동의 ===");
@@ -189,6 +193,32 @@ ok(path() === "/profiles", "정원 초과면 A-4 진입 차단 → /profiles", p
 ok(
   await page.getByText("아이는 최대 3명까지 등록할 수 있어요.").count() >= 1,
   "정원 초과 토스트"
+);
+
+// 로그인 콜백 — 백엔드가 302로 보내는 주소다. 여기가 막히면 로그인이 막힌다.
+// (docs/request/frontend/kakao-login-flow.md)
+console.log("\n=== 로그인 콜백 ===");
+await page.goto(`${BASE}/auth/callback?hasCompletedOnboarding=true`, { waitUntil: "networkidle" });
+await page.waitForURL("**/profiles", { timeout: 10000 }).catch(() => {});
+ok(path() === "/profiles", "onboarding=true → /profiles", path());
+
+await page.goto(`${BASE}/auth/callback?error=login_failed`, { waitUntil: "networkidle" });
+ok(
+  await page.getByRole("heading", { name: "로그인하지 못했어요" }).isVisible(),
+  "error 쿼리 → 실패 안내 (무한 로딩 아님)"
+);
+ok(path() === "/auth/callback", "실패 시 자동 이동하지 않음", path());
+await page.getByRole("button", { name: "로그인 화면으로" }).click();
+await page.waitForURL("**/login", { timeout: 8000 }).catch(() => {});
+ok(path() === "/login", "실패 화면에 돌아갈 길 있음", path());
+
+// 로그인 안 된 채 콜백 주소로 직접 들어온 경우. /auth/me가 401을 준다.
+await page.evaluate(() => localStorage.removeItem("gq.accessToken"));
+await page.goto(`${BASE}/auth/callback`, { waitUntil: "networkidle" });
+await page.getByRole("heading", { name: "로그인하지 못했어요" }).waitFor({ timeout: 8000 }).catch(() => {});
+ok(
+  await page.getByRole("heading", { name: "로그인하지 못했어요" }).isVisible(),
+  "쿼리 없이 직접 진입 + 미인증 → 실패 안내"
 );
 
 console.log("\n=== 없는 경로 · 없는 이야기 ===");

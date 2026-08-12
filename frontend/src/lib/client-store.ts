@@ -1,12 +1,15 @@
 /**
  * 브라우저 보관소 — docs/spec/screens.md §A
  *
- * 여기 있는 값은 **서버 상태가 아니다.** 서버가 붙으면 토큰은 httpOnly 쿠키로,
- * 선택한 아이는 서버 세션으로 옮긴다. 그때 이 파일만 갈아치우면 된다.
+ * 여기 있는 값은 **서버 상태가 아니다.** 선택한 아이는 나중에 서버 세션으로 옮긴다.
  *
- * 지금 localStorage를 쓰는 이유는 명세의 요구 두 개 때문이다.
+ * ⚠️ **토큰은 여기 없다.** JWT가 HttpOnly 쿠키로 오면서 프론트가 토큰을 보관하지
+ *    않는다. 로그인 여부는 `GET /api/auth/me`가 답한다.
+ *    (docs/request/frontend/kakao-login-flow.md)
+ *
+ * 지금 localStorage에 남은 것은 화면 상태뿐이다.
  *   - A-5 체크리스트: "선택한 childId가 새로고침 후에도 유지되는지"
- *   - A-1: 진입 즉시 세션 토큰을 확인해 /profiles 또는 /login으로 보낸다
+ *   - A-3 → A-4 동의 값 임시 보관
  *
  * ⚠️ 읽기는 반드시 클라이언트에서만 한다. 서버 렌더 중에 부르면 window가 없다.
  */
@@ -15,7 +18,6 @@
 
 import { useSyncExternalStore } from "react";
 
-const TOKEN_KEY = "gq.accessToken";
 const CHILD_KEY = "gq.selectedChildId";
 /** A-3 → A-4 동의 값 임시 보관. 탭을 닫으면 사라져야 하므로 sessionStorage다. */
 const CONSENT_KEY = "gq.consentDraft";
@@ -42,14 +44,6 @@ function write(storage: "local" | "session", key: string, value: string | null) 
   } catch {
     // 저장에 실패해도 화면은 계속 동작해야 한다.
   }
-}
-
-export function getAccessToken(): string | null {
-  return read("local", TOKEN_KEY);
-}
-
-export function setAccessToken(token: string | null) {
-  write("local", TOKEN_KEY, token);
 }
 
 export function getSelectedChildId(): string | null {
@@ -121,7 +115,6 @@ function subscribeToStorage(onChange: () => void): () => void {
 
 /** 로그아웃 · 데모 초기화 */
 export function clearClientStore() {
-  setAccessToken(null);
   setSelectedChildId(null);
   setConsentDraft(null);
 }

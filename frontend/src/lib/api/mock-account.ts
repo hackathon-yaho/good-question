@@ -13,7 +13,6 @@
 import { ApiError } from "@/lib/api/errors";
 import type {
   AccountApi,
-  AuthResult,
   Child,
   ChildListResult,
   ConsentValues,
@@ -26,12 +25,6 @@ import { STORY_META } from "@/mocks/story-banggui";
 const CHILD_LIMIT = 3;
 
 const STORE_KEY = "gq.mock.account";
-
-const MOCK_PARENT = {
-  id: "p_mock_0001",
-  name: "보호자",
-  email: "parent@example.com",
-};
 
 type StoredChild = {
   id: string;
@@ -97,25 +90,11 @@ function toChild(stored: StoredChild): Child {
   };
 }
 
+/**
+ * 로그인은 여기 없다. 백엔드 리다이렉트 방식으로 바뀌어 `lib/api/auth.ts`가 담당한다.
+ * (백엔드 D-18 · docs/request/frontend/kakao-login-flow.md)
+ */
 export const mockAccountApi: AccountApi = {
-  async signIn(provider, body) {
-    // OAuth 왕복을 흉내낸다. A-2에서 스피너가 보일 만큼은 걸려야 한다.
-    await delay(700);
-    assertOnline();
-    if (!body.authorizationCode) {
-      throw new ApiError("UNAUTHORIZED", "인가 코드가 없습니다");
-    }
-
-    const store = load();
-    const result: AuthResult = {
-      accessToken: `mock.${provider}.${store.children.length}`,
-      // 아이가 한 명이라도 있으면 온보딩을 끝낸 계정으로 본다.
-      hasCompletedOnboarding: store.children.length > 0,
-      parent: MOCK_PARENT,
-    };
-    return result;
-  },
-
   async listChildren() {
     await delay(150);
     assertOnline();

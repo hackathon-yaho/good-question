@@ -49,8 +49,8 @@ import { getSelectedChildId } from "@/lib/client-store";
 import { STORY_ID } from "@/mocks/story-banggui";
 import { PlayState, isCharacterTurn } from "@/lib/play-state";
 import { playTurnChime } from "@/lib/sound";
-import { useSpeechRecognition } from "@/lib/speech/useSpeechRecognition";
-import { useSpeechSynthesis } from "@/lib/speech/useSpeechSynthesis";
+import { RESPOND_TIMEOUT_MS } from "@/lib/api/speech";
+import { useCharacterVoice, useChildSpeech } from "@/lib/speech";
 import { TOTAL_SCREEN_SCENES, toScreenIndex } from "@/mocks/story-banggui";
 
 /**
@@ -89,7 +89,7 @@ export function PlayScreen({
   const [openWord, setOpenWord] = useState<HighlightWord | null>(null);
   const [savedWords, setSavedWords] = useState<readonly string[]>([]);
 
-  const { speak, cancel: cancelTts, speaking } = useSpeechSynthesis();
+  const { speak, cancel: cancelTts, unlock: unlockAudio } = useCharacterVoice();
 
   // 이미 읽은 문장을 다시 읽지 않기 위한 키. 리렌더마다 speak가 재실행되면 소리가 겹친다.
   const spokenKeyRef = useRef<string | null>(null);
@@ -126,12 +126,25 @@ export function PlayScreen({
     };
   }, [api, sessionId, toast]);
 
-  // --- STT --------------------------------------------------------------
-  const stt = useSpeechRecognition({
+  // --- STT ① -----------------------------------------------------------
+  // 2안에서는 녹음 종료(stop) → 업로드 → 텍스트가 별개 구간이다. onTranscribeStart가
+  // 그 시작을 알린다. (docs/request/frontend/stt-tts-integration.md)
+  const stt = useChildSpeech({
     maxDurationMs: 30_000,
+    onTranscribeStart: () => dispatch({ type: "TRANSCRIBING" }),
+    // 백엔드 모드에서는 오지 않는다. 여기에 기능을 의존하면 안 된다.
     onInterim: (text) => dispatch({ type: "INTERIM", text }),
     onFinal: (text) => dispatch({ type: "TRANSCRIBED", text }),
-    onError: (code) => dispatch({ type: "STT_FAILED", code }),
+    onError: (code) => {
+      // 변환 자체가 실패·타임아웃한 경우는 아이 잘못이 아니다. I-2("잘 안 들렸어")로
+      // 보내면 원인을 아이에게 떠넘기는 문구가 된다. I-3을 띄우고 같은 발화를
+      // 다시 녹음할 수 있게 되돌린다. (요청 문서 "상태별 처리" — 에러는 I-3)
+      if (code === "stt-timeout" || code === "stt-failed") {
+        network.show({ retry: () => dispatch({ type: "RETRY_SPEAKING" }) });
+        return;
+      }
+      dispatch({ type: "STT_FAILED", code });
+    },
   });
 
   const startRecording = useCallback(() => {
@@ -203,10 +216,11 @@ export function PlayScreen({
       const key = `intro:${scene.sceneId}:${state.sentenceIndex}`;
       if (spokenKeyRef.current === key) return;
       spokenKeyRef.current = key;
-      speak(currentSentence(state), {
-        rate: settings.rate,
-        volume: settings.volume,
-      });
+      // 자막은 메시지가 아니라 messageId가 없다. 텍스트로 음성을 요청한다.
+      speak(
+        { text: currentSentence(state) },
+        { rate: settings.rate, volume: settings.volume }
+      );
       return;
     }
 
@@ -216,14 +230,17 @@ export function PlayScreen({
       if (spokenKeyRef.current === key) return;
       spokenKeyRef.current = key;
 
-      speak(currentSentence(state), {
-        rate: settings.rate,
-        volume: settings.volume,
-        onDone: () => {
-          if (isLastSentence(state)) void advanceScene(scene.sceneId);
-          else dispatch({ type: "SENTENCE_NEXT" });
-        },
-      });
+      speak(
+        { text: currentSentence(state) },
+        {
+          rate: settings.rate,
+          volume: settings.volume,
+          onDone: () => {
+            if (isLastSentence(state)) void advanceScene(scene.sceneId);
+            else dispatch({ type: "SENTENCE_NEXT" });
+          },
+        }
+      );
       return;
     }
 
@@ -233,14 +250,18 @@ export function PlayScreen({
       if (spokenKeyRef.current === key) return;
       spokenKeyRef.current = key;
 
-      speak(state.characterText, {
-        rate: settings.rate,
-        volume: settings.volume,
-        onDone: () => {
-          playTurnChime(settings.volume);
-          dispatch({ type: "CHARACTER_TTS_DONE" });
-        },
-      });
+      // messageId가 있으면 백엔드 캐시를 탄다. 고정 대사는 프리워밍되어 즉시 온다.
+      speak(
+        { text: state.characterText, messageId: state.characterMessageId },
+        {
+          rate: settings.rate,
+          volume: settings.volume,
+          onDone: () => {
+            playTurnChime(settings.volume);
+            dispatch({ type: "CHARACTER_TTS_DONE" });
+          },
+        }
+      );
       return;
     }
 
@@ -249,10 +270,10 @@ export function PlayScreen({
       const key = `close:${scene.sceneId}:${state.characterText}`;
       if (spokenKeyRef.current === key) return;
       spokenKeyRef.current = key;
-      speak(state.characterText, {
-        rate: settings.rate,
-        volume: settings.volume,
-      });
+      speak(
+        { text: state.characterText, messageId: state.characterMessageId },
+        { rate: settings.rate, volume: settings.volume }
+      );
     }
   }, [advanceScene, audioUnlocked, paused, scene, settings, speak, state]);
 
@@ -301,7 +322,10 @@ export function PlayScreen({
         api.submitUtterance(sessionId, {
           text,
           sttRawText: state.sttRawText || undefined,
-        })
+        }),
+        // ②의 예산은 10초다. 요청이 셋으로 갈리면서 구간별 예산이 나뉘었다.
+        // (docs/request/frontend/stt-tts-integration.md · Q-14)
+        RESPOND_TIMEOUT_MS
       );
       // 기다리는 동안 장면이 바뀌었으면 이 응답은 지난 장면의 것이다. 버린다.
       if (currentSceneIdRef.current !== submittedSceneId) return;
@@ -344,14 +368,18 @@ export function PlayScreen({
     [contentApi, scene?.sceneId, state.characterText]
   );
 
+  /** C-3 "다시 듣기". 같은 오디오를 다시 재생한다 — 재요청하지 않는다. */
   const replay = useCallback(() => {
     if (!state.characterText) return;
-    speak(state.characterText, {
-      rate: settings.rate,
-      volume: settings.volume,
-      onDone: () => dispatch({ type: "CHARACTER_TTS_DONE" }),
-    });
-  }, [settings, speak, state.characterText]);
+    speak(
+      { text: state.characterText, messageId: state.characterMessageId },
+      {
+        rate: settings.rate,
+        volume: settings.volume,
+        onDone: () => dispatch({ type: "CHARACTER_TTS_DONE" }),
+      }
+    );
+  }, [settings, speak, state.characterMessageId, state.characterText]);
 
   const exit = useCallback(() => {
     cancelTts();
@@ -405,8 +433,12 @@ export function PlayScreen({
         word={openWord}
         contextSentence={state.characterText || null}
         saved={openWord ? savedWords.includes(openWord.word) : false}
+        // 단어 발음은 메시지가 아니라 messageId가 없다. 텍스트로 요청한다.
         onSpeak={(text, opts) =>
-          speak(text, { rate: opts?.rate ?? settings.rate, volume: settings.volume })
+          speak(
+            { text },
+            { rate: opts?.rate ?? settings.rate, volume: settings.volume }
+          )
         }
         onSave={saveWord}
         onClose={() => setOpenWord(null)}
@@ -429,19 +461,25 @@ export function PlayScreen({
           backgroundImageUrl={scene.backgroundImageUrl}
           onNext={() => {
             // 게이트를 건너뛰고 바로 넘긴 경우에도 이후 문장은 소리가 나야 한다.
+            unlockAudio();
             setAudioUnlocked(true);
             if (isLastSentence(state)) void advanceScene(scene.sceneId);
             else dispatch({ type: "SENTENCE_NEXT" });
           }}
           onExit={exit}
           needsStart={!audioUnlocked}
-          onStart={() => setAudioUnlocked(true)}
-          onReplay={() => {
+          onStart={() => {
+            // iOS는 이 탭 안에서 오디오를 열어야 이후 자동 재생이 통한다.
+            unlockAudio();
             setAudioUnlocked(true);
-            speak(currentSentence(state), {
-              rate: settings.rate,
-              volume: settings.volume,
-            });
+          }}
+          onReplay={() => {
+            unlockAudio();
+            setAudioUnlocked(true);
+            speak(
+              { text: currentSentence(state) },
+              { rate: settings.rate, volume: settings.volume }
+            );
           }}
         />
       </ImmersiveShell>
@@ -531,7 +569,6 @@ export function PlayScreen({
                 accumulatedElements={state.accumulatedElements}
                 guided={state.status === PlayState.GUIDED}
                 onReplay={replay}
-                replayDisabled={speaking}
                 highlightWords={state.highlightWords}
                 onWordClick={setOpenWord}
                 // 미션이 함께 떠 있으면 지난 기록과 비활성 마이크를 접는다.
@@ -545,12 +582,16 @@ export function PlayScreen({
                 displayName={displayName}
                 previousText={state.characterText}
                 recording={state.recording}
+                transcribing={state.status === PlayState.TRANSCRIBING}
                 interimText={state.interimText}
                 micLevel={displayedMicLevel}
                 onMicClick={startRecording}
                 onSubmit={() => stt.stop()}
+                // 변환 중에는 누를 수 없다. 백엔드 모드에는 interimText가 없어
+                // 녹음 여부만으로 판단해야 한다.
                 submitDisabled={
-                  !state.recording && !state.interimText.trim()
+                  state.status === PlayState.TRANSCRIBING ||
+                  (!state.recording && !state.interimText.trim())
                 }
                 // 미션이 함께 떠 있으면 지난 대사 줄을 접어 마이크 자리를 낸다.
                 compact={state.mission !== null}

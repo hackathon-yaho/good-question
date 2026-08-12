@@ -37,6 +37,15 @@ import {
 const CHILD_NAME = "민준";
 
 /**
+ * 카드 순서 재시도 제한 — 백엔드 D-10 (Q-15 해소)
+ *
+ * 이 값은 **서버 규칙이라 여기(목 서버)에만 있다.** 화면 코드는 시도 횟수를 세지
+ * 않고, 응답의 `correctOrder`가 실려 왔는지만 본다. 프론트가 세면 서버가 규칙을
+ * 바꿀 때 두 곳이 어긋난다. (§0-2)
+ */
+const ORDER_ATTEMPT_LIMIT = 3;
+
+/**
  * 밑줄 단어 사전. 실제로는 콘텐츠에 정의된다. (screens.md 7-1 #5)
  *
  * ⚠️ **장면 ID로 묶지 않는다.** 처음에는 그렇게 했다가 "구박"을 sc_banggui_05에
@@ -483,7 +492,8 @@ export const mockPlayApi: PlayApi = {
             session.turnCount
           );
 
-    pushMessage(session, scene.id, "character", characterText);
+    // 방금 만든 메시지의 id가 ③ GET /api/tts?messageId= 의 열쇠다.
+    const characterMessage = pushMessage(session, scene.id, "character", characterText);
 
     // --- 미션 노출 판정 — 백엔드가 결정한다. AI가 정하지 않는다 ----------
     let missionTriggered: UtteranceResponse["missionTriggered"] = null;
@@ -509,6 +519,7 @@ export const mockPlayApi: PlayApi = {
     const response: UtteranceResponse = {
       responseMode: mode,
       characterMessage: characterText,
+      messageId: characterMessage.id,
       characterName: scene.characterDisplayName ?? "",
       accumulatedElements: [...session.accumulatedElements],
       turnCount: session.turnCount,
@@ -564,13 +575,25 @@ export const mockActivityApi: ActivityApi = {
     // 오답이면 자리가 틀린 카드 하나를 힌트로 준다.
     const wrongIndex = submittedOrder.findIndex((id, i) => id !== correct[i]);
 
+    /**
+     * 3회째 오답이면 정답 순서를 함께 내려보내 다음 단계로 넘긴다. (D-10)
+     *
+     * 기록은 사실대로 `is_order_correct = false`로 남는다 — 통과시킨 것은
+     * 화면 흐름이고, 맞혔다고 기록하는 게 아니다. 이 목에는 리포트가 읽는
+     * 필드가 없어 저장까지는 재현하지 않는다.
+     */
+    const revealAnswer = !isCorrect && session.attemptCount >= ORDER_ATTEMPT_LIMIT;
+
     return {
       isCorrect,
       attemptCount: session.attemptCount,
-      retellingKeywords: isCorrect
-        ? [...MOCK_POST_ACTIVITY.retellingKeywords]
-        : null,
-      hintCardId: isCorrect ? null : (correct[wrongIndex] ?? null),
+      retellingKeywords:
+        isCorrect || revealAnswer
+          ? [...MOCK_POST_ACTIVITY.retellingKeywords]
+          : null,
+      // 정답을 보여주는 판에는 힌트가 필요 없다.
+      hintCardId: isCorrect || revealAnswer ? null : (correct[wrongIndex] ?? null),
+      correctOrder: revealAnswer ? correct : null,
     };
   },
 

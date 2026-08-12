@@ -23,12 +23,19 @@ export type ActivityState = {
   attemptCount: number;
   /** D-3에서 강조할 카드. 서버가 알려준다 */
   hintCardId: string | null;
+  /**
+   * 3회 시도 후 정답 순서를 보여주고 넘어온 경우. (D-10)
+   * D-4를 "맞췄어!"가 아니라 "이런 순서였어"로 그린다. 실패를 지적하지는 않는다.
+   */
+  orderRevealed: boolean;
   retellingKeywords: string[];
   /** D-5에서 아이가 실제로 말한 키워드 */
   spokenKeywords: string[];
   retellingText: string;
   interimText: string;
   recording: boolean;
+  /** ① 변환 중 — 오디오를 올리고 텍스트를 기다린다 (최대 8초) */
+  transcribing: boolean;
   result: RetellingResult | null;
   errorCode: string | null;
 };
@@ -39,11 +46,13 @@ export const initialActivityState: ActivityState = {
   slots: [null, null, null, null],
   attemptCount: 0,
   hintCardId: null,
+  orderRevealed: false,
   retellingKeywords: [],
   spokenKeywords: [],
   retellingText: "",
   interimText: "",
   recording: false,
+  transcribing: false,
   result: null,
   errorCode: null,
 };
@@ -58,6 +67,7 @@ export type ActivityAction =
   | { type: "RETRY_ORDER" }
   | { type: "GO_RETELLING" }
   | { type: "RECORDING_START" }
+  | { type: "TRANSCRIBING" }
   | { type: "INTERIM"; text: string }
   | { type: "TRANSCRIBED"; text: string }
   | { type: "RETELL_AGAIN" }
@@ -65,7 +75,13 @@ export type ActivityAction =
   | { type: "RETELLING_RESULT"; result: RetellingResult }
   | { type: "STT_FAILED"; code: string };
 
-/** 부분 전사에서 아직 안 나온 키워드를 찾아 점등 목록에 더한다. */
+/**
+ * 전사에서 아직 안 나온 키워드를 찾아 점등 목록에 더한다.
+ *
+ * 부분 전사(브라우저 모드)에서도, 최종 결과(백엔드 모드)에서도 같은 함수를 쓴다.
+ * 이미 점등된 것은 다시 넣지 않으므로 **몇 번 불려도 결과가 같다.**
+ * 그래서 2안의 일괄 점등이 별도 코드 없이 성립한다.
+ */
 function detectKeywords(
   transcript: string,
   keywords: readonly string[],
@@ -75,6 +91,23 @@ function detectKeywords(
     (kw) => transcript.includes(kw) && !already.includes(kw)
   );
   return found.length ? [...already, ...found] : [...already];
+}
+
+/**
+ * 카드 id 순서를 슬롯 배열로 바꾼다. 하나라도 못 찾으면 null을 준다 —
+ * 반쯤 채워진 슬롯을 보여주는 것보다 제출한 그대로 두는 게 낫다.
+ */
+function arrangeBy(
+  order: readonly string[],
+  state: ActivityState
+): (ActivityCard | null)[] | null {
+  const byId = new Map<string, ActivityCard>();
+  for (const card of [...state.tray, ...state.slots]) {
+    if (card) byId.set(card.id, card);
+  }
+  const arranged = order.map((id) => byId.get(id) ?? null);
+  if (arranged.length !== state.slots.length) return null;
+  return arranged.some((card) => card === null) ? null : arranged;
 }
 
 export function activityReducer(
@@ -138,8 +171,35 @@ export function activityReducer(
           attemptCount: result.attemptCount,
           retellingKeywords: result.retellingKeywords ?? [],
           hintCardId: null,
+          orderRevealed: false,
         };
       }
+
+      /**
+       * 서버가 정답 순서를 실어 보냈다 = 재시도 한도에 닿았다. (D-10 · 3회)
+       *
+       * ⚠️ **횟수를 세서 판단하지 않는다.** `attemptCount >= 3`으로 분기하면 서버가
+       *    한도를 바꿀 때 화면이 어긋난다. 이 필드의 유무가 서버의 통보다.
+       *
+       * D-3(오답 피드백)으로 보내지 않는다. 거기에는 "다시 해보기"가 있는데
+       * 다음 시도가 없다. 정답 순서를 보여주고 곧바로 다음 단계로 넘긴다 —
+       * 실패를 지적하지 않으면서 아이를 활동에 갇히게 두지도 않는 길이다.
+       */
+      if (result.correctOrder) {
+        return {
+          ...state,
+          step: ActivityStep.KEYWORDS,
+          attemptCount: result.attemptCount,
+          retellingKeywords: result.retellingKeywords ?? [],
+          hintCardId: null,
+          orderRevealed: true,
+          // 화면에 보여줄 순서를 정답으로 바꾼다. 돌아갈 길이 없으므로
+          // 슬롯을 덮어써도 안전하고, 화면이 실제로 그 순서를 그린다.
+          slots: arrangeBy(result.correctOrder, state) ?? state.slots,
+          tray: [],
+        };
+      }
+
       return {
         ...state,
         step: ActivityStep.FEEDBACK,
@@ -149,7 +209,11 @@ export function activityReducer(
     }
 
     case "RETRY_ORDER":
-      return { ...state, step: ActivityStep.CARD_ORDERING };
+      return {
+        ...state,
+        step: ActivityStep.CARD_ORDERING,
+        orderRevealed: false,
+      };
 
     case "GO_RETELLING":
       return {
@@ -158,16 +222,34 @@ export function activityReducer(
         spokenKeywords: [],
         retellingText: "",
         interimText: "",
+        transcribing: false,
       };
 
     case "RECORDING_START":
-      return { ...state, recording: true, interimText: "", errorCode: null };
+      return {
+        ...state,
+        recording: true,
+        transcribing: false,
+        interimText: "",
+        errorCode: null,
+      };
 
+    /**
+     * 변환 중(①). D-5도 대화와 같은 구간을 갖는다.
+     * 마이크를 끄고 문구를 바꾼다. 단계는 RETELLING 그대로다.
+     */
+    case "TRANSCRIBING":
+      return { ...state, recording: false, transcribing: true };
+
+    /**
+     * 부분 전사. **브라우저 모드에서만 온다.** 백엔드 모드(2안)에는 interim result가
+     * 없어서 실시간 점등이 불가능하고, 최종 결과 일괄 점등으로 폴백한다.
+     * (docs/request/frontend/stt-tts-integration.md "D-5 키워드 실시간 점등")
+     */
     case "INTERIM":
       return {
         ...state,
         interimText: action.text,
-        // 실시간 점등 — Web Speech API의 interimResults가 있어서 가능하다. (D-5)
         spokenKeywords: detectKeywords(
           action.text,
           state.retellingKeywords,
@@ -178,15 +260,22 @@ export function activityReducer(
     case "TRANSCRIBED": {
       const text = action.text.trim();
       if (!text) {
-        return { ...state, recording: false, errorCode: "no-speech" };
+        return {
+          ...state,
+          recording: false,
+          transcribing: false,
+          errorCode: "no-speech",
+        };
       }
       return {
         ...state,
         recording: false,
+        transcribing: false,
         step: ActivityStep.REVIEW,
         retellingText: text,
         interimText: "",
-        // 최종 결과로 한 번 더 훑는다. 부분 전사에서 놓친 키워드를 보정한다.
+        // 최종 결과로 훑는다. 백엔드 모드에서는 점등이 **여기서 처음** 일어나고,
+        // 브라우저 모드에서는 부분 전사에서 놓친 것을 보정한다.
         spokenKeywords: detectKeywords(
           text,
           state.retellingKeywords,
@@ -200,6 +289,7 @@ export function activityReducer(
         ...state,
         step: ActivityStep.RETELLING,
         recording: false,
+        transcribing: false,
         retellingText: "",
         interimText: "",
         spokenKeywords: [],
@@ -216,7 +306,12 @@ export function activityReducer(
       };
 
     case "STT_FAILED":
-      return { ...state, recording: false, errorCode: action.code };
+      return {
+        ...state,
+        recording: false,
+        transcribing: false,
+        errorCode: action.code,
+      };
 
     default:
       return state;

@@ -32,8 +32,7 @@ import {
 import { mockActivityApi } from "@/lib/api/mock";
 import type { ActivityApi } from "@/lib/api/types";
 import { ActivityStep } from "@/lib/play-state";
-import { useSpeechRecognition } from "@/lib/speech/useSpeechRecognition";
-import { useSpeechSynthesis } from "@/lib/speech/useSpeechSynthesis";
+import { useCharacterVoice, useChildSpeech } from "@/lib/speech";
 
 export function ActivityScreen({
   sessionId,
@@ -48,7 +47,7 @@ export function ActivityScreen({
   const [submitting, setSubmitting] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
 
-  const { speak, cancel: cancelTts, speaking } = useSpeechSynthesis();
+  const { speak, cancel: cancelTts, speaking } = useCharacterVoice();
   const submittingRef = useRef(false);
 
   // --- 활동 데이터 로드 --------------------------------------------------
@@ -72,8 +71,10 @@ export function ActivityScreen({
 
   // --- STT — D-5 재구성 발화 --------------------------------------------
   // 60초까지 허용한다. C-4는 30초였지만 여기는 이야기 전체를 말한다. (D-5 체크리스트)
-  const stt = useSpeechRecognition({
+  const stt = useChildSpeech({
     maxDurationMs: 60_000,
+    onTranscribeStart: () => dispatch({ type: "TRANSCRIBING" }),
+    // 백엔드 모드에서는 오지 않는다. 실시간 점등은 브라우저 모드 전용이다.
     onInterim: (text) => dispatch({ type: "INTERIM", text }),
     onFinal: (text) => dispatch({ type: "TRANSCRIBED", text }),
     onError: (code) => dispatch({ type: "STT_FAILED", code }),
@@ -180,6 +181,8 @@ export function ActivityScreen({
         <KeywordReveal
           slots={orderedSlots}
           keywords={state.retellingKeywords}
+          // 3회 시도 후 정답을 보여주며 넘어온 경우. (D-10)
+          revealed={state.orderRevealed}
           onNext={() => dispatch({ type: "GO_RETELLING" })}
         />
       ) : null}
@@ -190,6 +193,7 @@ export function ActivityScreen({
           keywords={state.retellingKeywords}
           spokenKeywords={state.spokenKeywords}
           recording={state.recording}
+          transcribing={state.transcribing}
           interimText={state.interimText}
           micLevel={displayedMicLevel}
           errorCode={state.errorCode}
@@ -204,7 +208,8 @@ export function ActivityScreen({
           keywords={state.retellingKeywords}
           speaking={speaking}
           // 원본 음성을 저장하지 않으므로 TTS로 읽어준다. (Q-07)
-          onListen={() => speak(state.retellingText)}
+          // 아이가 방금 말한 문장이라 메시지가 아니다 — 텍스트로 음성을 요청한다.
+          onListen={() => speak({ text: state.retellingText })}
           onRetell={() => dispatch({ type: "RETELL_AGAIN" })}
           onComplete={() => void submitRetelling()}
           submitting={submitting}

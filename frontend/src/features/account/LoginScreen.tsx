@@ -5,8 +5,15 @@
  *
  * ── 소셜 로그인은 카카오만이다 ──────────────────────────────────────
  * 명세는 카카오·구글·네이버 3종을 그렸지만, PRD M-01은 **카카오만** 구현 대상이다.
- * 단일 정본은 PRD이므로 카카오만 노출한다. 누를 수 없는 버튼을 늘어놓으면
- * 심사·시연에서 "안 되는 기능"으로 보인다. (screens.md A-2 체크리스트, Q-02)
+ * (Q-02, 백엔드 D-06) 누를 수 없는 버튼을 늘어놓으면 시연에서 "안 되는 기능"으로 보인다.
+ *
+ * ── 리다이렉트 방식이다 ─────────────────────────────────────────────
+ * 버튼은 **API 호출이 아니라 `window.location.href` 이동**이다.
+ * 카카오 동의 화면으로 넘어가야 하므로 fetch로는 동작하지 않는다.
+ * (docs/request/frontend/kakao-login-flow.md · 백엔드 D-18)
+ *
+ * 카카오 SDK를 넣지 않는다. 백엔드가 로그인 전 과정을 처리하고, 끝나면
+ * `/auth/callback`으로 되돌려 보낸다.
  */
 
 "use client";
@@ -15,44 +22,60 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { resetAllMockSessions } from "@/lib/api/mock";
-import { mockAccountApi, resetMockAccount } from "@/lib/api/mock-account";
-import type { AccountApi } from "@/lib/api/types";
+import { resetMockAccount } from "@/lib/api/mock-account";
+import { resetMockWordbook } from "@/lib/api/mock-content";
 import {
-  clearClientStore,
-  setAccessToken,
-  setConsentDraft,
-} from "@/lib/client-store";
+  authApi,
+  clearMockSession,
+  loginStartUrl,
+  mockLoginRedirectPath,
+} from "@/lib/api/auth";
+import { AUTH_MODE } from "@/lib/api/http";
+import { clearClientStore, setConsentDraft } from "@/lib/client-store";
 
-export function LoginScreen({ api = mockAccountApi }: { api?: AccountApi }) {
+export function LoginScreen() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const signIn = useCallback(async () => {
+  const startLogin = useCallback(() => {
+    if (pending) return;
+    setPending(true);
+    setFailed(false);
+
+    if (AUTH_MODE === "backend") {
+      // 여기서 페이지를 떠난다. 되돌아오는 곳은 /auth/callback이다.
+      window.location.href = loginStartUrl();
+      return;
+    }
+
+    // 목 모드 — 백엔드가 만들 콜백 URL과 같은 주소로 이동해 같은 코드를 태운다.
+    router.replace(mockLoginRedirectPath());
+  }, [pending, router]);
+
+  /** 카카오 앱 등록 전 개발용. 백엔드 dev-login으로 쿠키만 받아 흐름을 검증한다. */
+  const devLogin = useCallback(async () => {
     if (pending) return;
     setPending(true);
     setFailed(false);
     try {
-      // 실제로는 카카오 인가 코드를 리다이렉트로 받아 온다.
-      // 리다이렉트 복귀 시 무한 루프가 없는지는 실제 연동 때 확인한다. (체크리스트)
-      const result = await api.signIn("kakao", {
-        authorizationCode: "mock-authorization-code",
-      });
-      setAccessToken(result.accessToken);
-
-      // 서버가 내려준 값으로만 분기한다. 프론트가 추측하지 않는다.
-      if (result.hasCompletedOnboarding) router.replace("/profiles");
-      else router.replace("/onboarding/consent");
+      await authApi.devLogin();
+      const me = await authApi.me();
+      router.replace(
+        me.hasCompletedOnboarding ? "/profiles" : "/onboarding/consent"
+      );
     } catch {
       setFailed(true);
       setPending(false);
     }
-  }, [api, pending, router]);
+  }, [pending, router]);
 
   const resetDemo = useCallback(() => {
     clearClientStore();
     setConsentDraft(null);
+    clearMockSession();
     resetMockAccount();
+    resetMockWordbook();
     // 아이를 지우면 그 아이의 진행 중 세션도 남을 이유가 없다.
     resetAllMockSessions();
     router.refresh();
@@ -105,7 +128,7 @@ export function LoginScreen({ api = mockAccountApi }: { api?: AccountApi }) {
 
           <button
             type="button"
-            onClick={() => void signIn()}
+            onClick={startLogin}
             disabled={pending}
             className="mt-10 flex min-h-14 w-full items-center justify-center gap-3 rounded-pill bg-[#FEE500] px-6 text-parent-body font-bold text-[#191600] transition-all hover:brightness-105 disabled:opacity-70"
           >
@@ -127,13 +150,28 @@ export function LoginScreen({ api = mockAccountApi }: { api?: AccountApi }) {
           </p>
 
           {process.env.NODE_ENV === "development" ? (
-            <button
-              type="button"
-              onClick={resetDemo}
-              className="mt-10 text-sm text-muted underline"
-            >
-              데모 상태 초기화 (개발용)
-            </button>
+            <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
+              <p className="text-sm text-muted">
+                개발용 · 인증 모드 <b>{AUTH_MODE}</b>
+              </p>
+              {AUTH_MODE === "backend" ? (
+                <button
+                  type="button"
+                  onClick={() => void devLogin()}
+                  disabled={pending}
+                  className="text-sm text-muted underline"
+                >
+                  카카오 없이 로그인 (dev-login)
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={resetDemo}
+                className="text-sm text-muted underline"
+              >
+                데모 상태 초기화
+              </button>
+            </div>
           ) : null}
         </div>
       </main>

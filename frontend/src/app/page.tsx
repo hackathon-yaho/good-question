@@ -2,7 +2,11 @@
  * A-1 스플래시 — docs/spec/screens.md §A
  *
  * 라우트: /
- * 진입 즉시 세션 토큰을 확인해 /profiles 또는 /login으로 보낸다.
+ * 진입 즉시 로그인 여부를 확인해 /profiles 또는 /login으로 보낸다.
+ *
+ * 확인 방법이 바뀌었다. 예전에는 localStorage의 토큰을 봤지만, JWT가 HttpOnly 쿠키로
+ * 오면서 프론트가 토큰을 볼 수 없다. 대신 `GET /api/auth/me`에 물어본다.
+ * (docs/request/frontend/kakao-login-flow.md)
  *
  * 지켜야 할 세 가지 (명세 + 체크리스트)
  *   - 최소 노출 800ms. 인증이 즉시 끝나도 화면이 깜빡이지 않게
@@ -16,7 +20,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
-import { getAccessToken } from "@/lib/client-store";
+import { authApi } from "@/lib/api/auth";
 
 const MIN_VISIBLE_MS = 800;
 const AUTH_TIMEOUT_MS = 3000;
@@ -33,11 +37,13 @@ export default function SplashPage() {
       router.replace(path);
     };
 
-    // 토큰 확인 자체는 지금 동기다. 서버 검증이 붙으면 여기가 비동기가 되고,
-    // 그때를 대비해 타임아웃을 미리 걸어 둔다.
-    const check = new Promise<string>((resolve) => {
-      resolve(getAccessToken() ? "/profiles" : "/login");
-    });
+    // 로그인 여부를 서버에 물어본다. 온보딩까지 끝냈으면 /profiles, 아니면 동의부터.
+    const check = authApi
+      .me()
+      .then((me) =>
+        me.hasCompletedOnboarding ? "/profiles" : "/onboarding/consent"
+      )
+      .catch(() => "/login");
 
     const minWait = new Promise<void>((resolve) =>
       setTimeout(resolve, MIN_VISIBLE_MS)

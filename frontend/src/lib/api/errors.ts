@@ -11,8 +11,16 @@ export type ApiErrorCode =
   /** POST /api/sessions — 동의 없는 아이는 세션을 시작할 수 없다 */
   | "CONSENT_REQUIRED"
   | "UNAUTHORIZED"
-  /** 오프라인·타임아웃·5xx — I-3 전체화면으로 올린다 */
+  /** 오프라인·5xx — I-3 전체화면으로 올린다 */
   | "NETWORK"
+  /**
+   * 구간 예산을 넘겼다 — 변환 8초 / 응답 10초
+   * (docs/request/frontend/stt-tts-integration.md)
+   *
+   * NETWORK과 화면 처리는 같지만(I-3) 원인이 다르다. 배포 후 실측해서
+   * 예산을 다시 정할 때 이 구분이 있어야 어느 구간이 늦는지 안다. (Q-14)
+   */
+  | "TIMEOUT"
   | "UNKNOWN";
 
 export class ApiError extends Error {
