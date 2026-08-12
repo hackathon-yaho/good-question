@@ -349,11 +349,20 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| M-59 | Render 배포 (무료 티어) | 필수-기반 | |
-| B-21 | Supabase Postgres 연결 | 필수-기반 | 로컬은 Docker Compose → [setup.md](setup.md) |
-| B-22 | 헬스체크 엔드포인트 (`SELECT 1` 포함) | 필수-기반 | Render 슬립 + Supabase 일시정지 동시 방어 |
-| B-23 | 외부 크론 10분 핑 설정 | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고 |
-| B-24 | CORS 설정 (Vercel 오리진) | 필수-기반 | |
+| M-59 | Render 배포 (무료 티어) | 필수-기반 | 미착수 — Render 계정 필요 |
+| B-21 | Supabase Postgres 연결 | 필수-기반 | 로컬은 Docker Compose → [setup.md](setup.md). 미착수 — Supabase 계정 필요 |
+| B-22 | ~~헬스체크 엔드포인트 (`SELECT 1` 포함)~~ | 필수-기반 | **완료.** `health/controller/HealthController.java`, `GET /api/health`, 인증 불필요. Render 슬립 + Supabase 일시정지 동시 방어 |
+| B-23 | 외부 크론 10분 핑 설정 | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고. 미착수 — 배포 URL 확정 후 설정 |
+| B-24 | ~~CORS 설정 (Vercel 오리진)~~ | 필수-기반 | **완료** (Phase 2) |
+
+### 검증 — B-22 (2026-08-12)
+
+- 정상: `GET /api/health` → `{"status":"ok"}` 200, 인증 없이 호출됨
+- 에러: 로컬 Postgres 컨테이너를 `docker stop`으로 잠깐 내린 뒤 호출 → `{"status":"down"}` 503. 컨테이너 복구 후 다시 200으로 돌아옴 (HikariCP 재연결 확인)
+
+### 주의
+
+- **B-23·M-59·B-21은 배포 계정(Render·Supabase)이 있어야 진행 가능** — 로컬 작업만으로 끝낼 수 없어 사용자 확인 대기
 
 ---
 

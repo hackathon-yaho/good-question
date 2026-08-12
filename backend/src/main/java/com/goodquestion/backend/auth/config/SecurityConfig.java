@@ -46,6 +46,7 @@ public class SecurityConfig {
             "/auth/dev-login",
             "/auth/logout",
             "/mock-ai/**",
+            "/health",
     };
 
     @Bean
