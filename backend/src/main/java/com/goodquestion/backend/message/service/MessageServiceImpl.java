@@ -4,6 +4,7 @@ import com.goodquestion.backend.common.enums.ThoughtElement;
 import com.goodquestion.backend.common.global.ErrorCode;
 import com.goodquestion.backend.common.global.exception.BusinessException;
 import com.goodquestion.backend.message.dto.request.MessageCreateRequest;
+import com.goodquestion.backend.message.dto.response.HighlightWordResponse;
 import com.goodquestion.backend.message.dto.response.MessageCreateResponse;
 import com.goodquestion.backend.message.dto.response.MissionTriggeredResponse;
 import com.goodquestion.backend.message.entity.DetectedElement;
@@ -35,6 +36,7 @@ import com.goodquestion.backend.session.enums.SceneEndReason;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
 import com.goodquestion.backend.session.support.NameSubstitutor;
 import com.goodquestion.backend.story.constant.DialogueContents;
+import com.goodquestion.backend.story.constant.HighlightWords;
 import com.goodquestion.backend.story.constant.MissionDefinition;
 import com.goodquestion.backend.story.constant.Missions;
 import com.goodquestion.backend.story.entity.Story;
@@ -171,9 +173,17 @@ public class MessageServiceImpl implements MessageService {
                 characterTurn.sceneEnded(),
                 nextSceneId,
                 missionTriggered,
-                List.of(),
+                detectHighlightWords(scene.getSceneOrder(), characterTurn.text()),
                 characterMessage.getId()
         );
+    }
+
+    /** D-22. 후보 단어가 이번 턴 캐릭터 응답에 실제로 있을 때만 골라낸다 (D-11의 LLM 불일치 문제 해결). */
+    private List<HighlightWordResponse> detectHighlightWords(int sceneOrder, String characterText) {
+        return HighlightWords.forSceneOrder(sceneOrder).stream()
+                .filter(candidate -> characterText != null && characterText.contains(candidate.word()))
+                .map(candidate -> new HighlightWordResponse(candidate.word(), candidate.meaning()))
+                .toList();
     }
 
     private AnalyzeAiRequest buildAnalyzeRequest(StoryScene scene, String previousCharacterMessage, String childUtterance) {

@@ -377,16 +377,32 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | ID | 항목 | 근거 | 비고 |
 | --- | --- | --- | --- |
 | B-20 | ~~별가루 (`star_dust`)~~ | **요건 외 팀 추가** (D-09) | **완료.** 이야기 완료 시 +100. 사용처·차감 없음 |
-| O-06~O-10 | 단어장 (`wordbook` + API 3개) | 주최측 추가 요건 A-02 | `GET`/`POST`/`PATCH /api/wordbook` (D-11) |
+| O-06~O-10 | ~~단어장 (`wordbook` + API 3개)~~ | 주최측 추가 요건 A-02 | **완료.** `GET`/`POST`/`PATCH /api/wordbook` (D-11, D-22) |
 | O-01~O-05 | 보호자 리포트 + `reports` 테이블 | 주최측 추가 요건 A-01 | 응답 스키마 미결. 내부 분석 태그를 보호자 화면에 노출 금지 |
 | O-13 | NORMAL soft-cue | [PRD 6.14](../../docs/product/prd.md) | 미구현 시 NORMAL 일반 반응으로 동작. **새 필드 불필요** |
 | O-14 | `analysis_versions` | 확장 테이블 | 문자열 `mvp_v1` 저장으로 대체 가능 |
+
+### 단어장 구현 (2026-08-12)
+
+- `wordbook/{entity,repository,service,controller,dto}` 신규. `highlightWords`가 채워지게
+  되면서(아래) 진입점이 생겨 후순위에서 착수로 전환했다 (D-22)
+- `story/constant/HighlightWords.java` — 장면별 밑줄 단어 후보 1개씩. `MessageServiceImpl`이
+  이번 턴 캐릭터 응답 텍스트에 후보가 **실제로 포함될 때만** `highlightWords`에 담는다
+- `GET /api/wordbook?childId=&filter=` — `filter`는 `all`/`liked`/`story:{storyId}`.
+  `total`은 필터 적용 전 전체 개수 (api.md 3.7)
+- `sceneIndex`는 D-12와 같은 식(`scene_order / 2`)으로 변환. `isNew`는 저장 후 24시간 기준
+- `contextSentence`는 `POST /api/wordbook` 요청에서 선택 필드로 받아 그대로 저장 (D-22)
+
+**검증**: `POST /api/sessions/{id}/messages`로 대화4 마지막 턴(CLOSING)을 완주해
+`highlightWords: [{"word":"부끄러워", ...}]`가 실제로 응답에 실림을 확인 → 그 값을
+`POST /api/wordbook`으로 저장 → `GET ...?filter=all/liked/story:{id}` 3가지 전부 확인 →
+`PATCH .../{id}` `{liked:true}` → `filter=liked`에 나타남을 확인. 다른 보호자 토큰으로
+조회·수정 시 403, 없는 `childId`는 404, 잘못된 `filter` 값은 400 확인
 
 ### 미구현으로 두는 것
 
 | 항목 | 이유 |
 | --- | --- |
-| `highlightWords` 실제 값 | 밑줄 단어 선정 기준이 어느 문서에도 없음. **빈 배열 `[]`로 응답** (D-11) |
 | 구글·네이버 로그인 | 요건은 "1개 이상". 카카오로 충족 (D-06) |
 | 결제 | [PRD 2.3](../../docs/product/prd.md) MVP 범위 밖 |
 | 힌트 기능 | [PRD 5.4](../../docs/product/prd.md) MVP 범위 밖. GUIDED가 같은 역할 |

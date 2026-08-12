@@ -20,7 +20,7 @@
 | 3.3 | `stories.situation` · `child_role` 컬럼 추가 확정 (D-07) |
 | **3.5** | **발화 전송을 요청 3개로 분리.** `POST /api/stt` · `GET /api/tts` 신규 (D-02) |
 | 3.6 | 카드 재시도 3회 제한, 3회째 `correctOrder` 공개 (D-10) |
-| 3.7 | `highlightWords`는 빈 배열로 응답 (D-11) |
+| 3.7 | `highlightWords`는 장면별 후보 단어가 실제 대사에 있을 때만 채워짐, `wordbook` API 3개 구현 완료 (D-11 · D-22) |
 | 4.3 | 타임아웃·재시도·실패 동작 확정 (D-03) |
 | 5 | 미결 항목 갱신 |
 
@@ -573,7 +573,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `sceneEnded` | `true`면 `characterMessage` 재생 후 C-12로 |
 | `nextSceneId` | `sceneEnded=true`일 때 채움. 마지막 장면이면 `null` → `/activity`로 |
 | `missionTriggered` | 미션 노출 신호. 없으면 `null` |
-| `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. **당분간 빈 배열 `[]`** ([D-11](../../backend/docs/decisions.md)) |
+| `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. 장면별 후보 단어가 **이번 턴 `characterMessage`에 실제로 있을 때만** 채워진다. 없는 턴은 빈 배열 `[]` ([D-11](../../backend/docs/decisions.md) · [D-22](../../backend/docs/decisions.md)) |
 | `characterMessageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)) |
 
 **프론트가 하지 말아야 할 것**
@@ -707,26 +707,30 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 `stats`는 D-7 통계 카드 3개("말한 횟수 / 함께한 친구 / 새 단어")용입니다.
 `reportAvailable`은 보호자 리포트(O-01) 구현 여부에 따릅니다.
 
-### 3.7 단어장 (선택 · A-02) ⚪
+### 3.7 단어장 (선택 · A-02) ✅ 백엔드 구현 완료 (2026-08-12)
 
 | 엔드포인트 | 화면 | 비고 |
 | --- | --- | --- |
 | `GET /api/wordbook?childId={id}&filter={filter}` | E-1 | `filter`: `all` / `liked` / `story:{storyId}` |
-| `POST /api/wordbook` | C-9 | `{ childId, word, meaning, sourceSceneId }` |
+| `POST /api/wordbook` | C-9 | `{ childId, word, meaning, sourceSceneId, contextSentence? }` |
 | `PATCH /api/wordbook/{id}` | C-9, E-1 | `{ liked: true }` |
 
-> ✅ **범위 확정** ([D-11](../../backend/docs/decisions.md)): `wordbook` 테이블 + API 3개는
-> **선택-후순위**입니다. 필수 항목을 전부 끝낸 뒤 착수합니다.
+> ✅ **범위 확정 → 구현 완료** ([D-11](../../backend/docs/decisions.md) · [D-22](../../backend/docs/decisions.md)):
+> `wordbook` 테이블 + API 3개를 후순위로 미뤘다가, `highlightWords`가 채워지게 되면서
+> 진입점이 생겨 함께 구현했습니다.
 >
-> `highlightWords`(3.5 응답)는 **당분간 빈 배열 `[]`로 내려갑니다.** 밑줄 칠 단어의 선정 기준과
-> 뜻을 누가 쓸지가 어느 문서에도 없고, 캐릭터 대사는 LLM이 실시간 생성해 고정 목록과 안 맞을 수 있습니다.
-> 채우려면 ① 장면별 고정 목록을 팀이 창작(`story_scenes.highlight_words jsonb` 추가)하거나
-> ② `/respond` 응답에 AI가 함께 반환하도록 계약을 확장해야 합니다.
+> `highlightWords`(3.5 응답)는 **더 이상 항상 빈 배열이 아닙니다.** 장면별 후보 단어(팀
+> 창작, 코드 상수)가 **그 턴 `characterMessage`에 실제로 포함될 때만** 채워집니다 — 안
+> 나오는 턴은 여전히 빈 배열입니다. 위 표의 ①(장면별 고정 목록) 방식을 택했습니다.
+>
+> `POST /api/wordbook`의 `contextSentence`는 원안에 없던 **선택 필드**입니다. 저장 시점에
+> 화면에 떠 있던 대사 원문을 서버가 역산할 방법이 없어(같은 장면도 세션·턴마다 캐릭터
+> 대사가 다름) 프론트가 함께 보내야 합니다. 안 보내면 `null`로 저장됩니다.
 
-**응답 형태 (프론트 구현 기준, 2026-08-10)** 🟡
+**응답 형태 — 아래 그대로 구현했습니다** ✅
 
-E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 목으로 구현해 두었고 타입은
-`frontend/src/lib/api/types.ts`의 `WordEntry`입니다.
+E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 2026-08-10에 목으로 먼저 구현해둔
+형태이며, 타입은 `frontend/src/lib/api/types.ts`의 `WordEntry`입니다.
 
 ```json
 {
@@ -1021,6 +1025,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 목으로 구현
 | ~~백엔드→AI 타임아웃·재시도·실패 응답~~ | ✅ 5초 / 0회 / 폴백 확정 — 2.5절 · D-03 |
 | ~~카드 순서 재시도 횟수 제한~~ | ✅ **3회** — 3.6절 · D-10 |
 | ~~`children.avatar_id` 스키마 추가~~ | ✅ 추가. 값 검증 없음 — 3.2절 · D-08 |
+| ~~`highlightWords` 데이터 출처~~ | ✅ 장면별 고정 목록(팀 창작) 채택. 대사에 실제로 있을 때만 채움 — 3.7절 · D-22 |
 
 ### 남은 것
 
@@ -1029,7 +1034,6 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 목으로 구현
 | AI 서버 배포 주소 · 경로 · 내부 토큰 | 백엔드·AI | AI 담당 명세 대기. **mock 스텁으로 우회 중** |
 | 프론트 15초 예산 유지 여부 | 프론트·백엔드 | 배포 후 **실측** 필요 |
 | 이미지 URL 제공 방식 | 3인 | Supabase Storage 우선. **에셋 수령 시 확정.** 컬럼(`cover_image_url`·`background_image_url`)은 미리 추가 |
-| `highlightWords` 데이터 출처 | 3인 | 장면별 고정 목록 vs `/respond` 응답 확장. 당분간 빈 배열 |
 | 음성(Whisper·TTS) 비용 상한 | 백엔드 | 문서에 예산 없음 |
 | 리포트 응답 스키마 | 3인 | O-01 착수 시 |
 
