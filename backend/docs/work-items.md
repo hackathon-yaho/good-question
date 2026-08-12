@@ -296,7 +296,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | ID | 항목 | 등급 | 조건 위치 |
 | --- | --- | --- | --- |
 | M-47 | ~~미션1 노출 조건 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) **4개 조건 전부 구현** (D-20) |
-| M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — `PERSPECTIVE`+`REASON` 누적 시점 (D-20) |
+| M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — `PERSPECTIVE` 누적 시점. 원래 `PERSPECTIVE`+`REASON`(D-20)이었으나 장면9엔 REASON이 없어 한 번도 트리거된 적 없던 조건이었음 → `PERSPECTIVE` 단독으로 정정 (D-28) |
 | M-49 | ~~노출 기록 `speaker_type = system` 메시지~~ | 필수 | 중복 노출 방지 ([PRD I-07](../../docs/product/prd.md)) — **완료.** curl로 재노출 안 됨 확인 |
 
 ### 주의

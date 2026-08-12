@@ -662,6 +662,28 @@ PRD 11.3 O-12(주최측 추가 요건 A-03, "아이의 발화 내용에 따라 �
 
 ---
 
+### D-28 · 미션2 노출 조건 정정 — REASON 제거, PERSPECTIVE 단독
+
+D-20에서 미션2 조건을 `PERSPECTIVE && REASON`(둘 다 누적)으로 정했는데, 그 근거가
+"대화4(장면9)의 `element_criteria`에 REASON이 있다"는 **잘못된 전제**였다. 실제 장면9
+`required_elements`는 `EMOTION`·`PERSPECTIVE`·`RESULT`·`SOLUTION` 4개뿐이라 REASON은
+애초에 감지될 수 없는 요소였다 — `/analyze` 요청의 `targetElements`에도 안 들어가고,
+로컬 mock 서버도 REASON을 낸 적이 없어 **한 번도 실제로 트리거된 적 없는 조건**이었다.
+사용자가 "미션2도 트리거가 있냐"고 물어본 것을 계기로 발견했다(D-20의 검증 부채가
+실현된 사례 — D-20이 이미 "조건 2가 성립하려면 AI가 element_criteria를 일관되게 적용해야
+한다"며 검증이 더 필요하다고 남겨뒀었다).
+
+**정정**: `PERSPECTIVE` 단독으로 판정한다(`turnCount >= 1 && PERSPECTIVE ∈ accumulatedElements`).
+PRD 흐름의 마지막 단계("관점 확장")만 잡고, 앞 두 단계("부끄러워 안 해도 됨 → 긍정하는
+이유")는 별도 요소로 강제하지 않는다 — `RESULT`로 대체하는 대안도 검토했으나(장면9
+opening/closing이 "좋은 일에 씀"을 언급해 `RESULT`가 의미상 더 가깝다), 사용자가
+PERSPECTIVE 단독을 선택했다.
+
+**검증**: 로컬 mock 기준 전체 세션 주행(장면1→9) → 장면9 첫 턴에 `missionTriggered.id ==
+"mission_2"` 확인. 단위 테스트(`MissionTriggerTest`) 3건 갱신.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
