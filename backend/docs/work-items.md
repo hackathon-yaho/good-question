@@ -199,7 +199,7 @@ analyze/respond 각각 실패 폴백, 미션 트리거+중복방지, STT_EMPTY, 
 | B-09 | ~~`POST /analyze` 클라이언트~~ | 필수 | 타임아웃 5초 · 재시도 0회 — **완료.** `message/service/ai/AiAnalyzeClientImpl.java` |
 | B-10 | ~~`POST /respond` 클라이언트~~ | 필수 | 타임아웃 5초 · 재시도 0회 — **완료.** `message/service/ai/AiRespondClientImpl.java` |
 | B-11 | ~~**AI 서버 mock 스텁**~~ | 필수-기반 | `aimock/AiMockController.java` — `POST /api/mock-ai/analyze`·`/respond`, 고정 JSON, 인증 불필요. **완료** |
-| B-12 | 실패 폴백 처리 | 필수 | 아래 표 — 미착수 |
+| B-12 | ~~실패 폴백 처리~~ | 필수 | 아래 표 — **완료** (6장에도 같은 항목 있음, Phase 4에서 구현 후 이 표 갱신을 놓쳤었음) |
 
 계약: [api.md 4.1 · 4.2](../../docs/spec/api.md)
 
@@ -343,8 +343,10 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 - 3회 실패로 통과시켜도 `is_order_correct = false`로 저장. 기록은 사실대로 남기되 **아이 화면에는 실패를 표시하지 않음** (화면 명세 D-3 원칙)
 - `correctOrder`는 **처음에는 내려주지 않음.** 3회째에만 실어 보냄. `retellingKeywords`도 정답이거나 3회째일 때만 응답에 실림 — api.md 예시가 필드를 `null`이 아니라 **생략**으로 표현하므로 `@JsonInclude(NON_NULL)`을 씀
 - `imageUrl`은 아직 항상 `null` — 카드 이미지 에셋 미수령(U-03)
-- `newWordCount`는 항상 0 — 단어장(wordbook)이 선택-후순위라 아직 없음
-- `reportAvailable`은 항상 `false` — 보호자 리포트(O-01)가 선택 항목이라 아직 없음
+- `newWordCount`는 항상 0 — 단어장(wordbook)은 이제 있지만(O-06~O-10, D-22) `word_book` 항목이
+  "이 세션에서" 저장됐는지 구분할 세션 참조가 없어(child_id·source_scene_id만 있음) 집계 기준을
+  아직 안 정했다. 새로 미결로 남긴 것 — 나중에 필요해지면 그때 확인
+- `reportAvailable`은 이제 세션 완료 시 `true` — 보호자 리포트(O-01~O-05) 구현 완료 (D-24)
 - **B-20 (별가루)**: 지급 지점은 `ActivityServiceImpl.submitRetelling` 한 곳뿐이다. 세션이
   이미 `COMPLETED`면 `session.complete()`는 다시 호출해도 무해하지만 별가루는 건너뛴다 —
   같은 세션에 재구성 발화를 실수로 두 번 보내도 중복 지급되지 않는다. 이미 완료된 세션에
