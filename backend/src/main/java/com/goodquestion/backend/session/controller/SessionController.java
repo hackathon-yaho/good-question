@@ -1,14 +1,17 @@
 package com.goodquestion.backend.session.controller;
 
 import com.goodquestion.backend.session.dto.request.SessionCreateRequest;
+import com.goodquestion.backend.session.dto.request.SessionStopRequest;
 import com.goodquestion.backend.session.dto.response.SceneCompleteResponse;
 import com.goodquestion.backend.session.dto.response.SessionResponse;
+import com.goodquestion.backend.session.dto.response.SessionStatusResponse;
 import com.goodquestion.backend.session.service.SessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,5 +45,12 @@ public class SessionController {
                                                 @PathVariable UUID sessionId,
                                                 @PathVariable UUID sceneId) {
         return sessionService.completeScene(parentId, sessionId, sceneId);
+    }
+
+    @PatchMapping("/{sessionId}")
+    public SessionStatusResponse stopSession(@AuthenticationPrincipal UUID parentId,
+                                              @PathVariable UUID sessionId,
+                                              @Valid @RequestBody SessionStopRequest request) {
+        return sessionService.stopSession(parentId, sessionId, request);
     }
 }

@@ -130,7 +130,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | — | ~~세션 생성 · 재시작~~ | 필수 | `POST /api/sessions` — **완료** |
 | — | ~~세션 조회 (이어하기 복원)~~ | 필수 | `GET /api/sessions/{sessionId}` — **완료** |
 | M-46 | ~~장면 전환 처리 (intro/narrative → 다음)~~ | 필수 | `POST /api/sessions/{id}/scenes/{sceneId}/complete` — **완료** |
-| — | 이야기 나가기 | 선택 | `PATCH /api/sessions/{sessionId}` — 미착수 |
+| — | ~~이야기 나가기~~ | 선택 | `PATCH /api/sessions/{sessionId}` — **완료** (C-13). `{"status":"stopped"}`만 허용, 그 외 값은 400 |
 | M-44 | ~~`story_sessions` 상태 갱신~~ | 필수 | [PRD 8.8](../../docs/product/prd.md) — `advanceToScene()` 초기화 필드 전부 반영. **완료** |
 | M-26 | ~~**아이 이름 치환**~~ | 필수 | `session/support/NameSubstitutor.java`. 받침 유무 6가지 케이스 단위 테스트 + curl로 민준(받침 O)·지호(받침 X) 둘 다 검증. **완료** |
 | M-05 | ~~세션 시작 시 동의 검증 게이트~~ | 필수 | `POST /api/sessions`에서 403 `CONSENT_REQUIRED` — **완료** |
@@ -148,6 +148,13 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 - `sceneId`가 세션의 현재 장면과 다르면(이미 지나간 장면) 409 `SCENE_ALREADY_CLOSED`
 - `messages.turn_order`는 **세션 전체 기준 연속 번호**다 (장면별로 리셋하지 않음). `openingMessage`가 그 세션의 첫 메시지면 1부터 시작
 - 이름 치환은 **`messages` 저장 시점에** 수행. 치환 후 텍스트가 화면·TTS·AI 입력에 모두 쓰임 (D-04)
+- "이야기 나가기"는 현재 상태와 무관하게 `stop()`을 호출한다 — 이미 `stopped`/`completed`여도
+  에러 없이 그대로 둠(멱등). `restart:true`의 기존 세션 정지 로직과 같은 방식
+
+### 검증 — 이야기 나가기 (2026-08-12)
+
+- 정상: 진행 중 세션에 `PATCH {"status":"stopped"}` → 200, DB `status=STOPPED` 확인
+- 에러: `status` 값이 `stopped`가 아니면 400 `INVALID_REQUEST`, 다른 보호자 세션이면 403 `FORBIDDEN`, 없는 `sessionId`면 404 `NOT_FOUND`
 
 ---
 

@@ -10,12 +10,14 @@ import com.goodquestion.backend.message.entity.Message;
 import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.repository.MessageRepository;
 import com.goodquestion.backend.session.dto.request.SessionCreateRequest;
+import com.goodquestion.backend.session.dto.request.SessionStopRequest;
 import com.goodquestion.backend.session.dto.response.CurrentSceneResponse;
 import com.goodquestion.backend.session.dto.response.NextSceneResponse;
 import com.goodquestion.backend.session.dto.response.OpeningMessageResponse;
 import com.goodquestion.backend.session.dto.response.SceneCompleteResponse;
 import com.goodquestion.backend.session.dto.response.SessionMessageResponse;
 import com.goodquestion.backend.session.dto.response.SessionResponse;
+import com.goodquestion.backend.session.dto.response.SessionStatusResponse;
 import com.goodquestion.backend.session.entity.StorySession;
 import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
@@ -126,6 +128,24 @@ public class SessionServiceImpl implements SessionService {
         return new SceneCompleteResponse(new NextSceneResponse(
                 nextScene.getId(), nextScene.getSceneOrder(), nextScene.getSceneType().name().toLowerCase(),
                 nextScene.getCharacterName(), characterDisplayName, null, nextScene.getMaxTurns(), openingMessage));
+    }
+
+    /** C-13 "이야기 나가기". 지금은 "stopped" 하나만 허용한다 (api.md 3.4). */
+    @Override
+    @Transactional
+    public SessionStatusResponse stopSession(UUID parentId, UUID sessionId, SessionStopRequest request) {
+        if (!"stopped".equals(request.status())) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "status는 stopped만 허용합니다.");
+        }
+
+        StorySession session = storySessionRepository.findById(sessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        if (!session.getChild().getParent().getId().equals(parentId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        session.stop();
+        return new SessionStatusResponse(session.getStatus().name().toLowerCase());
     }
 
     private OpeningMessageResponse createOpeningMessage(StorySession session, StoryScene dialogueScene) {
