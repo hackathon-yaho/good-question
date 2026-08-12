@@ -122,21 +122,15 @@ public class MessageServiceImpl implements MessageService {
                 !newlyAccumulated.isEmpty(), previousMode,
                 turnsWithoutNewElement, lowInformationTurns));
 
-        // ④ 유도 정보 구성 (M-41)
-        String guidanceTarget = decision.mode() == ResponseMode.GUIDED
-                ? GuidanceSelector.select(missing, previousGuidanceTarget == null ? null : previousGuidanceTarget.name())
-                : null;
-        String remainingWorry = guidanceTarget == null
-                ? null
-                : DialogueContents.remainingWorryFor(scene.getSceneOrder(), ThoughtElement.valueOf(guidanceTarget));
-
-        // ⑤ 캐릭터 응답
+        // ④ 유도 정보 구성 (M-41) + ⑤ 캐릭터 응답. GUIDED 유도 대상과 NORMAL soft-cue 대상(O-13)은
+        // 둘 다 reactionKey가 있어야 판단할 수 있어(장난·질문·불명확이면 soft-cue 스킵) resolveCharacterResponse 안에서 함께 계산한다.
         CharacterTurnResult characterTurn = resolveCharacterResponse(
-                decision, scene, session, analysis, previousCharacterMessage, request.text(), guidanceTarget, remainingWorry);
+                decision, scene, session, analysis, previousCharacterMessage, request.text(),
+                missing, !newlyAccumulated.isEmpty(), previousGuidanceTarget);
 
         boolean missingEmptyAfterTurn = missing.isEmpty();
         session.recordTurnResult(turnCount, accumulated, newlyAccumulated, characterTurn.effectiveMode(),
-                guidanceTarget == null ? null : ThoughtElement.valueOf(guidanceTarget),
+                characterTurn.guidanceTarget() == null ? null : ThoughtElement.valueOf(characterTurn.guidanceTarget()),
                 turnsWithoutNewElement, lowInformationTurns, missingEmptyAfterTurn);
 
         int nextTurnOrder = childTurnOrder + 1;
@@ -201,23 +195,27 @@ public class MessageServiceImpl implements MessageService {
                 || validity == UtteranceValidity.OFF_TOPIC;
     }
 
-    private String previousGuidanceTargetName(StorySession session) {
-        return session.getLastGuidanceTarget() == null ? null : session.getLastGuidanceTarget().name();
-    }
-
     /**
      * ⑤ 캐릭터 응답. CLOSING이면 AI를 호출하지 않고 character_closing을 그대로 쓴다 (M-43).
      * /respond 실패(B-12)도 같은 종료 경로를 탄다 — "character_closing 조회 후 장면 종료".
      */
     private CharacterTurnResult resolveCharacterResponse(ProgressDecision decision, StoryScene scene, StorySession session,
                                                            AnalyzeAiResult analysis, String previousCharacterMessage,
-                                                           String childUtterance, String guidanceTarget, String remainingWorry) {
+                                                           String childUtterance, List<String> missing,
+                                                           boolean hasNewlyAccumulatedElement, ThoughtElement previousGuidanceTarget) {
         if (decision.mode() == ResponseMode.CLOSING) {
             String closingText = NameSubstitutor.substitute(scene.getCharacterClosing(), session.getChild().getName());
-            return new CharacterTurnResult(ResponseMode.CLOSING, closingText, true, decision.endReason());
+            return new CharacterTurnResult(ResponseMode.CLOSING, closingText, true, decision.endReason(), null);
         }
 
         String reactionKey = ReactionKeyMapper.map(analysis.childIntent(), analysis.utteranceValidity(), decision.mode());
+        String previousGuidanceTargetName = previousGuidanceTarget == null ? null : previousGuidanceTarget.name();
+        String guidanceTarget = GuidanceSelector.selectForTurn(decision.mode(), reactionKey, missing,
+                hasNewlyAccumulatedElement, previousGuidanceTargetName);
+        String remainingWorry = guidanceTarget == null
+                ? null
+                : DialogueContents.remainingWorryFor(scene.getSceneOrder(), ThoughtElement.valueOf(guidanceTarget));
+
         String characterDisplayName = DialogueContents.forSceneOrder(scene.getSceneOrder()).characterDisplayName();
         String characterPersona = DialogueContents.forSceneOrder(scene.getSceneOrder()).guidanceStyle();
 
@@ -230,10 +228,10 @@ public class MessageServiceImpl implements MessageService {
         if (!respondResult.success()) {
             // B-12: /respond 실패 → character_closing으로 장면을 종료한다. 사유 코드는 규칙엔진이 낸 것이 아니라 없음(null).
             String fallbackText = NameSubstitutor.substitute(scene.getCharacterClosing(), session.getChild().getName());
-            return new CharacterTurnResult(ResponseMode.CLOSING, fallbackText, true, null);
+            return new CharacterTurnResult(ResponseMode.CLOSING, fallbackText, true, null, null);
         }
 
-        return new CharacterTurnResult(decision.mode(), respondResult.text(), false, null);
+        return new CharacterTurnResult(decision.mode(), respondResult.text(), false, null, guidanceTarget);
     }
 
     /** 대화3(미션1)·대화4(미션2)에서만 판정한다. 이미 노출됐으면 다시 노출하지 않는다 (PRD I-07). */
@@ -258,6 +256,7 @@ public class MessageServiceImpl implements MessageService {
                 .findFirst();
     }
 
-    private record CharacterTurnResult(ResponseMode effectiveMode, String text, boolean sceneEnded, SceneEndReason endReason) {
+    private record CharacterTurnResult(ResponseMode effectiveMode, String text, boolean sceneEnded,
+                                        SceneEndReason endReason, String guidanceTarget) {
     }
 }

@@ -165,7 +165,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | M-38 | ~~**진행 판단 규칙 엔진**~~ | 필수 | [PRD 6.9](../../docs/product/prd.md) — **완료.** `session/engine/ProgressJudge.java` + 단위 테스트 11건 |
 | M-39 | ~~응답 모드 결정 (`NORMAL`/`GUIDED`/`CLOSING`)~~ | 필수 | [PRD 6.10](../../docs/product/prd.md) — **완료** |
 | M-40 | ~~`reactionKey` 매핑~~ | 필수 | [PRD 6.13](../../docs/product/prd.md) — **완료.** `session/engine/ReactionKeyMapper.java` |
-| M-41 | ~~GUIDED 유도 대상 선택 + 재료 구성~~ | 필수 | [PRD 6.9 · 6.15](../../docs/product/prd.md) — **완료.** `session/engine/GuidanceSelector.java` |
+| M-41 | ~~GUIDED 유도 대상 선택 + 재료 구성~~ | 필수 | [PRD 6.9 · 6.15](../../docs/product/prd.md) — **완료.** `session/engine/GuidanceSelector.java`. O-13(NORMAL soft-cue, 아래)도 같은 클래스의 `selectForTurn()`으로 함께 구현 (D-23) |
 | M-42 | ~~캐릭터 응답 LLM 호출~~ | 필수 | [PRD 6.12](../../docs/product/prd.md) — **완료** |
 | M-43 | ~~`CLOSING` 시 고정 마지막 대사 재생~~ | 필수 | [PRD I-01](../../docs/product/prd.md) — **완료** |
 | M-44 | ~~`story_sessions` 상태 갱신 (턴 단위)~~ | 필수 | [PRD 8.8](../../docs/product/prd.md) — **완료.** `StorySession.recordTurnResult()`·`closeScene()` |
@@ -186,6 +186,9 @@ analyze/respond 각각 실패 폴백, 미션 트리거+중복방지, STT_EMPTY, 
 - **`remainingWorry`가 없으면 아무것도 전달하지 않는다.** 대체 문구를 만들어 넣지 않음 ([PRD 6.14](../../docs/product/prd.md))
 - 사고 요소는 **8개뿐**. 그 외 값은 제거 ([PRD 6.3](../../docs/product/prd.md))
 - `missingElements`를 응답에 넣지 않음 — 아이에게 "못한 것"으로 읽힘 ([api.md 3.5](../../docs/spec/api.md))
+- **O-13 NORMAL soft-cue는 "새 필드 불필요"이지 "코드 불필요"가 아니다.** `responseMode`가
+  `NORMAL`이어도 신규 요소가 막 잡히고 missing이 남아 있고 장난·질문·불명확 반응이 아니면
+  GUIDED와 같은 `guidanceTarget`/`remainingWorry`를 함께 실어 보낸다 ([api.md 4.2](../../docs/spec/api.md) · D-23)
 
 ---
 
@@ -379,8 +382,27 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | B-20 | ~~별가루 (`star_dust`)~~ | **요건 외 팀 추가** (D-09) | **완료.** 이야기 완료 시 +100. 사용처·차감 없음 |
 | O-06~O-10 | ~~단어장 (`wordbook` + API 3개)~~ | 주최측 추가 요건 A-02 | **완료.** `GET`/`POST`/`PATCH /api/wordbook` (D-11, D-22) |
 | O-01~O-05 | 보호자 리포트 + `reports` 테이블 | 주최측 추가 요건 A-01 | 응답 스키마 미결. 내부 분석 태그를 보호자 화면에 노출 금지 |
-| O-13 | NORMAL soft-cue | [PRD 6.14](../../docs/product/prd.md) | 미구현 시 NORMAL 일반 반응으로 동작. **새 필드 불필요** |
+| O-13 | ~~NORMAL soft-cue~~ | [PRD 6.14](../../docs/product/prd.md) | **완료.** `session/engine/GuidanceSelector.selectForTurn()` (D-23) |
 | O-14 | `analysis_versions` | 확장 테이블 | 문자열 `mvp_v1` 저장으로 대체 가능 |
+
+### NORMAL soft-cue 구현 (2026-08-12)
+
+work-items.md에 "새 필드 불필요"라고만 적혀 있어 사실상 스킵 대상처럼 방치돼 있었다.
+PRD 6.14·api.md 4.2를 다시 읽어 "새 필드가 없다 = 기존 `guidanceTarget`/`remainingWorry`를
+`responseMode: NORMAL`에도 함께 보내면 된다"는 뜻임을 확인하고 구현했다 (D-23).
+
+- `GuidanceSelector.selectForTurn(mode, reactionKey, missing, hasNewlyAccumulatedElement, previousGuidanceTarget)`
+  — GUIDED면 항상, NORMAL이면 "신규 요소 확인 + missing 남음 + 반응이 장난·질문·불명확이
+  아님"일 때만 유도 대상을 고른다
+- `ProgressJudge`의 강한 유도 제한(신규 요소 확인 시 NORMAL 강제)이 만드는 턴이 정확히
+  soft-cue 조건과 겹친다 — 두 규칙이 맞물리도록 설계돼 있었다
+- `story_sessions.last_guidance_target`은 원래부터 "GUIDED 또는 soft-cue 대상"으로 정의된
+  컬럼이라 스키마 변경 없음
+
+**검증**: mock으로 신규 요소가 잡히는 턴을 재현 → 응답 `responseMode: "normal"`이면서
+DB `last_guidance_target`이 채워짐을 확인. `GuidanceSelectorTest`에 단위 테스트 6건 추가
+(GUIDED 항상 선택 / NORMAL+조건 충족 / 신규요소 없음 / missing 없음 / 스킵 반응 3종 /
+CLOSING).
 
 ### 단어장 구현 (2026-08-12)
 

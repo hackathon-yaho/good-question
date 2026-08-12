@@ -502,6 +502,39 @@ PRD 8.12 원 스키마(`id`, `child_id`, `word`, `meaning`, `source_scene_id`)�
 
 ---
 
+### D-23 · O-13 NORMAL soft-cue 구현 — 새 AI 필드 없이 기존 유도 필드를 재사용한다
+
+work-items.md·plan.md는 O-13을 "미구현 시 NORMAL 일반 반응으로 동작. 새 필드 불필요"로
+적어두고 사실상 스킵 대상처럼 남겨뒀습니다. 그런데 [PRD 6.14](../../docs/product/prd.md)를
+다시 읽어보니 **"새 필드가 불필요하다"는 건 맞지만 "백엔드 코드가 불필요하다"는 뜻이
+아니었습니다** — [api.md 4.2](../../docs/spec/api.md)가 이미 명시적으로 방법까지 정해뒀습니다.
+
+> ⚠️ soft-cue를 구현할 때: `responseMode = NORMAL`인데도 `remainingWorry`를 실어 보내면
+> 됩니다. 새 필드는 필요 없습니다.
+
+즉 **GUIDED와 똑같은 `guidanceTarget`/`remainingWorry`를, `responseMode`는 `NORMAL`로 둔 채
+같이 보내는 것**이 구현입니다. `story_sessions.last_guidance_target` 컬럼 설명도 처음부터
+"GUIDED **또는 soft-cue** 대상 사고 요소"였습니다 — 같은 컬럼을 공유하도록 설계돼 있었습니다.
+
+**트리거 조건은 우연이 아니라 규칙 엔진의 빈틈을 정확히 메웁니다.** `ProgressJudge`의 2단계
+"강한 유도 제한"은 신규 요소가 막 잡힌 턴을 **항상 NORMAL로 강제**합니다(축하하는 턴에 바로
+유도를 얹지 않기 위함). PRD 6.14의 soft-cue 조건("NORMAL + 신규 요소 + missing 남음")은 바로
+그 턴을 가리킵니다 — 강제로 NORMAL이 됐지만 아직 부족한 요소가 있으면, 약하게만 다음 요소를
+곁들이라는 것입니다. 두 규칙이 서로를 위해 설계된 것처럼 맞물립니다.
+
+**구현**: `GuidanceSelector.selectForTurn(mode, reactionKey, missing, hasNewlyAccumulatedElement,
+previousGuidanceTarget)`. `MessageServiceImpl`이 `reactionKey`를 계산한 직후 호출한다 —
+soft-cue 스킵 대상(`playfulUtterance`·`questionFromChild`·`unclearUtterance`)을 걸러내려면
+reactionKey가 있어야 하기 때문에, 기존에 바깥에서 미리 계산하던 `guidanceTarget`을
+`resolveCharacterResponse` 안으로 옮겼다. 대상 선택 자체는 `GuidanceSelector.select()`를
+그대로 재사용한다(직전 유도 요소 반복 회피 원칙도 soft-cue에 동일 적용).
+
+**검증**: mock 스텁으로 신규 요소가 잡히는 턴을 재현해 `responseMode: "normal"`이면서
+`story_sessions.last_guidance_target`이 채워지는 것을 DB로 직접 확인했다. `GuidanceSelector`
+단위 테스트 6건(GUIDED/소프트큐 성립·신규요소 없음·missing 없음·스킵 반응 3종·CLOSING) 추가.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
