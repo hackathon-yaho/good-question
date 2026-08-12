@@ -127,7 +127,8 @@ ok(path().startsWith("/play/"), "세션 없으면 곧바로 /play", path());
 
 // ── C-9 단어 뜻 팝업 → 단어장에 담기 ─────────────────────────────────
 console.log("\n=== C-9 단어 뜻 팝업 ===");
-// 밑줄 단어("구박")는 장면 2(sc_banggui_05)에 있다. 대화 1을 끝내야 도달한다.
+// 밑줄 단어는 **장면 첫 대사가 아니라 턴 응답**에 실려 온다 — 서버가 생성한 대사에
+// 후보 단어가 실제로 등장한 턴에만 채워진다 (백엔드 D-22). 그래서 몇 턴 진행해야 나온다.
 await page.getByText("탭하면 이야기가 시작돼요").click({ timeout: 8000 }).catch(() => {});
 
 const LONG = "며느리가 창피해서 계속 참았던 것 같아요. 가족들에게 솔직하게 말하면 좋겠어요. 그러면 마음이 편해질 거예요.";
@@ -144,7 +145,7 @@ for (let step = 0; step < 60 && !found; step++) {
   }
   await page.waitForTimeout(320);
 }
-ok(found, "장면 2 첫 대사에 밑줄 단어 '창피한'");
+ok(found, "턴 응답 대사에 밑줄 단어 '창피한' (D-22)");
 
 if (found) {
   await page.getByRole("button", { name: /창피한 뜻 보기/ }).first().click();

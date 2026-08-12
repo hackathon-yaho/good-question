@@ -46,15 +46,21 @@ export function ActivityIntro({ onStart }: { onStart: () => void }) {
  *
  * ⚠️ 절대 금지: 빨간색, X 마크, "틀렸어요", "실패".
  *    실패를 지적하면 아이가 위축된다.
+ *
+ * ── "힌트 보기"를 넣지 않았다 ────────────────────────────────────────
+ * 명세는 버튼 2개(힌트 보기 / 다시 해보기)를 그렸지만, **서버가 강조할 카드를
+ * 알려주지 않는다** — `POST .../activity/order` 응답에 그런 필드가 없다
+ * (backend/docs/api-spec.md 8.2). 프론트는 정답을 모르므로 힌트를 만들 수 없다.
+ * 누르면 아무 일도 없는 버튼보다 없는 것이 정직하다.
+ *
+ * 빠져나갈 길은 3회 제한이 대신한다 — 3회째에 서버가 정답 순서를 보여준다. (D-10)
  */
 export function FeedbackModal({
   open,
   onRetry,
-  onHint,
 }: {
   open: boolean;
   onRetry: () => void;
-  onHint: () => void;
 }) {
   return (
     <Modal open={open} width={560} dismissible={false} label="다시 해보기">
@@ -72,14 +78,9 @@ export function FeedbackModal({
           순서가 조금 바뀐 것 같아. 다시 한 번 놓아볼까?
         </p>
 
-        <div className="flex w-full gap-3">
-          <PillButton variant="outlined" className="basis-2/5" onClick={onHint}>
-            힌트 보기
-          </PillButton>
-          <PillButton className="basis-3/5" onClick={onRetry}>
-            다시 해보기
-          </PillButton>
-        </div>
+        <PillButton fullWidth onClick={onRetry}>
+          다시 해보기
+        </PillButton>
       </div>
     </Modal>
   );

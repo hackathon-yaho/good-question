@@ -28,17 +28,36 @@ export const API_BASE = `${BACKEND_URL}/api`;
 export const AUTH_MODE: "mock" | "backend" =
   process.env.NEXT_PUBLIC_AUTH_MODE === "backend" ? "backend" : "mock";
 
-/** 백엔드가 준 에러 코드를 프론트 코드로 옮긴다. 모르는 값은 UNKNOWN. */
+/**
+ * 백엔드가 준 에러 코드를 프론트 코드로 옮긴다.
+ *
+ * 백엔드가 쓰는 코드 9종은 그대로 통과시킨다
+ * (backend/docs/api-spec.md 0.4 · `common/global/ErrorCode.java`).
+ * 문구가 아니라 코드로 분기하기 때문에 이름이 같으면 그대로 쓰는 게 맞다.
+ */
+const BACKEND_CODES = new Set<ApiErrorCode>([
+  "INVALID_REQUEST",
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "CONSENT_REQUIRED",
+  "NOT_FOUND",
+  "CHILD_LIMIT_EXCEEDED",
+  "SCENE_ALREADY_CLOSED",
+  "STT_EMPTY",
+  "INTERNAL_ERROR",
+]);
+
 function toErrorCode(status: number, code?: string): ApiErrorCode {
-  if (status === 401) return "UNAUTHORIZED";
-  switch (code) {
-    case "CHILD_LIMIT_EXCEEDED":
-    case "CONSENT_REQUIRED":
-    case "UNAUTHORIZED":
-      return code;
-    default:
-      return "UNKNOWN";
+  if (code && BACKEND_CODES.has(code as ApiErrorCode)) {
+    return code as ApiErrorCode;
   }
+  // 본문이 JSON이 아니거나 모르는 코드다. 상태 코드로만 판단한다.
+  if (status === 401) return "UNAUTHORIZED";
+  if (status === 403) return "FORBIDDEN";
+  if (status === 404) return "NOT_FOUND";
+  // 5xx는 재시도가 통할 수 있다. I-3으로 올린다.
+  if (status >= 500) return "NETWORK";
+  return "UNKNOWN";
 }
 
 type RequestOptions = {

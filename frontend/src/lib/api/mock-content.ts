@@ -184,13 +184,11 @@ export const mockContentApi: ContentApi = {
         ? {
             sessionId: resumable.sessionId,
             currentSceneOrder: resumable.currentSceneOrder,
-            sceneProgress: resumable.sceneProgress,
             status: resumable.status,
           }
         : null,
       // 이 목에서는 등록 시 동의를 함께 받으므로 항상 true다.
       // 서버는 child_consents를 실제로 조회해야 한다.
-      consentGranted: true,
     };
     return detail;
   },

@@ -33,8 +33,15 @@ export const ActivityStep = {
 
 export type ActivityStep = (typeof ActivityStep)[keyof typeof ActivityStep];
 
-/** 서버가 확정해 내려주는 진행 모드. 프론트가 판단하지 않는다. (§0-2) */
-export type ResponseMode = "NORMAL" | "GUIDED" | "CLOSING";
+/**
+ * 서버가 확정해 내려주는 진행 모드. 프론트가 판단하지 않는다. (§0-2)
+ *
+ * ⚠️ **소문자다.** 백엔드가 `ResponseMode` enum을 `.name().toLowerCase()`로 내려보낸다
+ * (`MessageServiceImpl`). api.md의 대문자 표기는 낡았다 —
+ * backend/docs/api-spec.md 부록 A.3이 정본이다.
+ * 대문자로 비교하면 **모든 턴이 어느 분기에도 걸리지 않는다.**
+ */
+export type ResponseMode = "normal" | "guided" | "closing";
 
 /**
  * 서버 응답 → 화면 상태 매핑 — §C 공통
@@ -45,11 +52,11 @@ export type ResponseMode = "NORMAL" | "GUIDED" | "CLOSING";
  */
 export function toPlayState(mode: ResponseMode): PlayState {
   switch (mode) {
-    case "NORMAL":
+    case "normal":
       return PlayState.CHARACTER_SPEAKING;
-    case "GUIDED":
+    case "guided":
       return PlayState.GUIDED;
-    case "CLOSING":
+    case "closing":
       return PlayState.SCENE_TRANSITION;
   }
 }

@@ -20,11 +20,13 @@ import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
 import { MicBlockedScreen } from "@/features/system/MicBlockedScreen";
 import { MicPermissionModal } from "@/features/system/MicPermissionModal";
+import { errorCodeOf } from "@/lib/api/errors";
 import { mockPlayApi } from "@/lib/api/mock";
 import { mockContentApi } from "@/lib/api/mock-content";
 import type { ContentApi, PlayApi, StoryDetail } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { queryMicPermission } from "@/lib/mic-permission";
+import { toScreenIndex } from "@/mocks/story-banggui";
 
 /** 정보 블록 3개 — 이 화면의 핵심 (명세 B-3) */
 const BLOCKS = [
@@ -100,8 +102,15 @@ export function StoryDetailScreen({
           restart: mode === "restart",
         });
         router.push(`/play/${session.sessionId}`);
-      } catch {
-        toast.show("이야기를 시작하지 못했어요. 다시 시도해 주세요.", "danger");
+      } catch (error) {
+        // 동의 없는 아이는 서버가 403 CONSENT_REQUIRED로 막는다. 상세 응답에
+        // consentGranted가 없으므로 이 코드가 유일한 판단 근거다.
+        // (backend/docs/api-spec.md 5.1)
+        if (errorCodeOf(error) === "CONSENT_REQUIRED") {
+          toast.show("보호자 동의가 필요해요. 설정에서 확인해 주세요.", "danger");
+        } else {
+          toast.show("이야기를 시작하지 못했어요. 다시 시도해 주세요.", "danger");
+        }
         setStarting(false);
       }
     },
@@ -128,16 +137,14 @@ export function StoryDetailScreen({
 
   const onStart = useCallback(() => {
     if (!story) return;
-    if (!story.consentGranted) {
-      toast.show("보호자 동의가 필요해요. 설정에서 확인해 주세요.", "danger");
-      return;
-    }
+    // 동의 여부는 미리 보지 않는다. 상세 응답에 그 필드가 없고, 세션 생성 시
+    // 서버가 403으로 막아 준다. 판단 주체를 한 곳에 둔다.
     if (story.existingSession) {
       setResumeOpen(true);
       return;
     }
     void startWithMicCheck("new");
-  }, [startWithMicCheck, story, toast]);
+  }, [startWithMicCheck, story]);
 
   if (gate === "blocked") {
     return (
@@ -287,7 +294,8 @@ export function StoryDetailScreen({
           </span>
           <h2 className="text-headline font-bold text-text">이어서 할까요?</h2>
           <p className="text-kid-body text-text">
-            지난번에 장면 {story.existingSession?.sceneProgress.current ?? 1}까지
+            지난번에 장면{" "}
+            {toScreenIndex(story.existingSession?.currentSceneOrder ?? 1) || 1}까지
             이야기했어요.
           </p>
 

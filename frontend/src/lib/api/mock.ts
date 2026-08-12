@@ -15,6 +15,7 @@ import { withChildName } from "@/lib/korean";
 import type {
   ActivityApi,
   Message,
+  OrderResult,
   PlayApi,
   SceneCompleteResponse,
   SceneInfo,
@@ -68,40 +69,48 @@ function highlightWordsIn(text: string) {
   );
 }
 
-/** 캐릭터별 반응 문구. 실제로는 캐릭터 LLM이 생성한다. */
+/**
+ * 캐릭터별 반응 문구. 실제로는 캐릭터 LLM이 생성한다.
+ *
+ * ⚠️ **밑줄 단어(WORD_GLOSSARY)를 일부 대사에 심어 뒀다.** 실서버도 같은 구조다 —
+ *    `highlightWords`는 장면 첫 대사가 아니라 **생성된 턴 응답에 후보 단어가 실제로
+ *    등장할 때만** 채워진다 (백엔드 D-22 · `MessageServiceImpl.detectHighlightWords`).
+ *    여기 한 단어도 안 넣으면 목에서 C-9(단어 뜻 팝업)로 갈 통로가 아예 없어져
+ *    단어장까지 검증할 수 없다.
+ */
 const REACTIONS: Record<string, Record<ResponseMode, string[]>> = {
   ch_banggui_daughter_in_law: {
-    NORMAL: [
+    normal: [
       "정말? 내 마음을 알아주는 사람이 있었네…",
-      "그렇게 생각해 주니 조금 마음이 놓여.",
+      "그렇게 말해 주니 창피한 마음이 조금 가벼워지는 것 같아.",
     ],
-    GUIDED: [
+    guided: [
       "그런데 왜 꼭 말해야 하는지 나는 아직 잘 모르겠어.",
       "말을 꺼내고 싶어도 어떻게 시작해야 할지 모르겠어.",
     ],
-    CLOSING: [],
+    closing: [],
   },
   ch_banggui_father_in_law: {
-    NORMAL: [
+    normal: [
       "흠… 네 말도 아주 틀린 것은 아니구나.",
-      "그렇게 말하니 조금은 들어볼 만하구나.",
+      "그렇게 말하니 내가 구박만 한 것이 미안해지는구나.",
     ],
-    GUIDED: [
+    guided: [
       "일부러 그런 것이 아니라는 걸 내가 어찌 믿겠느냐.",
       "그래서 나더러 어찌하란 말이냐.",
     ],
-    CLOSING: [],
+    closing: [],
   },
   ch_banggui_village_chief: {
-    NORMAL: [
-      "허허, 그런 방법이 있었구려!",
+    normal: [
+      "허허, 그런 뾰족한 방법이 있었구려!",
       "듣고 보니 해볼 만한 이야기구려.",
     ],
-    GUIDED: [
+    guided: [
       "그 방법이 정말 통할지 나는 알 수가 없구려.",
       "사람들이 다치지나 않을까 그것이 걱정이구려.",
     ],
-    CLOSING: [],
+    closing: [],
   },
 };
 
@@ -357,12 +366,11 @@ export const mockPlayApi: PlayApi = {
       status: session.status,
       currentSceneId: scene.id,
       currentSceneOrder: scene.sceneOrder,
-      sceneProgress: {
-        current: toScreenIndex(scene.sceneOrder),
-        total: TOTAL_SCREEN_SCENES,
-      },
+      // 실서버는 화면 단위 현재 위치를 주지 않는다. 분모만 준다.
+      // (backend/docs/api-spec.md 5.2 — sceneProgress는 /home에만 있다)
+      totalScenes: TOTAL_SCREEN_SCENES,
       turnCount: session.turnCount,
-      maxTurns: scene.maxTurns ?? 0,
+      maxTurns: scene.maxTurns ?? null,
       accumulatedElements: [...session.accumulatedElements],
       messages: [...session.messages],
       currentScene: toSceneInfo(scene, session),
@@ -370,15 +378,32 @@ export const mockPlayApi: PlayApi = {
     return snapshot;
   },
 
+  /**
+   * intro·narrative 전용. **dialogue에 부르면 실서버가 400을 준다** — 목도 같이 막는다.
+   * 막지 않으면 목에서만 통하는 경로가 생겨서 실연동에서 처음 터진다.
+   * (backend/docs/api-spec.md 5.3)
+   */
   async completeScene(sessionId, sceneId) {
     await delay(120);
     assertOnline();
     const session = ensureSession(sessionId);
-    const next = nextSceneOf(sceneId);
+    const current = findScene(sceneId);
 
+    if (current?.sceneType === "dialogue") {
+      throw new ApiError(
+        "INVALID_REQUEST",
+        "대화 장면은 이 엔드포인트로 넘길 수 없습니다"
+      );
+    }
+    // 이미 지나간 장면을 다시 넘기려는 경우.
+    if (session.currentSceneId !== sceneId) {
+      throw new ApiError("SCENE_ALREADY_CLOSED");
+    }
+
+    const next = nextSceneOf(sceneId);
     if (!next) {
-      persist();
-      return { nextScene: null, postActivityReady: true };
+      // 서술 장면이 마지막인 이야기는 없다. 실서버는 이 경우 404다.
+      throw new ApiError("NOT_FOUND", "다음 장면이 없습니다");
     }
 
     resetSceneState(session, next.id);
@@ -396,13 +421,15 @@ export const mockPlayApi: PlayApi = {
 
     const response: SceneCompleteResponse = {
       nextScene: {
-        ...toSceneInfo(next, session),
+        sceneId: next.id,
+        sceneOrder: next.sceneOrder,
+        sceneType: next.sceneType,
+        characterName: next.characterName ?? null,
+        characterDisplayName: next.characterDisplayName ?? null,
+        characterImageUrl: null,
+        maxTurns: next.maxTurns ?? null,
         openingMessage,
-        // 첫 대사(C-3)가 어려운 낱말이 가장 많이 나오는 자리다. 여기에 밑줄이
-        // 없으면 C-9로 갈 통로가 사실상 닫힌다.
-        highlightWords: highlightWordsIn(openingMessage?.text ?? ""),
       },
-      postActivityReady: false,
     };
     persist();
     return response;
@@ -456,15 +483,15 @@ export const mockPlayApi: PlayApi = {
       (session.turnCount >= (scene.preferredTurns ?? 1) && missing.length === 0) ||
       session.turnCount >= scene.maxTurns
     ) {
-      mode = "CLOSING";
+      mode = "closing";
     }
     // 2. 강한 유도 제한 조건
     else if (
       session.turnCount === 1 ||
       detected.length > 0 ||
-      session.previousMode === "GUIDED"
+      session.previousMode === "guided"
     ) {
-      mode = "NORMAL";
+      mode = "normal";
     }
     // 3. 유도 필요성
     else if (
@@ -473,11 +500,11 @@ export const mockPlayApi: PlayApi = {
         session.turnsWithoutNewElement >= 2 ||
         turnsLeft <= 2)
     ) {
-      mode = "GUIDED";
+      mode = "guided";
     }
     // 4. 그 외
     else {
-      mode = "NORMAL";
+      mode = "normal";
     }
 
     session.previousMode = mode;
@@ -485,7 +512,7 @@ export const mockPlayApi: PlayApi = {
     // --- 캐릭터 응답 ----------------------------------------------------
     // CLOSING이면 AI를 호출하지 않고 고정 마지막 대사를 그대로 쓴다. (PRD I-01)
     const characterText =
-      mode === "CLOSING"
+      mode === "closing"
         ? (scene.characterClosing ?? "")
         : pick(
             REACTIONS[scene.characterName ?? ""]?.[mode] ?? [],
@@ -500,7 +527,7 @@ export const mockPlayApi: PlayApi = {
     if (
       scene.missionId &&
       !session.missionRevealedScenes.has(scene.id) &&
-      mode !== "CLOSING" &&
+      mode !== "closing" &&
       session.turnCount >= 1
     ) {
       session.missionRevealedScenes.add(scene.id);
@@ -514,7 +541,7 @@ export const mockPlayApi: PlayApi = {
       };
     }
 
-    const next = mode === "CLOSING" ? nextSceneOf(scene.id) : undefined;
+    const next = mode === "closing" ? nextSceneOf(scene.id) : undefined;
 
     const response: UtteranceResponse = {
       responseMode: mode,
@@ -523,12 +550,28 @@ export const mockPlayApi: PlayApi = {
       characterName: scene.characterDisplayName ?? "",
       accumulatedElements: [...session.accumulatedElements],
       turnCount: session.turnCount,
-      maxTurns: scene.maxTurns,
-      sceneEnded: mode === "CLOSING",
+      maxTurns: scene.maxTurns ?? null,
+      sceneEnded: mode === "closing",
       nextSceneId: next?.id ?? null,
       missionTriggered,
       highlightWords: highlightWordsIn(characterText),
     };
+
+    /**
+     * 장면이 닫혔으면 **여기서 세션을 옮긴다.** 응답을 만든 뒤에 옮기는 이유는
+     * 위 응답이 이번 턴의 turnCount·누적 요소를 담아야 하기 때문이다.
+     *
+     * 실서버가 이 자리에서 `session.advanceToScene()`을 부른다
+     * (`MessageServiceImpl`). 그래서 프론트는 `.../complete`를 부르지 않고
+     * `GET /sessions/{id}`만 다시 읽는다. 목이 이걸 흉내내지 않으면
+     * **장면 전환 코드가 목에서만 다른 길을 타게 된다.**
+     */
+    if (mode === "closing") {
+      if (next) resetSceneState(session, next.id);
+      // 마지막 대화 장면이 닫혔다. 후속 활동 진입 신호는 이 상태값이다.
+      else session.status = "post_activity";
+    }
+
     persist();
     return response;
   },
@@ -572,9 +615,6 @@ export const mockActivityApi: ActivityApi = {
       .map((c) => c.id);
     const isCorrect = submittedOrder.join() === correct.join();
 
-    // 오답이면 자리가 틀린 카드 하나를 힌트로 준다.
-    const wrongIndex = submittedOrder.findIndex((id, i) => id !== correct[i]);
-
     /**
      * 3회째 오답이면 정답 순서를 함께 내려보내 다음 단계로 넘긴다. (D-10)
      *
@@ -584,17 +624,21 @@ export const mockActivityApi: ActivityApi = {
      */
     const revealAnswer = !isCorrect && session.attemptCount >= ORDER_ATTEMPT_LIMIT;
 
-    return {
+    /**
+     * ⚠️ 없는 값은 **키 자체를 빼고** 보낸다. 실서버가 `@JsonInclude(NON_NULL)`이라
+     *    `null`이 아니라 키가 없다. 목이 null로 채워 보내면 `"correctOrder" in result`
+     *    같은 검사가 목에서만 통하고 실연동에서 어긋난다.
+     *    (backend/docs/api-spec.md 8.2)
+     */
+    const result: OrderResult = {
       isCorrect,
       attemptCount: session.attemptCount,
-      retellingKeywords:
-        isCorrect || revealAnswer
-          ? [...MOCK_POST_ACTIVITY.retellingKeywords]
-          : null,
-      // 정답을 보여주는 판에는 힌트가 필요 없다.
-      hintCardId: isCorrect || revealAnswer ? null : (correct[wrongIndex] ?? null),
-      correctOrder: revealAnswer ? correct : null,
     };
+    if (isCorrect || revealAnswer) {
+      result.retellingKeywords = [...MOCK_POST_ACTIVITY.retellingKeywords];
+    }
+    if (revealAnswer) result.correctOrder = correct;
+    return result;
   },
 
   async submitRetelling(sessionId, body) {

@@ -42,12 +42,13 @@ import {
 
 import { WordPopup } from "@/features/play/WordPopup";
 import { useNetworkError, withTimeout } from "@/features/system/NetworkErrorHost";
+import { errorCodeOf } from "@/lib/api/errors";
 import { mockPlayApi } from "@/lib/api/mock";
 import { mockContentApi } from "@/lib/api/mock-content";
 import type { ContentApi, HighlightWord, PlayApi } from "@/lib/api/types";
 import { getSelectedChildId } from "@/lib/client-store";
 import { STORY_ID } from "@/mocks/story-banggui";
-import { PlayState, isCharacterTurn } from "@/lib/play-state";
+import { PlayState, isCharacterTurn, type SceneType } from "@/lib/play-state";
 import { playTurnChime } from "@/lib/sound";
 import { RESPOND_TIMEOUT_MS } from "@/lib/api/speech";
 import { useCharacterVoice, useChildSpeech } from "@/lib/speech";
@@ -172,31 +173,60 @@ export function PlayScreen({
   // --- 다음 장면으로 진행 ------------------------------------------------
   // 이름 있는 함수 표현식으로 둔다. 실패 시 재시도가 자기 자신을 다시 불러야 하는데,
   // ref에 담아 두면 React 19 린트가 "훅에 넘긴 값을 다시 대입한다"고 막는다.
+  /**
+   * 장면 전환. 두 경로가 하나로 합쳐져 있다.
+   *
+   *   서술 장면(intro·narrative) — `POST .../complete`로 넘긴 뒤 세션을 다시 읽는다
+   *   대화 장면(dialogue)        — 서버가 이미 넘겨 놨다. **다시 읽기만** 한다
+   *
+   * dialogue에 `.../complete`를 부르면 400이 온다. 대화 종료 판단은 서버가
+   * `POST .../messages` 안에서 하고 `session.advanceToScene()`까지 이미 실행한다.
+   * (backend/docs/api-spec.md 5.3 · 6.1)
+   *
+   * 후속 활동 진입은 `status === "post_activity"`로 판단한다. 서버가 마지막 대화
+   * 장면을 닫을 때 세션 상태를 그렇게 바꾼다 — 프론트가 장면 수를 세지 않는다.
+   */
   const advanceScene = useCallback(
-    async function advance(sceneId: string): Promise<void> {
+    async function advance(
+      sceneId: string,
+      sceneType: SceneType
+    ): Promise<void> {
       if (advancingRef.current) return;
       advancingRef.current = true;
       setAdvancing(true);
       try {
-        const result = await withTimeout(api.completeScene(sessionId, sceneId));
-        if (result.postActivityReady || !result.nextScene) {
+        if (sceneType !== "dialogue") {
+          await withTimeout(api.completeScene(sessionId, sceneId));
+        }
+        // 자막(sceneDescription)이 complete 응답에 없어서 어느 경로든 다시 읽는다.
+        const snapshot = await withTimeout(api.getSession(sessionId));
+
+        if (snapshot.status === "post_activity") {
           dispatch({ type: "POST_ACTIVITY_READY" });
           router.push(`/activity/${sessionId}`);
           return;
         }
-        const { openingMessage, highlightWords, ...nextScene } =
-          result.nextScene;
-        dispatch({
-          type: "SCENE_LOADED",
-          scene: nextScene,
-          openingMessage,
-          highlightWords,
-        });
+        dispatch({ type: "SCENE_LOADED", snapshot });
       } catch (error) {
         console.error("[play] 장면 전환 실패", error);
+        // 이미 넘어간 장면을 다시 넘기려 한 경우(409)는 재시도해도 같다.
+        // 세션을 다시 읽어 화면을 최신으로 맞추는 것이 해소 방법이다.
+        if (errorCodeOf(error) === "SCENE_ALREADY_CLOSED") {
+          try {
+            const snapshot = await api.getSession(sessionId);
+            if (snapshot.status === "post_activity") {
+              router.push(`/activity/${sessionId}`);
+            } else {
+              dispatch({ type: "SCENE_LOADED", snapshot });
+            }
+            return;
+          } catch {
+            // 재조회도 실패했다. 아래 I-3으로 넘긴다.
+          }
+        }
         // 장면 전환이 막히면 이야기가 더 진행되지 않는다. 토스트로는 부족하다.
         // I-3을 띄우고 같은 요청을 그대로 다시 보낼 수 있게 한다. (명세 I-3)
-        network.show({ retry: () => advance(sceneId) });
+        network.show({ retry: () => advance(sceneId, sceneType) });
       } finally {
         advancingRef.current = false;
         setAdvancing(false);
@@ -236,7 +266,7 @@ export function PlayScreen({
           rate: settings.rate,
           volume: settings.volume,
           onDone: () => {
-            if (isLastSentence(state)) void advanceScene(scene.sceneId);
+            if (isLastSentence(state)) void advanceScene(scene.sceneId, scene.sceneType);
             else dispatch({ type: "SENTENCE_NEXT" });
           },
         }
@@ -463,7 +493,7 @@ export function PlayScreen({
             // 게이트를 건너뛰고 바로 넘긴 경우에도 이후 문장은 소리가 나야 한다.
             unlockAudio();
             setAudioUnlocked(true);
-            if (isLastSentence(state)) void advanceScene(scene.sceneId);
+            if (isLastSentence(state)) void advanceScene(scene.sceneId, scene.sceneType);
             else dispatch({ type: "SENTENCE_NEXT" });
           }}
           onExit={exit}
@@ -503,7 +533,7 @@ export function PlayScreen({
           closingText={state.characterText}
           accumulatedElements={state.accumulatedElements}
           nextScreenIndex={nextIndex}
-          onContinue={() => void advanceScene(scene.sceneId)}
+          onContinue={() => void advanceScene(scene.sceneId, scene.sceneType)}
           continueDisabled={advancing}
         />
       </ImmersiveShell>

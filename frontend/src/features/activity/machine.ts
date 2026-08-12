@@ -21,8 +21,6 @@ export type ActivityState = {
   /** 슬롯 4칸. null은 빈 칸 */
   slots: (ActivityCard | null)[];
   attemptCount: number;
-  /** D-3에서 강조할 카드. 서버가 알려준다 */
-  hintCardId: string | null;
   /**
    * 3회 시도 후 정답 순서를 보여주고 넘어온 경우. (D-10)
    * D-4를 "맞췄어!"가 아니라 "이런 순서였어"로 그린다. 실패를 지적하지는 않는다.
@@ -45,7 +43,6 @@ export const initialActivityState: ActivityState = {
   tray: [],
   slots: [null, null, null, null],
   attemptCount: 0,
-  hintCardId: null,
   orderRevealed: false,
   retellingKeywords: [],
   spokenKeywords: [],
@@ -148,7 +145,7 @@ export function activityReducer(
         else tray = [...tray, displaced];
       }
 
-      return { ...state, slots, tray, hintCardId: null };
+      return { ...state, slots, tray };
     }
 
     case "REMOVE": {
@@ -160,7 +157,7 @@ export function activityReducer(
     }
 
     case "SUBMIT_ORDER":
-      return { ...state, hintCardId: null };
+      return state;
 
     case "ORDER_RESULT": {
       const { result } = action;
@@ -170,7 +167,6 @@ export function activityReducer(
           step: ActivityStep.KEYWORDS,
           attemptCount: result.attemptCount,
           retellingKeywords: result.retellingKeywords ?? [],
-          hintCardId: null,
           orderRevealed: false,
         };
       }
@@ -191,7 +187,6 @@ export function activityReducer(
           step: ActivityStep.KEYWORDS,
           attemptCount: result.attemptCount,
           retellingKeywords: result.retellingKeywords ?? [],
-          hintCardId: null,
           orderRevealed: true,
           // 화면에 보여줄 순서를 정답으로 바꾼다. 돌아갈 길이 없으므로
           // 슬롯을 덮어써도 안전하고, 화면이 실제로 그 순서를 그린다.
@@ -204,7 +199,6 @@ export function activityReducer(
         ...state,
         step: ActivityStep.FEEDBACK,
         attemptCount: result.attemptCount,
-        hintCardId: result.hintCardId,
       };
     }
 

@@ -22,7 +22,6 @@ type Props = {
   tray: readonly ActivityCard[];
   slots: readonly (ActivityCard | null)[];
   attemptCount: number;
-  hintCardId: string | null;
   submitting: boolean;
   canSubmit: boolean;
   onPlace: (cardId: string, slotIndex: number) => void;
@@ -34,7 +33,6 @@ export function CardOrdering({
   tray,
   slots,
   attemptCount,
-  hintCardId,
   submitting,
   canSubmit,
   onPlace,
@@ -154,9 +152,6 @@ export function CardOrdering({
                 dragging === card.id
                   ? "scale-105 border-primary bg-surface shadow-soft"
                   : "border-border bg-surface",
-                hintCardId === card.id
-                  ? "border-accent ring-4 ring-accent/50"
-                  : "",
               ].join(" ")}
             >
               <span className="text-parent-body leading-snug font-bold text-text">

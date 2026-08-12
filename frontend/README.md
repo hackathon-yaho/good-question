@@ -58,7 +58,7 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 
 ## 검증
 
-`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **270개**를 확인합니다.
+`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **275개**를 확인합니다.
 `scripts/verify/`에 스위트별로 나뉘어 있습니다.
 
 | 스위트 | 범위 |
@@ -72,7 +72,7 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 | `account` | A-1~A-5 · B-1 · 로그인 콜백 · 새로고침 유지 · 라우트 가드 · 정원 초과 |
 | `system` | I-1 · I-3 · I-4 (오프라인 → 재시도 → 발화 복구까지) |
 | `browse` | B-2·B-3·B-4 · C-9 → 단어장 · E · F-1 |
-| `parent` | A-6 · G-1~G-4 · H-1~H-7 |
+| `parent` | A-6 · G-1~G-4 · H-1~H-7 (완주 → 리포트 생성까지) |
 | `layout` | 태블릿 5종 — 버튼 줄바꿈·넘침, C-10 미션 겹침·잘림 |
 
 단순 렌더 확인이 아니라 **요건 위반을 잡는 검사**가 섞여 있습니다. 예: 리포트에
@@ -90,7 +90,8 @@ Chromium을 못 찾으면 `npx playwright install chromium`, 또는 `GQ_CHROME`�
 | 문서 | 내용 |
 | --- | --- |
 | [../docs/spec/screens.md](../docs/spec/screens.md) | 화면 48개 · 상태 전이 · 디자인 토큰 |
-| [../docs/spec/api.md](../docs/spec/api.md) | 서버 계약 (3절이 프론트↔백엔드) |
+| [../backend/docs/api-spec.md](../backend/docs/api-spec.md) | **서버 계약 정본.** 구현된 코드 기준이라 api.md보다 최신 |
+| [../docs/spec/api.md](../docs/spec/api.md) | 서버 계약 초안 (위 문서와 다르면 위가 맞다) |
 | [../docs/spec/assets.md](../docs/spec/assets.md) | 이미지 규격 · 미수령 에셋 폴백 |
 | [../docs/team/roles.md](../docs/team/roles.md) | 2장이 프론트 담당 범위 |
 | [../docs/open-questions.md](../docs/open-questions.md) | 미결 · 문서 간 충돌 |
@@ -162,6 +163,7 @@ A-3의 동의 값을 함께 받는 계약이고(api.md 3.2) 동의 없는 아이
 | 항목 | 이유 |
 | --- | --- |
 | C-8 힌트 시트 | PRD 5.4가 MVP 범위 밖, 3단계 힌트 콘텐츠가 없음 ([Q-05](../docs/open-questions.md)) |
+| D-3 "힌트 보기" 버튼 | 서버가 강조할 카드를 주지 않고, 프론트는 정답을 모름 (api-spec 8.2). 3회 제한이 대신함 |
 | G-2 역량 4점 dot | 점 개수를 정하는 산출 기준이 어디에도 없음 ([Q-23](../docs/open-questions.md)) |
 | "별가루" 칩 (B-1·F-1) | 적립 규칙이 DB·요건 어디에도 없음 ([Q-12](../docs/open-questions.md)) |
 | A-2 구글·네이버 버튼 | PRD M-01은 카카오만 ([Q-02](../docs/open-questions.md)) |

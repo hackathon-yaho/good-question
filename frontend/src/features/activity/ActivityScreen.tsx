@@ -158,7 +158,6 @@ export function ActivityScreen({
             tray={state.tray}
             slots={orderedSlots}
             attemptCount={state.attemptCount}
-            hintCardId={state.hintCardId}
             submitting={submitting}
             canSubmit={isOrderComplete(state)}
             onPlace={(cardId, slotIndex) =>
@@ -172,8 +171,7 @@ export function ActivityScreen({
           <FeedbackModal
             open={state.step === ActivityStep.FEEDBACK}
             onRetry={() => dispatch({ type: "RETRY_ORDER" })}
-            onHint={() => dispatch({ type: "RETRY_ORDER" })}
-          />
+            />
         </>
       ) : null}
 

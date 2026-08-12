@@ -11,6 +11,34 @@
 
 ## 수정 이력
 
+### 2026-08-13 — 백엔드 API 41개 구현 완료 → 프론트 계약 정합
+
+정본이 바뀌었습니다. [backend/docs/api-spec.md](../backend/docs/api-spec.md)가
+**실제 구현된 코드 기준**이고 [spec/api.md](spec/api.md)보다 최신입니다.
+둘이 다르면 그쪽이 맞습니다.
+
+프론트 타입을 실제 응답에 맞춰 고친 것들:
+
+| 어긋난 것 | 실제 | 고친 방식 |
+| --- | --- | --- |
+| `responseMode` 대문자 | **소문자** (`normal`/`guided`/`closing`) | 타입·목·매핑 전부 소문자로. 대문자면 모든 턴이 어느 분기에도 안 걸렸다 |
+| 장면 전환 | `.../complete`는 **intro·narrative 전용**(dialogue엔 400) | 대화 종료 시 서버가 이미 옮겨 놓으므로 `GET /sessions/{id}` 재조회로 통일 |
+| `postActivityReady` | 없음 | 세션의 `status === "post_activity"`로 판단 |
+| `sceneProgress`(세션 조회) | `totalScenes`만 | 현재 위치는 `toScreenIndex()`로 계산 |
+| `hintCardId` | 없음 | D-3 "힌트 보기" 버튼 제거 (아래) |
+| `OrderResult` 조건부 필드 | **키 자체가 생략됨** | `null` 비교 대신 옵셔널 프로퍼티로 |
+| `StoryDetail.consentGranted` | 없음 | `POST /sessions`의 403 `CONSENT_REQUIRED`로 판단 |
+| 에러 코드 | 9종 | `INVALID_REQUEST`·`FORBIDDEN`·`NOT_FOUND`·`SCENE_ALREADY_CLOSED`·`STT_EMPTY`·`INTERNAL_ERROR` 추가 |
+| `highlightWords` | **턴 응답에만** 실린다 (D-22) | 장면 첫 대사에서 제거 — C-9는 두 번째 턴부터 열린다 |
+
+백엔드가 프론트 요청 2건을 **코드까지 고쳐 반영**했습니다 ([D-26](../backend/docs/decisions.md)) —
+`GET /tts?text=` 추가(내레이션·단어 발음 음성), `characterMessageId` → `messageId`.
+그래서 이 두 건은 프론트 수정이 없었습니다.
+
+**엔드포인트가 없는 화면 3개**: H-1 계정 정보(이메일·연결된 로그인), H-3 공지사항,
+H-7 회원 탈퇴. 별가루도 지급은 되지만(`children.star_dust`) 어떤 응답에도 노출되지
+않아 화면에 그릴 수 없습니다. 목으로 그려 둔 상태이며, 실연동 시 판단이 필요합니다.
+
 ### 2026-08-12 — 2안 STT/TTS 프론트 구현 완료
 
 근거: [request/frontend/stt-tts-integration.md](request/frontend/stt-tts-integration.md)

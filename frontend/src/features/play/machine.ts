@@ -91,12 +91,8 @@ export type PlayAction =
   | { type: "HYDRATE"; snapshot: SessionSnapshot }
   | { type: "SENTENCE_NEXT" }
   | { type: "NARRATION_DONE" }
-  | {
-      type: "SCENE_LOADED";
-      scene: SceneInfo;
-      openingMessage: Message | null;
-      highlightWords?: HighlightWord[];
-    }
+  /** 장면이 넘어갔다. 서버를 다시 읽은 스냅샷으로 갈아탄다. */
+  | { type: "SCENE_LOADED"; snapshot: SessionSnapshot }
   | { type: "POST_ACTIVITY_READY" }
   | { type: "CHARACTER_TTS_DONE" }
   | { type: "RECORDING_START" }
@@ -122,34 +118,68 @@ function entryStatus(scene: SceneInfo): PlayState {
   return PlayState.CHARACTER_SPEAKING;
 }
 
+/**
+ * 세션 스냅샷을 화면 상태로 옮긴다. 최초 진입과 장면 전환이 **같은 코드를 탄다.**
+ *
+ * 장면 전환도 스냅샷으로 처리하는 이유:
+ *   - 대화 장면이 끝나면 서버가 이미 다음 장면으로 옮겨 놨다. `.../complete`는
+ *     dialogue에 쓸 수 없고(400), 그 응답에는 자막(`sceneDescription`)도 없다
+ *   - 그래서 두 경로 모두 `GET /sessions/{id}`를 다시 읽는다
+ *     (backend/docs/api-spec.md 5.3 · 6.1)
+ *
+ * 장면별 값은 여기서 전부 초기화한다. 안 하면 지난 장면의 미션이 새 장면에 남고,
+ * turnCount가 이어져 다음 장면이 첫 턴에 즉시 종료된다. (PRD 8.8)
+ */
+function applySnapshot(
+  state: PlayMachineState,
+  snapshot: SessionSnapshot
+): PlayMachineState {
+  const scene = snapshot.currentScene;
+  // 이 장면의 마지막 캐릭터 대사. 다른 장면 것을 끌어오면 말풍선이 어긋난다.
+  const opening = [...snapshot.messages]
+    .reverse()
+    .find(
+      (m) => m.speakerType === "character" && m.sceneId === scene.sceneId
+    );
+  const isDialogue = scene.sceneType === "dialogue";
+
+  return {
+    ...state,
+    scene,
+    messages: snapshot.messages,
+    sentences: sentencesOf(scene),
+    sentenceIndex: 0,
+    status: entryStatus(scene),
+    characterText: isDialogue ? (opening?.text ?? "") : "",
+    characterMessageId: isDialogue ? (opening?.id ?? null) : null,
+    turnCount: snapshot.turnCount,
+    maxTurns: snapshot.maxTurns ?? 0,
+    accumulatedElements: snapshot.accumulatedElements,
+    mission: null,
+    /**
+     * 밑줄 단어는 서버가 `POST /messages` 응답에만 실어 준다. 세션 조회에는 없다.
+     * 그래서 장면 첫 대사에는 밑줄이 없고, C-9는 두 번째 턴부터 열린다.
+     * (백엔드 D-22 — 후보 단어가 대사에 실제로 등장한 턴에만 채워진다)
+     */
+    highlightWords: [],
+    draftText: "",
+    sttRawText: "",
+    interimText: "",
+    recording: false,
+    nextSceneId: null,
+    errorCode: null,
+  };
+}
+
 export function playReducer(
   state: PlayMachineState,
   action: PlayAction
 ): PlayMachineState {
   switch (action.type) {
-    case "HYDRATE": {
-      const { snapshot } = action;
-      const scene = snapshot.currentScene;
-      const opening = [...snapshot.messages]
-        .reverse()
-        .find((m) => m.speakerType === "character");
-
-      return {
-        ...state,
-        scene,
-        messages: snapshot.messages,
-        sentences: sentencesOf(scene),
-        sentenceIndex: 0,
-        status: entryStatus(scene),
-        characterText:
-          scene.sceneType === "dialogue" ? (opening?.text ?? "") : "",
-        characterMessageId:
-          scene.sceneType === "dialogue" ? (opening?.id ?? null) : null,
-        turnCount: snapshot.turnCount,
-        maxTurns: snapshot.maxTurns,
-        accumulatedElements: snapshot.accumulatedElements,
-      };
-    }
+    // 최초 진입과 장면 전환이 같다. 둘 다 서버 스냅샷이 정본이다.
+    case "HYDRATE":
+    case "SCENE_LOADED":
+      return applySnapshot(state, action.snapshot);
 
     case "SENTENCE_NEXT": {
       const last = state.sentenceIndex >= state.sentences.length - 1;
@@ -160,33 +190,6 @@ export function playReducer(
     // 자막이 끝났다. 다음 장면을 서버에 요청하는 동안 상태는 그대로 둔다.
     case "NARRATION_DONE":
       return state;
-
-    case "SCENE_LOADED": {
-      const { scene, openingMessage } = action;
-      return {
-        ...state,
-        scene,
-        sentences: sentencesOf(scene),
-        sentenceIndex: 0,
-        status: entryStatus(scene),
-        characterText: openingMessage?.text ?? "",
-        characterMessageId: openingMessage?.id ?? null,
-        messages: openingMessage
-          ? [...state.messages, openingMessage]
-          : state.messages,
-        // 장면 전환 시 초기화 (PRD 8.8). 안 하면 다음 장면이 첫 턴에 즉시 종료된다.
-        turnCount: 0,
-        maxTurns: scene.maxTurns ?? 0,
-        accumulatedElements: [],
-        mission: null,
-        // 첫 대사의 밑줄 단어는 유지한다. 여기서 비우면 C-9로 갈 통로가 닫힌다.
-        highlightWords: action.highlightWords ?? [],
-        draftText: "",
-        sttRawText: "",
-        interimText: "",
-        nextSceneId: null,
-      };
-    }
 
     case "POST_ACTIVITY_READY":
       return { ...state, postActivityReady: true };
@@ -260,7 +263,8 @@ export function playReducer(
         characterText: result.characterMessage,
         characterMessageId: result.messageId,
         turnCount: result.turnCount,
-        maxTurns: result.maxTurns,
+        // dialogue 장면이면 값이 있다. 없으면 턴 표시(n/m)를 그리지 않는다.
+        maxTurns: result.maxTurns ?? state.maxTurns,
         accumulatedElements: result.accumulatedElements,
         mission: result.missionTriggered ?? state.mission,
         highlightWords: result.highlightWords,
