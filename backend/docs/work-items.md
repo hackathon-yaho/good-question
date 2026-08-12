@@ -158,19 +158,24 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 규칙 위치 |
 | --- | --- | --- | --- |
-| M-33 | `messages` 저장 | 필수 | [PRD 8.9](../../docs/product/prd.md) |
-| M-35 | 발화 분석 LLM 호출 (입력 조립) | 필수 | [PRD 6.5](../../docs/product/prd.md) |
-| M-36 | **서버 후처리** — 근거 검증 · 중복 제거 | 필수 | [PRD 6.7](../../docs/product/prd.md) |
-| M-37 | 누적 요소 갱신 | 필수 | [PRD 6.8](../../docs/product/prd.md) |
-| M-38 | **진행 판단 규칙 엔진** | 필수 | [PRD 6.9](../../docs/product/prd.md) |
-| M-39 | 응답 모드 결정 (`NORMAL`/`GUIDED`/`CLOSING`) | 필수 | [PRD 6.10](../../docs/product/prd.md) |
-| M-40 | `reactionKey` 매핑 | 필수 | [PRD 6.13](../../docs/product/prd.md) |
-| M-41 | GUIDED 유도 대상 선택 + 재료 구성 | 필수 | [PRD 6.9 · 6.15](../../docs/product/prd.md) |
-| M-42 | 캐릭터 응답 LLM 호출 | 필수 | [PRD 6.12](../../docs/product/prd.md) |
-| M-43 | `CLOSING` 시 고정 마지막 대사 재생 | 필수 | [PRD I-01](../../docs/product/prd.md) |
-| M-45 | `utterance_analyses` 저장 | 필수 | [PRD 8.10](../../docs/product/prd.md) |
+| M-33 | ~~`messages` 저장~~ | 필수 | [PRD 8.9](../../docs/product/prd.md) — **완료** |
+| M-35 | ~~발화 분석 LLM 호출 (입력 조립)~~ | 필수 | [PRD 6.5](../../docs/product/prd.md) — **완료** |
+| M-36 | ~~**서버 후처리** — 근거 검증 · 중복 제거~~ | 필수 | [PRD 6.7](../../docs/product/prd.md) — **완료.** `session/engine/AnalysisPostProcessor.java` |
+| M-37 | ~~누적 요소 갱신~~ | 필수 | [PRD 6.8](../../docs/product/prd.md) — **완료.** `session/engine/AccumulatedElementsCalculator.java` |
+| M-38 | ~~**진행 판단 규칙 엔진**~~ | 필수 | [PRD 6.9](../../docs/product/prd.md) — **완료.** `session/engine/ProgressJudge.java` + 단위 테스트 11건 |
+| M-39 | ~~응답 모드 결정 (`NORMAL`/`GUIDED`/`CLOSING`)~~ | 필수 | [PRD 6.10](../../docs/product/prd.md) — **완료** |
+| M-40 | ~~`reactionKey` 매핑~~ | 필수 | [PRD 6.13](../../docs/product/prd.md) — **완료.** `session/engine/ReactionKeyMapper.java` |
+| M-41 | ~~GUIDED 유도 대상 선택 + 재료 구성~~ | 필수 | [PRD 6.9 · 6.15](../../docs/product/prd.md) — **완료.** `session/engine/GuidanceSelector.java` |
+| M-42 | ~~캐릭터 응답 LLM 호출~~ | 필수 | [PRD 6.12](../../docs/product/prd.md) — **완료** |
+| M-43 | ~~`CLOSING` 시 고정 마지막 대사 재생~~ | 필수 | [PRD I-01](../../docs/product/prd.md) — **완료** |
+| M-44 | ~~`story_sessions` 상태 갱신 (턴 단위)~~ | 필수 | [PRD 8.8](../../docs/product/prd.md) — **완료.** `StorySession.recordTurnResult()`·`closeScene()` |
+| M-45 | ~~`utterance_analyses` 저장~~ | 필수 | [PRD 8.10](../../docs/product/prd.md) — **완료** |
+| M-47~M-49 | ~~미션 노출 판정 + system 메시지~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — **완료.** `session/engine/MissionTrigger.java` (D-20, 조작화 근거 참조) |
+| B-12 | ~~AI 실패 폴백~~ | 필수 | `/analyze` 실패→빈 분석 진행, `/respond` 실패→`character_closing`으로 강제 종료. **완료** |
 
-엔드포인트: `POST /api/sessions/{sessionId}/messages` — 스키마 [api.md 3.5](../../docs/spec/api.md)
+엔드포인트: `POST /api/sessions/{sessionId}/messages` — 스키마 [api.md 3.5](../../docs/spec/api.md). **완료**,
+mock 스텁 상대로 curl 검증 (evidence 삭제, GUIDED 트리거, max_turns 종료, 장면전환 초기화,
+analyze/respond 각각 실패 폴백, 미션 트리거+중복방지, STT_EMPTY, FORBIDDEN, non-dialogue 거절).
 
 ### 반드시 지킬 것
 
@@ -188,8 +193,8 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| B-09 | `POST /analyze` 클라이언트 | 필수 | 타임아웃 5초 · 재시도 0회 — 미착수 |
-| B-10 | `POST /respond` 클라이언트 | 필수 | 타임아웃 5초 · 재시도 0회 — 미착수 |
+| B-09 | ~~`POST /analyze` 클라이언트~~ | 필수 | 타임아웃 5초 · 재시도 0회 — **완료.** `message/service/ai/AiAnalyzeClientImpl.java` |
+| B-10 | ~~`POST /respond` 클라이언트~~ | 필수 | 타임아웃 5초 · 재시도 0회 — **완료.** `message/service/ai/AiRespondClientImpl.java` |
 | B-11 | ~~**AI 서버 mock 스텁**~~ | 필수-기반 | `aimock/AiMockController.java` — `POST /api/mock-ai/analyze`·`/respond`, 고정 JSON, 인증 불필요. **완료** |
 | B-12 | 실패 폴백 처리 | 필수 | 아래 표 — 미착수 |
 
@@ -258,17 +263,18 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 등급 | 조건 위치 |
 | --- | --- | --- | --- |
-| M-47 | 미션1 노출 조건 판정 | 필수 | [PRD 7.6](../../docs/product/prd.md) 4개 조건 |
-| M-48 | 미션2 노출 시점 판정 | 필수 | [PRD 7.6](../../docs/product/prd.md) |
-| M-49 | 노출 기록 `speaker_type = system` 메시지 | 필수 | 중복 노출 방지 ([PRD I-07](../../docs/product/prd.md)) |
+| M-47 | ~~미션1 노출 조건 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) 4개 조건 — **완료(2개 신호로 조작화, D-20)** |
+| M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — **완료(조작화, D-20)** |
+| M-49 | ~~노출 기록 `speaker_type = system` 메시지~~ | 필수 | 중복 노출 방지 ([PRD I-07](../../docs/product/prd.md)) — **완료.** curl로 재노출 안 됨 확인 |
 
 ### 주의
 
 - **노출 시점은 백엔드가 결정합니다. AI가 정하지 않습니다** ([roles.md 3.7](../../docs/team/roles.md))
-- 미션 정의(제목·체크리스트)는 **코드 상수.** 별도 테이블을 만들지 않음
+- 미션 정의(제목·체크리스트)는 **코드 상수.** 별도 테이블을 만들지 않음 — `story/constant/Missions.java`
 - 다음 턴에 해당 `scene_id`에 system 메시지가 있으면 재노출하지 않음
 - system 메시지는 대화 히스토리 응답에 **표시하지 않음**
 - 응답 필드 `missionTriggered` 형태: [api.md 3.5](../../docs/spec/api.md)
+- **노출 조건은 PRD 원문 그대로가 아니라 팀이 신호 기반으로 근사한 것** — D-20 참조. 실제 발화로 미노출·과다노출 검증 필요
 
 ---
 

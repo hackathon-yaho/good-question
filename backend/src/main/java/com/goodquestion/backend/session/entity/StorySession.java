@@ -163,4 +163,30 @@ public class StorySession {
         this.status = SessionStatus.STOPPED;
         this.lastActivityAt = Instant.now();
     }
+
+    /**
+     * 진행 판단 규칙 엔진(M-38~M-41)이 계산한 이번 턴의 결과를 세션에 반영한다 (M-44, PRD 8.8).
+     * guidanceTarget이 null이면(NORMAL/CLOSING) 직전 유도 대상을 그대로 둔다 — 다음 GUIDED 턴에서
+     * "직전 유도 요소 반복 방지"에 계속 쓰이기 때문이다 (PRD 6.9 유도 대상 선택 원칙).
+     */
+    public void recordTurnResult(int turnCount, List<String> accumulatedElements, List<String> newlyDetectedTypes,
+                                  ResponseMode mode, ThoughtElement guidanceTarget,
+                                  int turnsWithoutNewElement, int consecutiveLowInformationTurns,
+                                  boolean sceneGoalMet) {
+        this.currentChildTurnCount = turnCount;
+        this.accumulatedElements = accumulatedElements;
+        this.lastDetectedElements = newlyDetectedTypes;
+        this.lastResponseMode = mode;
+        if (guidanceTarget != null) this.lastGuidanceTarget = guidanceTarget;
+        this.turnsWithoutNewElement = turnsWithoutNewElement;
+        this.consecutiveLowInformationTurns = consecutiveLowInformationTurns;
+        this.sceneGoalMet = sceneGoalMet;
+        this.lastActivityAt = Instant.now();
+    }
+
+    /** CLOSING 확정 시 종료 사유를 남긴다. AI 실패로 강제 종료된 경우는 사유가 없어 null일 수 있다 (B-12). */
+    public void closeScene(SceneEndReason reason) {
+        this.sceneEndReason = reason;
+        this.lastActivityAt = Instant.now();
+    }
 }

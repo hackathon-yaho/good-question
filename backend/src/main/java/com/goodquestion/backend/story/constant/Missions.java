@@ -9,15 +9,16 @@ import java.util.Map;
  */
 public final class Missions {
 
+    /** 체크리스트 순서·element 매핑은 api.md 3.5 missionTriggered 예시와 PRD 7.6 확인 항목이 일치한다. */
     public static final MissionDefinition MISSION_1 = new MissionDefinition(
             "mission_1",
             "높이 있는 배 따기",
             "높은 배나무의 배를 떨어뜨리기 위해 며느리의 큰 방귀를 안전하게 사용하는 방법을 구성한다",
             List.of(
-                    "무엇을 사용할 것인지",
-                    "주변에 있는 마을 사람들과 시아버지는 어디로 피해야 할지",
-                    "며느리에게 어떻게 부탁할 것인지",
-                    "그 결과 어떤 일이 생길지"
+                    new MissionChecklistItem("무엇을 사용할 것인지", "SOLUTION"),
+                    new MissionChecklistItem("주변에 있는 마을 사람들과 시아버지는 어디로 피해야 할지", "SOLUTION"),
+                    new MissionChecklistItem("며느리에게 어떻게 부탁할 것인지", "REQUEST"),
+                    new MissionChecklistItem("그 결과 어떤 일이 생길지", "RESULT")
             )
     );
 

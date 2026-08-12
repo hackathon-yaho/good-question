@@ -81,8 +81,9 @@ volumes:
 | `FRONTEND_URL` | 로그인 성공/실패 후 리다이렉트 대상 | 뒤에 `/auth/callback`이 자동으로 붙음 |
 | `COOKIE_SECURE` | JWT 쿠키 `Secure`·`SameSite` 전환 | 로컬(http) `false` / 배포(https) `true`. Vercel↔Render 크로스 도메인이라 배포는 `SameSite=None`이 필요 |
 | `OPENAI_API_KEY` | **Whisper · TTS 전용** | 백엔드 담당 키 (D-16). AI 서버 키와 별개 |
-| `AI_SERVER_BASE_URL` | AI 서버 주소 | **미결 U-01.** mock 단계에서는 로컬 스텁 주소 |
-| `AI_SERVER_INTERNAL_TOKEN` | 내부 호출 인증 | 미결 U-01. `X-Internal-Token` 헤더 |
+| `AI_SERVER_BASE_URL` | AI 서버 주소 | **미결 U-01.** 기본값 `http://localhost:8080/api/mock-ai`(B-11 자체 mock) — 값을 안 넣어도 동작함 |
+| `AI_SERVER_TIMEOUT_SECONDS` | `/analyze`·`/respond` 타임아웃 | 기본 5초 (D-03) |
+| `AI_SERVER_INTERNAL_TOKEN` | 내부 호출 인증 | 미결 U-01. 아직 코드에서 쓰지 않음(mock은 인증 없음) |
 | `CORS_ALLOWED_ORIGINS` | 프론트 오리진(콤마 구분) | `Access-Control-Allow-Credentials`가 켜져 있어 쿠키 인증에 필수 |
 
 **`OPENAI_API_KEY`는 백엔드 것만 둡니다.** `gpt-5-mini` 호출은 AI 서버가 자기 키로 합니다 (D-16).
