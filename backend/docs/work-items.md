@@ -228,12 +228,34 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| B-13 | `POST /api/stt` — 오디오 업로드 → 텍스트 | 필수 | `multipart/form-data`. 타임아웃 8초 |
-| B-14 | Whisper 연동 | 필수 | |
-| B-15 | **오디오 즉시 폐기** | 필수 | 메모리 처리 후 폐기. 저장 금지 ([PRD 10.3](../../docs/product/prd.md)) |
-| B-16 | `GET /api/tts?messageId=` — 오디오 반환 | 필수 | 캐시 히트 시 즉시, 미스 시 생성 후 저장 |
-| B-17 | `tts_cache` 저장·조회 | 필수 | DB(`bytea`). **파일시스템 금지** — Render 재배포 시 초기화됨 |
-| B-18 | 기동 시 고정 대사 **프리워밍 11건** | 필수 | 없는 것만 생성 |
+| B-13 | ~~`POST /api/stt` — 오디오 업로드 → 텍스트~~ | 필수 | **완료.** `voice/controller/SttController.java`. `multipart/form-data`. 타임아웃 8초 |
+| B-14 | ~~Whisper 연동~~ | 필수 | **완료.** `voice/client/OpenAiSttClientImpl.java` (`whisper-1`, D-21) |
+| B-15 | ~~**오디오 즉시 폐기**~~ | 필수 | **완료.** 오디오는 바이트 배열로 메모리에서만 다루고 디스크에 별도로 쓰지 않음 ([PRD 10.3](../../docs/product/prd.md)) |
+| B-16 | ~~`GET /api/tts?messageId=` — 오디오 반환~~ | 필수 | **완료.** `voice/controller/TtsController.java`. 캐시 히트 시 즉시, 미스 시 생성 후 저장 |
+| B-17 | ~~`tts_cache` 저장·조회~~ | 필수 | **완료.** DB(`bytea`). **파일시스템 금지** — Render 재배포 시 초기화됨 |
+| B-18 | ~~기동 시 고정 대사 **프리워밍 11건**~~ | 필수 | **완료.** `voice/support/TtsPrewarmRunner.java` (`@Order(2)`, ContentSeeder 다음). 없는 것만 생성 |
+
+### 검증 (2026-08-12)
+
+실 OpenAI 키로 성공 경로까지 curl로 확인했습니다.
+
+- **TTS 캐시 미스→생성**: 캐시에 없는 캐릭터 대사를 요청 → `audio/mpeg` 200, 실제 MP3(57600바이트) 반환
+- **TTS 캐시 히트**: 같은 메시지 재요청 → 1.2초→0.02초, 바이트 완전 동일, `tts_cache` 행 추가 안 됨
+- **STT 라운드트립**: 위에서 생성한 TTS 오디오를 그대로 `/api/stt`에 업로드 → 원문 "그랬구나, 네 말을…"과 사실상 동일한 텍스트로 복원 (쉼표→마침표 정도 차이)
+- **빈 오디오**: 빈 파일 업로드 → OpenAI 호출 없이 `{"text": ""}` 즉시 반환
+- **이름 치환된 고정 대사 지연 생성**: `character_opening`(대화1, "민준아…") 같은 이름 포함 메시지를 재생 → 프리워밍 11건에 없던 것이 첫 재생 시 생성돼 `tts_cache`에 추가됨 (D-05 표대로 동작)
+- **재기동 시 재프리워밍 안 함**: 서버 재시작 → `TtsPrewarmRunner` 로그에 "신규 생성 0건" (DB에 이미 있어 스킵)
+- **인증/소유권**: 다른 보호자 JWT로 조회 시 403 `FORBIDDEN`, 존재하지 않는 `messageId`는 404 `NOT_FOUND`
+- **OpenAI 실패 시 무장애**: 크레딧 소진 키로 먼저 검증 — 500 `INTERNAL_ERROR`로만 응답하고 서버는 죽지 않음 (api.md 2.3의 일반 5xx 계약)
+
+**버그 발견·수정 2건** (이 검증 과정에서 발견):
+1. `TtsPrewarmRunner`가 예외를 그대로 던지면 `ApplicationRunner` 실패가 `ApplicationContext` 기동
+   자체를 막았다. 프리워밍 실패를 항목별로 흡수하도록 고쳐, 외부 API 장애가 서버 부팅을 막지
+   않게 했다 (크레딧 소진 키로 기동해 로그로 확인).
+2. `MultipartBodyBuilder`로 Whisper에 오디오를 보내면 `NoClassDefFoundError:
+   org/reactivestreams/Publisher`가 났다 — 이 클래스가 reactive-streams(WebFlux 전용
+   의존성)를 참조하는데 이 프로젝트는 서블릿(MVC) 기반이라 없다. `LinkedMultiValueMap` +
+   `ByteArrayResource`로 바꿔 해결했다.
 
 ### 요청 분리 (D-02)
 

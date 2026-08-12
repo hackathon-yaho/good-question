@@ -160,18 +160,24 @@ AI 서버 완성을 기다리지 않고 전체 흐름을 검증할 수 있습니
 
 | 순서 | 작업 | 항목 |
 | --- | --- | --- |
-| 1 | `POST /api/stt` — multipart 수신 | B-13 |
-| 2 | Whisper 호출 + **오디오 즉시 폐기** | B-14, B-15 |
-| 3 | `tts_cache` 조회·저장 | B-17 |
-| 4 | `GET /api/tts?messageId=` | B-16 |
-| 5 | 기동 시 고정 대사 **11건** 프리워밍 | B-18 |
-| 6 | 타임아웃 값 적용 (STT 8초 / analyze 5초 / respond 5초) | D-03 |
+| 1 | ~~`POST /api/stt` — multipart 수신~~ | B-13 — **완료** |
+| 2 | ~~Whisper 호출 + **오디오 즉시 폐기**~~ | B-14, B-15 — **완료** |
+| 3 | ~~`tts_cache` 조회·저장~~ | B-17 — **완료** |
+| 4 | ~~`GET /api/tts?messageId=`~~ | B-16 — **완료** |
+| 5 | ~~기동 시 고정 대사 **11건** 프리워밍~~ | B-18 — **완료** |
+| 6 | ~~타임아웃 값 적용 (STT 8초 / analyze 5초 / respond 5초)~~ | D-03 — **완료** |
 
 **완료 조건**
-- 오디오 업로드 → 텍스트 반환. **디스크에 파일이 남지 않는다**
-- 빈 STT 결과면 `POST /messages`를 호출하지 않아 `messages`에 빈 레코드가 안 생긴다
-- 재기동해도 프리워밍이 다시 돌지 않는다 (캐시가 DB에 남아 있음)
-- 이름이 들어간 고정 대사 2건은 첫 재생 시 생성되어 캐시에 추가된다
+- [x] 오디오 업로드 → 텍스트 반환. **디스크에 파일이 남지 않는다** — TTS로 만든 실음성을 STT에 그대로 넣어 원문과 사실상 동일한 텍스트로 복원 확인. 업로드 바이트는 메모리에서만 다룸
+- [x] 빈 STT 결과면 `POST /messages`를 호출하지 않아 `messages`에 빈 레코드가 안 생긴다 — 빈 파일 업로드 시 OpenAI 호출 없이 `{"text":""}` 즉시 반환 확인 (프론트가 이때 ②를 안 부름)
+- [x] 재기동해도 프리워밍이 다시 돌지 않는다 (캐시가 DB에 남아 있음) — 재기동 로그에 "신규 생성 0건"
+- [x] 이름이 들어간 고정 대사 2건은 첫 재생 시 생성되어 캐시에 추가된다 — 대화1 "민준아…" 메시지 최초 재생 시 `tts_cache` 행이 늘어남을 확인
+
+> **Phase 5 완료** (2026-08-12). 실 OpenAI 키로 TTS 생성·캐시 히트·STT 라운드트립까지 curl로
+> 검증했다. 이 과정에서 버그 2건을 발견해 고쳤다 — ① `ApplicationRunner` 실패가 서버 기동
+> 자체를 막던 것(TtsPrewarmRunner 항목별 예외 흡수로 해결), ② `MultipartBodyBuilder`가
+> 서블릿 프로젝트에 없는 reactive-streams를 요구해 나던 `NoClassDefFoundError`
+> (`LinkedMultiValueMap`+`ByteArrayResource`로 해결). 상세는 work-items.md 8장·decisions.md D-21.
 
 ---
 

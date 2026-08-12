@@ -445,6 +445,32 @@ client_secret_post` + 실제 Client Secret 조합이 정상 동작합니다.
 
 ---
 
+### D-21 · STT/TTS 모델·목소리, TTS 생성 타임아웃 값
+
+PRD·api.md 어디에도 구체적인 모델명이 없어 팀이 정합니다.
+
+| 항목 | 값 | 근거 |
+| --- | --- | --- |
+| STT 모델 | `whisper-1` | [PRD 9.3](../../docs/product/prd.md)·[decisions.md D-01](decisions.md)이 "Whisper"까지만 지정 |
+| TTS 모델 | `tts-1` | 캐시를 쓰므로(D-05) 지연시간보다 비용이 우선 — `tts-1-hd`는 쓰지 않음 |
+| TTS 목소리 | `alloy` | 다국어 목소리 중 하나. 한국어 전용 옵션이 없어 팀이 임의 선택 — 시연 중 톤이 안 맞으면 `application.yml`의 `openai.tts.voice` 값만 바꾸면 됨(재배포 불필요, env로도 덮어쓰기 가능) |
+| TTS 생성 타임아웃 | 8초 | [D-03](decisions.md)의 표에 TTS가 빠져 있음(Whisper만 명시). 캐시 미스 시에만 타는 경로라 실제 호출은 드물지만, Whisper와 같은 값으로 맞춰 둠 |
+
+TTS 실패(타임아웃 포함)는 `/analyze`·`/respond`처럼 별도 폴백을 두지 않습니다.
+api.md 2.3의 일반 `5xx/타임아웃` 처리로 충분합니다 — 캐릭터 대사가 안 나오는 것과 달리,
+오디오 재생 실패는 대화 진행 자체를 막지 않기 때문입니다 (프론트가 I-3으로 처리).
+
+**구현 중 발견한 것**: Spring의 `MultipartBodyBuilder`로 Whisper에 오디오를 보내면
+`NoClassDefFoundError: org/reactivestreams/Publisher`가 났습니다. 이 클래스가 WebFlux 전용
+`reactive-streams` 의존성을 참조하는데, 이 프로젝트는 서블릿(MVC) 기반이라 클래스패스에 없기
+때문입니다. `LinkedMultiValueMap<String,Object>` + `ByteArrayResource`로 바꿔 해결했습니다 —
+새 의존성을 추가하지 않고 이미 있는 `FormHttpMessageConverter`가 처리하게 한 것입니다.
+`ApplicationRunner`에서 예외가 나면 `ApplicationContext` 기동 자체가 막힌다는 점도 이때
+확인했습니다 — `TtsPrewarmRunner`가 항목 하나 실패로 서버 전체를 못 띄우던 걸 항목별
+try/catch로 고쳤습니다.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
