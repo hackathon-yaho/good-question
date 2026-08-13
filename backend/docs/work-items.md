@@ -369,7 +369,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | M-59 | ~~Render 배포 (무료 티어)~~ | 필수-기반 | **완료.** `good-question` 서비스, `https://good-question-7yyt.onrender.com` |
 | B-21 | ~~Supabase Postgres 연결~~ | 필수-기반 | **완료.** 로컬은 Docker Compose → [setup.md](setup.md). 배포는 Supabase **Session Pooler** — direct connection(`db.<ref>.supabase.co`)은 IPv6 전용이라 Render에서 연결 불가, `aws-0-<region>.pooler.supabase.com:5432` 사용 |
 | B-22 | ~~헬스체크 엔드포인트 (`SELECT 1` 포함)~~ | 필수-기반 | **완료.** `health/controller/HealthController.java`, `GET /api/health`, 인증 불필요. Render 슬립 + Supabase 일시정지 동시 방어 |
-| B-23 | 외부 크론 10분 핑 설정 | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고. 배포 URL 확정됨(`https://good-question-7yyt.onrender.com/api/health`) — 크론 설정만 남음 |
+| B-23 | ~~외부 크론 10분 핑 설정~~ | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고. **완료.** cron-job.org, `GET /api/health` 10분 간격 |
 | B-24 | ~~CORS 설정 (Vercel 오리진)~~ | 필수-기반 | **완료** (Phase 2) |
 
 ### 검증 — B-22 (2026-08-12)
@@ -382,6 +382,11 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 - 정상: Render `good-question` 서비스 배포 → `GET https://good-question-7yyt.onrender.com/api/health` → `{"status":"ok"}` 200. JPA `ddl-auto=update`로 테이블 12개 자동 생성, 시드·TTS 프리워밍 정상 실행
 - 에러 케이스로 확인됨(진행 중 실제로 발생): DB URL이 로컬 기본값으로 남아 `Connection to localhost:5432 refused` → Supabase 접속 정보로 교체. 이어서 direct connection 사용 시 `The connection attempt failed`(IPv6 미지원) → Session Pooler로 교체 후 해결
 - Supabase 보안 advisor: 12개 테이블 모두 RLS 비활성(critical) 확인 → 정책 없이 RLS만 활성화(백엔드는 `postgres` 계정 직접 접속이라 BYPASSRLS, 영향 없음). 적용 후 재확인 → critical 해소, INFO 수준(정책 없음)만 남음
+
+### 검증 — B-23 (2026-08-13)
+
+- 1차 시도: GitHub Actions `schedule` 트리거(`.github/workflows/keep-alive.yml`, `*/10 * * * *`)로 구현 → **실측으로 불안정함을 확인하고 폐기.** 등록 후 첫 자동 실행까지 1시간 11분, 그 뒤 41분(10분 주기면 4회 기대)간 0회 — YAML·권한·fork 여부 전부 정상이라 GitHub `schedule` 트리거 자체의 알려진 한계(부하 시 지연·스킵)로 판단. 워크플로우 파일은 백업으로 남겨둠(비용 없음)
+- 2차: **cron-job.org**로 전환(사용자가 직접 가입·등록, 10분 간격 `GET /api/health`). 검증: 마지막 GitHub Actions 실행(15:31, 콜드스타트) 이후 71분간 GitHub Actions는 0회였는데도 16:44 요청이 0.78초(콜드스타트 아님)로 응답 → 그 사이 cron-job.org가 슬립을 막았음을 타이밍으로 확인. cron-job.org 자체 실행 로그(16:50 응답)의 `x-render-origin-server: Render`·`rndr-id` 헤더로 실제 배포 서버가 응답했음을 재확인
 
 ---
 
