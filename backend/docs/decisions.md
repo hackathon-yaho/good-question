@@ -785,6 +785,28 @@ satisfiedIndexes:[]}` → 장면 종료 시 다시 `null`로 정확히 전환되
 
 ---
 
+### D-32 · 카드 순서 — 칸별 정오 `slotResults` 추가
+
+프론트 요청([request/backend/order-slot-results.md](../../docs/request/backend/order-slot-results.md))
+— 오답일 때 배치 전체가 아니라 **틀린 칸만** 표시하고 싶은데, 정답 판정은 서버만 한다는
+원칙(PRD 8.11)상 프론트가 정답을 몰라 어느 칸이 틀렸는지 계산할 수 없었다.
+
+**해결**: `POST .../activity/order` 응답에 `slotResults: boolean[]`를 추가한다 —
+`correctOrder[i].equals(submittedOrder[i])`를 칸(인덱스)별로 계산만 하고, 정답 **순서
+자체는 여전히 내려주지 않는다**(요청 문서가 강조한 대로 정답 역산 불가 유지).
+
+- `isCorrect: true`이거나 3회째(정답 공개로 전환)면 `slotResults`를 안 보낸다 —
+  기존에 `correctOrder`·`retellingKeywords`가 조건부로 **키 자체를 생략**하던
+  `@JsonInclude(NON_NULL)` 관례를 그대로 따랐다(이 셋 다 같은 레코드)
+- 맞은 칸에 대한 별도 신호는 없다 — `false`만 의미 있게 쓰고, 나머지는 프론트가
+  "표시 안 함"으로 처리하는 게 요청 문서의 의도(정답 개수를 세는 화면이 되지 않도록)
+
+**검증**: 1·2회째 오답 제출 → `slotResults`가 실제 오답 위치와 정확히 일치(`[true,false,
+false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답에서 빠지고 `correctOrder`로
+전환됨 확인. 정답 제출(1회째) → `slotResults` 없음 확인.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

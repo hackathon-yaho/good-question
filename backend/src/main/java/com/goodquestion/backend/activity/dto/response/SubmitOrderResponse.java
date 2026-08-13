@@ -14,11 +14,12 @@ public record SubmitOrderResponse(
         boolean isCorrect,
         int attemptCount,
         List<String> correctOrder,
-        List<String> retellingKeywords
+        List<String> retellingKeywords,
+        List<Boolean> slotResults
 ) {
 
-    public static SubmitOrderResponse of(boolean isCorrect, int attemptCount,
-                                          List<String> correctOrder, List<String> retellingKeywords) {
-        return new SubmitOrderResponse(isCorrect, attemptCount, correctOrder, retellingKeywords);
+    public static SubmitOrderResponse of(boolean isCorrect, int attemptCount, List<String> correctOrder,
+                                          List<String> retellingKeywords, List<Boolean> slotResults) {
+        return new SubmitOrderResponse(isCorrect, attemptCount, correctOrder, retellingKeywords, slotResults);
     }
 }

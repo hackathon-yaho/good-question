@@ -8,6 +8,14 @@
 
 ## 수정 이력
 
+### 2026-08-13 — 카드 순서 칸별 정오 slotResults 추가
+
+근거: [request/backend/order-slot-results.md](../request/backend/order-slot-results.md), [backend/docs/decisions.md D-32](../../backend/docs/decisions.md)
+
+| 절 | 변경 |
+| --- | --- |
+| 3.6 | `POST /api/sessions/{sessionId}/activity/order` 응답에 `slotResults` 신규 — 오답+3회 미만일 때만, 제출 배치 기준 칸별 정오. 정답 순서 자체는 여전히 안 줌 |
+
 ### 2026-08-13 — 메시지 히스토리에 characterDisplayName 추가
 
 근거: [request/backend/message-character.md](../request/backend/message-character.md), [backend/docs/decisions.md D-31](../../backend/docs/decisions.md)
@@ -703,8 +711,11 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 **Response 200**
 
 ```json
-{ "isCorrect": false, "attemptCount": 2 }
+{ "isCorrect": false, "attemptCount": 2, "slotResults": [true, false, false, true] }
 ```
+
+**신규(D-32)**: `slotResults`(boolean[])가 제출한 배치 기준 칸별 정오를 알려줍니다. 오답이면서
+3회 미만일 때만 옵니다 — 정답이거나 3회째면 키 생략. 정답 순서 자체는 여전히 안 줍니다.
 
 정답일 때 🟡:
 

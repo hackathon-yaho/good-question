@@ -318,7 +318,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
 | — | ~~카드 조회 (셔플 고정)~~ | 필수 | `GET /api/sessions/{id}/activity` — **완료** |
-| M-53 | ~~**정답 판정 서버 계산**~~ | 필수 | `POST /api/sessions/{id}/activity/order` — **완료** |
+| M-53 | ~~**정답 판정 서버 계산**~~ | 필수 | `POST /api/sessions/{id}/activity/order` — **완료.** `slotResults`(칸별 정오) 추가 (선택, 프론트 요청 — D-32) |
 | M-54 | ~~정답 시 `retellingKeywords` 응답~~ | 필수 | 〃 — **완료** |
 | B-19 | ~~**재시도 3회 제한**~~ | 필수 | 3회째에 `correctOrder` 공개 (D-10) — **완료** |
 | — | ~~재구성 발화 수신~~ | 필수 | `POST /api/sessions/{id}/activity/retelling` — **완료** |

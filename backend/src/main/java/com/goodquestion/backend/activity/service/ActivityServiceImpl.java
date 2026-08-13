@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 /**
  * PRD 7.8, work-items.md 10장. 정답 판정·셔플 고정은 전부 서버 책임이다 (PRD 8.11) —
@@ -91,11 +92,21 @@ public class ActivityServiceImpl implements ActivityService {
         result.recordAttempt(request.submittedOrder(), isCorrect);
 
         boolean revealAnswer = !isCorrect && result.getAttemptCount() >= MAX_ATTEMPTS;
+        // request/backend/order-slot-results.md: 칸 단위 정오. 정답이거나(볼 이유 없음)
+        // 3회째(정답 공개로 넘어감, 지적만 남기지 않음)면 안 보낸다.
+        List<Boolean> slotResults = (!isCorrect && !revealAnswer) ? slotResults(correctOrder, request.submittedOrder()) : null;
         return SubmitOrderResponse.of(
                 isCorrect,
                 result.getAttemptCount(),
                 revealAnswer ? correctOrder : null,
-                (isCorrect || revealAnswer) ? config.retellingKeywords() : null);
+                (isCorrect || revealAnswer) ? config.retellingKeywords() : null,
+                slotResults);
+    }
+
+    private List<Boolean> slotResults(List<String> correctOrder, List<String> submittedOrder) {
+        return IntStream.range(0, submittedOrder.size())
+                .mapToObj(i -> correctOrder.get(i).equals(submittedOrder.get(i)))
+                .toList();
     }
 
     @Override

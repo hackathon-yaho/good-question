@@ -1335,7 +1335,7 @@ Content-Type: application/json
 
 **Response**
 
-**⚠️ 아래 3개 필드는 상황에 따라 응답 JSON에 키 자체가 없을 수 있습니다** (값이 `null`인 게 아니라 키가 아예 생략됩니다 — `"correctOrder" in response`로 존재 여부를 확인하세요).
+**⚠️ 아래 4개 필드는 상황에 따라 응답 JSON에 키 자체가 없을 수 있습니다** (값이 `null`인 게 아니라 키가 아예 생략됩니다 — `"correctOrder" in response`로 존재 여부를 확인하세요).
 
 | key | 설명 | value 타입 | Nullable / 생략 조건 | 예시 |
 | --- | --- | --- | --- | --- |
@@ -1343,20 +1343,21 @@ Content-Type: application/json
 | attemptCount | 이번 제출까지 포함한 누적 시도 횟수 | Integer | N | 3 |
 | correctOrder | 정답 카드 순서(id 배열). **정답을 맞혔거나 3회 미만 오답이면 응답에서 키 자체가 생략됨.** `!isCorrect && attemptCount>=3`일 때만 존재 | String[] | 조건부 생략 | ["card_1","card_2","card_3","card_4"] |
 | retellingKeywords | 다음 단계(재구성 말하기)에서 쓸 핵심 단어 목록. **정답을 맞혔거나 3회째일 때만 존재**, 그 전(오답+3회 미만)에는 키 생략 | String[] | 조건부 생략 | ["며느리","방귀","배나무","시아버지"] |
+| slotResults | **신규(D-32).** 제출한 배치 기준, 그 칸이 정답 위치인지(칸별 정오). **오답이면서 3회 미만일 때만 존재** — 정답을 맞혔거나(볼 필요 없음) 3회째(정답 공개로 전환)면 키 생략. 정답 **순서 자체는 여전히 안 줍니다** — `false`인 칸만 의미 있게 쓰고 `true`인 칸엔 별도 강조를 넣지 마세요(정답 개수를 세는 화면이 됨) | Boolean[] | 조건부 생략 | [true, false, false, true] |
 
 **응답 3가지 패턴**
 
-1) **오답, 아직 3회 미만** — `correctOrder`/`retellingKeywords` 둘 다 없음:
+1) **오답, 아직 3회 미만** — `correctOrder`/`retellingKeywords`는 없고 `slotResults`만 있음:
 ```json
-{ "isCorrect": false, "attemptCount": 2 }
+{ "isCorrect": false, "attemptCount": 2, "slotResults": [true, false, false, true] }
 ```
 
-2) **정답** (몇 회째든 상관없이) — `retellingKeywords`만 있고 `correctOrder`는 없음(이미 맞혔으니 공개할 필요 없음):
+2) **정답** (몇 회째든 상관없이) — `retellingKeywords`만 있고 `correctOrder`/`slotResults`는 없음(이미 맞혔으니 공개·강조할 필요 없음):
 ```json
 { "isCorrect": true, "attemptCount": 1, "retellingKeywords": ["며느리", "방귀", "배나무", "시아버지"] }
 ```
 
-3) **3회째인데 오답** — 둘 다 있음(정답을 공개하고 다음 단계로 넘김):
+3) **3회째인데 오답** — `correctOrder`/`retellingKeywords`는 있고 `slotResults`는 없음(정답을 공개하고 다음 단계로 넘김, 칸별 지적은 더 이상 의미 없음):
 ```json
 {
   "isCorrect": false,
