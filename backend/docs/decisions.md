@@ -954,6 +954,7 @@ D-35에서 "재료를 새로 안 만들고 `guidanceStyle`을 재사용한다"�
 | **U-05** | Supabase 무료 티어 일시정지 기간·용량 한도 | 신규 가입. 가입 시 확인 필요 | 시연 전 확인 |
 | **U-06** | `highlightWords` 데이터 출처 | 장면별 고정 목록(팀 창작) vs `/respond` 응답 확장(AI 재합의) | 단어장 구현 시 |
 | **U-07** | 보호자 리포트 응답 스키마 | 선택 항목(O-01). 내부 분석 태그를 보호자 화면에 노출 금지 | Phase 7 착수 시 |
+| **U-08** | 미션2 성공 판정 — 자연 발동 시 `mission2Satisfied`(프론트, before/after diff)가 항상 실패 | 원인·해결 방향 정리 완료, 프론트 확인 대기. `missionProgress` 체크리스트 1항목 채우는 안 제안 | 프론트 확인 후 구현 |
 
 ### 프론트에 알려야 할 것
 
@@ -962,3 +963,6 @@ D-01·D-02가 프론트 작업 범위를 바꿉니다.
 
 D-34 — 도입부 텍스트 확장 요청 반려, 페이싱은 프론트 UI로 처리 요청.
 → [docs/request/frontend/intro-pacing-declined.md](../../docs/request/frontend/intro-pacing-declined.md)
+
+U-08 — 미션2 성공 판정이 자연 발동 시 항상 실패하는 구조적 문제, 해결 방향 확인 요청.
+→ [docs/request/frontend/mission2-success-signal-gap.md](../../docs/request/frontend/mission2-success-signal-gap.md)
