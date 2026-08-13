@@ -117,11 +117,15 @@ public class MessageServiceImpl implements MessageService {
         ResponseMode previousMode = session.getLastResponseMode();
         ThoughtElement previousGuidanceTarget = session.getLastGuidanceTarget();
 
+        // D-29: 대화3·4는 미션이 항상 나와야 한다 — 진행 판단이 GOAL_MET으로 장면을 먼저
+        // 닫아버리지 않도록, 이번 장면에 아직 안 보여준 미션이 있는지 미리 알려준다.
+        boolean hasUnrevealedMission = hasUnrevealedMission(session, scene);
+
         // ③ 진행 판단 (M-38, M-39) — 판단 순서를 바꾸지 않는다.
         ProgressDecision decision = ProgressJudge.judge(new ProgressInput(
                 turnCount, scene.getPreferredTurns(), scene.getMaxTurns(), missing,
                 !newlyAccumulated.isEmpty(), previousMode,
-                turnsWithoutNewElement, lowInformationTurns));
+                turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission));
 
         // ④ 유도 정보 구성 (M-41) + ⑤ 캐릭터 응답. GUIDED 유도 대상과 NORMAL soft-cue 대상(O-13)은
         // 둘 다 reactionKey가 있어야 판단할 수 있어(장난·질문·불명확이면 soft-cue 스킵) resolveCharacterResponse 안에서 함께 계산한다.
@@ -152,9 +156,9 @@ public class MessageServiceImpl implements MessageService {
 
         MissionTriggeredResponse missionTriggered = characterTurn.sceneEnded()
                 ? null
-                : judgeMission(session, scene, new MissionTriggerContext(
+                : judgeMission(session, scene, hasUnrevealedMission, new MissionTriggerContext(
                         turnCount, analysis.childIntent(), request.text(), accumulated, missing,
-                        previousMode, previousGuidanceTarget), nextTurnOrder + 1);
+                        previousMode, previousGuidanceTarget, scene.getMaxTurns()), nextTurnOrder + 1);
 
         String characterDisplayName = DialogueContents.forSceneOrder(scene.getSceneOrder()).characterDisplayName();
 
@@ -237,11 +241,10 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /** 대화3(미션1)·대화4(미션2)에서만 판정한다. 이미 노출됐으면 다시 노출하지 않는다 (PRD I-07). */
-    private MissionTriggeredResponse judgeMission(StorySession session, StoryScene scene,
+    private MissionTriggeredResponse judgeMission(StorySession session, StoryScene scene, boolean hasUnrevealedMission,
                                                     MissionTriggerContext context, int systemMessageTurnOrder) {
+        if (!hasUnrevealedMission) return null;
         MissionDefinition mission = Missions.forSceneOrder(scene.getSceneOrder());
-        if (mission == null) return null;
-        if (messageRepository.existsBySessionAndSceneAndSpeakerType(session, scene, SpeakerType.SYSTEM)) return null;
 
         boolean shouldReveal = mission == Missions.MISSION_1
                 ? MissionTrigger.shouldRevealMission1(context)
@@ -250,6 +253,12 @@ public class MessageServiceImpl implements MessageService {
 
         messageRepository.save(Message.ofSystem(session, scene, systemMessageTurnOrder, mission.id()));
         return MissionTriggeredResponse.of(mission);
+    }
+
+    /** 이번 장면에 미션이 있고, 아직 system 메시지로 노출된 적 없으면 true (PRD I-07, D-29). */
+    private boolean hasUnrevealedMission(StorySession session, StoryScene scene) {
+        return Missions.forSceneOrder(scene.getSceneOrder()) != null
+                && !messageRepository.existsBySessionAndSceneAndSpeakerType(session, scene, SpeakerType.SYSTEM);
     }
 
     private Optional<StoryScene> findSceneByOrder(Story story, int sceneOrder) {

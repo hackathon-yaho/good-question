@@ -177,7 +177,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | M-43 | ~~`CLOSING` 시 고정 마지막 대사 재생~~ | 필수 | [PRD I-01](../../docs/product/prd.md) — **완료** |
 | M-44 | ~~`story_sessions` 상태 갱신 (턴 단위)~~ | 필수 | [PRD 8.8](../../docs/product/prd.md) — **완료.** `StorySession.recordTurnResult()`·`closeScene()` |
 | M-45 | ~~`utterance_analyses` 저장~~ | 필수 | [PRD 8.10](../../docs/product/prd.md) — **완료** |
-| M-47~M-49 | ~~미션 노출 판정 + system 메시지~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — **완료.** `session/engine/MissionTrigger.java` (D-20, 조작화 근거 참조) |
+| M-47~M-49 | ~~미션 노출 판정 + system 메시지~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — **완료.** `session/engine/MissionTrigger.java` (D-20, 조작화 근거 참조). 주최측이 "항상 노출"로 확정한 뒤 GOAL_MET 유예 + 강제 노출 턴 추가 (D-29) |
 | B-12 | ~~AI 실패 폴백~~ | 필수 | `/analyze` 실패→빈 분석 진행, `/respond` 실패→`character_closing`으로 강제 종료. **완료** |
 
 엔드포인트: `POST /api/sessions/{sessionId}/messages` — 스키마 [api.md 3.5](../../docs/spec/api.md). **완료**,
@@ -295,8 +295,8 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 등급 | 조건 위치 |
 | --- | --- | --- | --- |
-| M-47 | ~~미션1 노출 조건 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) **4개 조건 전부 구현** (D-20) |
-| M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — `PERSPECTIVE` 누적 시점. 원래 `PERSPECTIVE`+`REASON`(D-20)이었으나 장면9엔 REASON이 없어 한 번도 트리거된 적 없던 조건이었음 → `PERSPECTIVE` 단독으로 정정 (D-28) |
+| M-47 | ~~미션1 노출 조건 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) **4개 조건 전부 구현** (D-20). 주최측 확정으로 "장면 종료 직전 턴엔 무조건 노출" 안전장치 추가 (D-29) |
+| M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — `PERSPECTIVE` 누적 시점. 원래 `PERSPECTIVE`+`REASON`(D-20)이었으나 장면9엔 REASON이 없어 한 번도 트리거된 적 없던 조건이었음 → `PERSPECTIVE` 단독으로 정정 (D-28). 주최측이 "항상 노출"로 확정한 뒤, GOAL_MET 조기 종료가 미션 판정을 건너뛸 수 있던 경쟁 조건을 없애고 강제 노출 턴 추가 (D-29) |
 | M-49 | ~~노출 기록 `speaker_type = system` 메시지~~ | 필수 | 중복 노출 방지 ([PRD I-07](../../docs/product/prd.md)) — **완료.** curl로 재노출 안 됨 확인 |
 
 ### 주의

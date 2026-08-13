@@ -34,7 +34,8 @@ public final class MissionTrigger {
         return proposedUsingFart(context)
                 || directionWithoutConcreteMethod(context)
                 || methodStalledAfterTwoTurns(context)
-                || characterGuidanceDidNotWork(context);
+                || characterGuidanceDidNotWork(context)
+                || forcedByApproachingMaxTurns(context);
     }
 
     /** 조건 1 — 아이가 며느리의 **방귀를 활용**할 수 있다고 제안한 경우. */
@@ -73,6 +74,15 @@ public final class MissionTrigger {
     }
 
     /**
+     * 강제 노출 (D-29) — 주최측이 "두 미션 모두 항상 나와야 한다"고 확정했다. 내용 조건(위 4개)이
+     * 하나도 안 걸려도 장면이 끝나기 한 턴 전(maxTurns-1)에는 무조건 노출한다. ProgressJudge가
+     * 이 턴까지는 GOAL_MET으로 장면을 닫지 않도록 미리 미뤄준다 — 여기와 짝을 이루는 규칙이다.
+     */
+    private static boolean forcedByApproachingMaxTurns(MissionTriggerContext context) {
+        return context.turnCount() >= context.maxTurns() - 1;
+    }
+
+    /**
      * 미션2 (대화4). PRD 7.6은 조건식 대신 흐름만 준다 —
      * "특징을 부끄러워하지 않아도 된다고 말함 → 긍정하는 이유 확인 → 관점 확장".
      *
@@ -83,6 +93,6 @@ public final class MissionTrigger {
      */
     public static boolean shouldRevealMission2(MissionTriggerContext context) {
         return context.turnCount() >= MIN_TURNS_BEFORE_ANY_REVEAL
-                && context.accumulatedElements().contains(PERSPECTIVE);
+                && (context.accumulatedElements().contains(PERSPECTIVE) || forcedByApproachingMaxTurns(context));
     }
 }

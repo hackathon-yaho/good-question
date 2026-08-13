@@ -684,6 +684,51 @@ PERSPECTIVE 단독을 선택했다.
 
 ---
 
+### D-29 · 미션 "반드시 노출" 보장 — GOAL_MET 유예 + 강제 노출 턴
+
+주최측이 미션1·미션2를 조건부가 아니라 **항상 노출돼야 한다**고 확정했다. 확인해보니 실제
+경쟁 조건이 있었다: `ProgressJudge`의 `GOAL_MET`(필수 요소 충족 시 조기 종료) 판정이
+`MissionTrigger`의 조건 판정보다 먼저 장면을 닫아버릴 수 있다 —
+`MessageServiceImpl.createMessage()`가 `characterTurn.sceneEnded()`인 턴엔 `judgeMission(...)`을
+아예 호출하지 않기 때문이다. 특히 장면9(대화4, 미션2)는 `preferredTurns=2`라, 필요한 요소
+4개(`EMOTION`·`PERSPECTIVE`·`RESULT`·`SOLUTION`)가 2턴 안에 다 채워지면 미션 조건이 한 번도
+평가되지 못한 채 장면이 닫힐 수 있었다(D-28에서 이미 이 경로가 실제로 한 번도 트리거된 적
+없다는 걸 확인한 것과 같은 성격의 위험).
+
+**2단계로 고쳤다.**
+
+1. **`ProgressJudge` — GOAL_MET 유예.** `ProgressInput`에 `hasUnrevealedMission` 필드를
+   추가하고, 이 값이 `true`이고 `turnCount < maxTurns`이면 `GOAL_MET`으로 닫는 대신 이번
+   턴을 NORMAL/GUIDED로 흘려보내 `judgeMission`이 실행될 기회를 준다. **`MAX_TURNS`(대화
+   길이 하드 한도) 분기는 그대로 무조건 종료** — 미공개 미션이 있어도 최대 턴을 넘겨
+   대화가 늘어지지는 않는다. 판단 순서(1→2→3→4)는 바꾸지 않고 1단계 안에 게이트 하나만
+   추가했다.
+2. **`MissionTrigger` — 강제 노출.** `MissionTriggerContext`에 `maxTurns`를 추가하고,
+   `turnCount >= maxTurns - 1`(장면 종료 직전 턴)이면 내용 조건(미션1의 4개, 미션2의
+   `PERSPECTIVE`)과 무관하게 무조건 노출하는 `forcedByApproachingMaxTurns`를 OR로 붙였다.
+
+두 장치는 짝을 이룬다 — 1번이 없으면 강제 노출 턴에 도달하기 전에 장면이 먼저 닫혀버릴 수
+있고, 2번이 없으면 유예만 하고 실제로 노출은 안 될 수 있다.
+
+**전제 조건**: 이 방식은 `maxTurns > preferredTurns`(여유 턴이 최소 1턴)를 가정한다. 장면7은
+5 vs 3, 장면9는 4 vs 2로 둘 다 여유 2턴이라 안전하다. 앞으로 미션이 딸린 장면을 새로 추가할
+때 `maxTurns == preferredTurns`로 두면 이 보장이 깨진다 — 코드에 짧은 주석으로 남겨뒀다.
+
+**미반영 잔여 위험**: `/respond` AI 실패 폴백(B-12)은 `hasUnrevealedMission`과 무관하게
+여전히 `character_closing`으로 장면을 즉시 강제 종료한다 — AI 서버 장애 상황이라 이번
+수정 범위 밖으로 남겨뒀다. 흔치 않은 경로이고, 다루려면 실패 시 대체용 "중간 대사"를 장면마다
+따로 준비해야 해서 별도 논의가 필요하다.
+
+**검증**:
+- 단위 테스트: `ProgressJudgeTest`에 GOAL_MET 유예/`MAX_TURNS` 하드 한도 유지 2건,
+  `MissionTriggerTest`에 미션1·미션2 강제 노출 2건 추가. 전체 88건 통과.
+- 라이브: 장면9에서 `PERSPECTIVE`가 전혀 안 쌓이도록(evidence 문구를 뺀 발화) 유도해도
+  `turnCount == maxTurns-1(=3)`에 `mission_2`가 강제로 뜨는 것 확인. GOAL_MET 유예 자체는
+  로컬 mock이 고정 `PERSPECTIVE`만 내놔서 `missingEmpty`를 실제로 재현할 수 없어 라이브
+  검증은 못 했고, 위 단위 테스트로 대신 검증했다.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

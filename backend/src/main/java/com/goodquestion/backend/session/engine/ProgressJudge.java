@@ -8,6 +8,7 @@ import com.goodquestion.backend.session.enums.SceneEndReason;
  * 이 순서를 그대로 지킨다 — 순서를 바꾸는 리팩터링을 하지 않는다.
  *
  * 1. 종료 조건 확인 (필수 요소 충족 + 최소 대화량 / 최대 대화 범위 도달)
+ *    — 단, 미공개 미션이 있으면(D-29) maxTurns 전까지는 GOAL_MET으로 닫지 않는다.
  * 2. 강한 유도 제한 조건 확인 (첫 발화 / 신규 요소 확인 / 직전 GUIDED → NORMAL 강제)
  * 3. 유도 필요성 확인 (missing 있고 정체·저정보·턴 부족 중 하나)
  * 4. 그 외 NORMAL
@@ -27,7 +28,11 @@ public final class ProgressJudge {
         boolean missingEmpty = input.missingElements().isEmpty();
 
         // 1. 종료 조건
-        if (missingEmpty && input.turnCount() >= input.preferredTurns()) {
+        // D-29: 대화3·4는 미션이 항상 나와야 한다(주최측 확정) — 미공개 미션이 있으면
+        // maxTurns 도달 전까지는 GOAL_MET으로 닫지 않고, MissionTrigger의 강제 노출 턴
+        // (maxTurns-1)까지 대화를 이어간다. maxTurns 하한선(바로 아래 분기)은 그대로 유지된다.
+        boolean deferGoalMetForUnrevealedMission = input.hasUnrevealedMission() && input.turnCount() < input.maxTurns();
+        if (missingEmpty && input.turnCount() >= input.preferredTurns() && !deferGoalMetForUnrevealedMission) {
             return ProgressDecision.closing(SceneEndReason.GOAL_MET);
         }
         if (input.turnCount() >= input.maxTurns()) {

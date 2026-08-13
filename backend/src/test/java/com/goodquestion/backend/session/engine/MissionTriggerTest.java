@@ -17,7 +17,7 @@ class MissionTriggerTest {
         return new MissionTriggerContext(
                 1, ChildIntent.OPINION, "배가 높이 있네요.",
                 List.of("REASON"), List.of("REQUEST", "RESULT"),
-                ResponseMode.NORMAL, null);
+                ResponseMode.NORMAL, null, 5);
     }
 
     @Test
@@ -31,7 +31,7 @@ class MissionTriggerTest {
     void 조건1_방귀_활용을_제안하면_첫턴에도_노출() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.SOLUTION, "며느리 방귀로 배를 떨어뜨려요.",
-                List.of("SOLUTION"), List.of("REQUEST"), ResponseMode.NORMAL, null);
+                List.of("SOLUTION"), List.of("REQUEST"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isTrue();
     }
@@ -41,7 +41,7 @@ class MissionTriggerTest {
         // SOLUTION이 이미 누적돼 조건 2·3도 성립하지 않는 상태 — 조건 1만 따로 본다.
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.SOLUTION, "장대를 쓰면 될 것 같아요.",
-                List.of("SOLUTION"), List.of("REQUEST"), ResponseMode.NORMAL, null);
+                List.of("SOLUTION"), List.of("REQUEST"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isFalse();
     }
@@ -52,7 +52,7 @@ class MissionTriggerTest {
     void 조건2_해결_의도는_있지만_SOLUTION이_누적되지_않았으면_노출() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.SOLUTION, "어떻게든 해보면 될 것 같아요.",
-                List.of(), List.of("SOLUTION"), ResponseMode.NORMAL, null);
+                List.of(), List.of("SOLUTION"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isTrue();
     }
@@ -61,7 +61,7 @@ class MissionTriggerTest {
     void 조건2_SOLUTION이_이미_누적됐으면_노출되지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.SOLUTION, "장대를 쓰면 될 것 같아요.",
-                List.of("SOLUTION"), List.of("REQUEST"), ResponseMode.NORMAL, null);
+                List.of("SOLUTION"), List.of("REQUEST"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isFalse();
     }
@@ -72,7 +72,7 @@ class MissionTriggerTest {
     void 조건3_두턴_이상이고_SOLUTION이_미확인이면_노출() {
         MissionTriggerContext context = new MissionTriggerContext(
                 2, ChildIntent.OPINION, "잘 모르겠어요.",
-                List.of(), List.of("SOLUTION"), ResponseMode.NORMAL, null);
+                List.of(), List.of("SOLUTION"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isTrue();
     }
@@ -81,7 +81,7 @@ class MissionTriggerTest {
     void 조건3_첫턴이면_SOLUTION이_미확인이어도_이_조건으로는_노출되지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.OPINION, "잘 모르겠어요.",
-                List.of(), List.of("SOLUTION"), ResponseMode.NORMAL, null);
+                List.of(), List.of("SOLUTION"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isFalse();
     }
@@ -92,7 +92,7 @@ class MissionTriggerTest {
     void 조건4_직전턴에_SOLUTION을_유도했는데_여전히_미확인이면_노출() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.OPINION, "음….",
-                List.of(), List.of("SOLUTION"), ResponseMode.GUIDED, ThoughtElement.SOLUTION);
+                List.of(), List.of("SOLUTION"), ResponseMode.GUIDED, ThoughtElement.SOLUTION, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isTrue();
     }
@@ -101,7 +101,7 @@ class MissionTriggerTest {
     void 조건4_다른_요소를_유도했던_경우는_이_조건에_해당하지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.OPINION, "음….",
-                List.of("SOLUTION"), List.of("REASON"), ResponseMode.GUIDED, ThoughtElement.REASON);
+                List.of("SOLUTION"), List.of("REASON"), ResponseMode.GUIDED, ThoughtElement.REASON, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isFalse();
     }
@@ -112,7 +112,7 @@ class MissionTriggerTest {
     void 아이가_아직_말하지_않았으면_어떤_조건도_노출되지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
                 0, ChildIntent.SOLUTION, "며느리 방귀로 배를 떨어뜨려요.",
-                List.of(), List.of("SOLUTION"), ResponseMode.GUIDED, ThoughtElement.SOLUTION);
+                List.of(), List.of("SOLUTION"), ResponseMode.GUIDED, ThoughtElement.SOLUTION, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isFalse();
     }
@@ -123,7 +123,7 @@ class MissionTriggerTest {
     void 미션2_PERSPECTIVE가_누적되면_노출() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.PERSPECTIVE, "부끄러워하지 않아도 돼요.",
-                List.of("PERSPECTIVE"), List.of("RESULT"), ResponseMode.NORMAL, null);
+                List.of("PERSPECTIVE"), List.of("RESULT"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission2(context)).isTrue();
     }
@@ -132,7 +132,7 @@ class MissionTriggerTest {
     void 미션2_PERSPECTIVE가_아직_없으면_노출되지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
                 2, ChildIntent.EMOTION, "속상했을 것 같아요.",
-                List.of(), List.of("PERSPECTIVE", "RESULT"), ResponseMode.NORMAL, null);
+                List.of(), List.of("PERSPECTIVE", "RESULT"), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission2(context)).isFalse();
     }
@@ -141,8 +141,28 @@ class MissionTriggerTest {
     void 미션2_아이가_아직_말하지_않았으면_노출되지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
                 0, ChildIntent.PERSPECTIVE, null,
-                List.of("PERSPECTIVE"), List.of(), ResponseMode.NORMAL, null);
+                List.of("PERSPECTIVE"), List.of(), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission2(context)).isFalse();
+    }
+
+    // ── 노출 원칙(D-29): 내용 조건이 없어도 maxTurns 한 턴 전이면 무조건 노출된다 ────────────
+
+    @Test
+    void 노출_원칙_어떤_조건도_없어도_maxTurns_한턴_전이면_미션1이_강제_노출된다() {
+        MissionTriggerContext context = new MissionTriggerContext(
+                4, ChildIntent.OPINION, "잘 모르겠어요.",
+                List.of("SOLUTION"), List.of(), ResponseMode.NORMAL, null, 5);
+
+        assertThat(MissionTrigger.shouldRevealMission1(context)).isTrue();
+    }
+
+    @Test
+    void 노출_원칙_PERSPECTIVE가_없어도_maxTurns_한턴_전이면_미션2가_강제_노출된다() {
+        MissionTriggerContext context = new MissionTriggerContext(
+                3, ChildIntent.EMOTION, "속상했을 것 같아요.",
+                List.of(), List.of("PERSPECTIVE", "RESULT"), ResponseMode.NORMAL, null, 4);
+
+        assertThat(MissionTrigger.shouldRevealMission2(context)).isTrue();
     }
 }
