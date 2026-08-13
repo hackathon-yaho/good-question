@@ -85,6 +85,7 @@ export type ActivityAction =
   | { type: "RETELL_AGAIN" }
   | { type: "SUBMIT_RETELLING" }
   | { type: "RETELLING_RESULT"; result: RetellingResult }
+  | { type: "COMPLETE_RETELLING" } // 👈 수동 이동용 액션 추가
   | { type: "STT_FAILED"; code: string };
 
 /**
@@ -323,6 +324,12 @@ export function activityReducer(
         ...state,
         step: ActivityStep.COMPLETE,
         result: action.result,
+      };
+    
+    case "COMPLETE_RETELLING":
+      return {
+        ...state,
+        step: ActivityStep.REVIEW,
       };
 
     case "STT_FAILED":

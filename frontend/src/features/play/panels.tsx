@@ -1,7 +1,5 @@
 /**
- * 우측 대화 패널 — docs/spec/screens.md C-2 ~ C-6, I-2
- *
- * 상태별로 우측 40% 영역에 들어가는 뷰들이다.
+ * 우측 대화 패널 — docs/spec/screens.md C-2 ~ C-6
  * C-3(CHARACTER_SPEAKING)과 C-7(GUIDED)은 UI 구조가 같으므로 컴포넌트를 분리하지 않고
  * guided prop으로 구분한다. (§C 공통)
  */
@@ -224,7 +222,7 @@ export function ChildTurnPanel({
             네 말을 글로 옮기고 있어…
           </p>
         ) : (
-          <p className="shrink-0 text-center text-parent-body text-muted">
+          <p className="shrink-0 text-kid-body font-semibold text-muted">
             말이 끝나면 아래 보내기를 눌러줘
           </p>
         )}
@@ -236,7 +234,7 @@ export function ChildTurnPanel({
         ) : null}
       </div>
 
-      <footer className="flex shrink-0 items-center justify-end gap-3 px-6 pb-5">
+      <footer className="flex shrink-0 items-center justify-center gap-3 px-6 pb-5 mt-4">
         <PillButton size="kid" onClick={onSubmit} disabled={submitDisabled}>
           보내기
         </PillButton>
@@ -318,10 +316,6 @@ export function ThinkingPanel({
 
   return (
     <div className="flex size-full min-h-0 flex-col">
-      <div className="max-h-[40%] shrink-0 overflow-y-auto px-6 py-5">
-        <SpeechBubble speaker="child">{childText}</SpeechBubble>
-      </div>
-
       {/* 초상화를 여기 두지 않는다. 좌측 패널이 같은 얼굴을 상시 그리고 있어
           한 화면에 두 번 나온다 (2026-08-13 개편). 기다리는 신호만 남긴다. */}
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 overflow-hidden">

@@ -24,6 +24,7 @@ type Props = {
   imageUrl?: string | null;
   estimatedMinutes?: number | null;
   topics?: readonly string[];
+  className?: string;
 };
 
 /** 331px에 들어가는 칩 수. 서버가 더 줘도 여기서 자른다. */
@@ -35,24 +36,30 @@ export function StoryListRow({
   imageUrl,
   estimatedMinutes,
   topics = [],
+  className = "",
 }: Props) {
   return (
     <Link
       href={`/stories/${storyId}`}
-      className="flex items-center gap-3.5 rounded-card border border-border bg-surface p-3.5 shadow-soft transition-transform hover:-translate-y-0.5"
+      className={[
+        /* items-center 유지: 세로 중앙 정렬 */
+        "flex h-full w-full items-center gap-3.5 rounded-card border border-border bg-surface p-3.5 shadow-soft transition-transform hover:-translate-y-0.5",
+        className,
+      ].join(" ")}
     >
-      {/* 88 × 66px = 4:3. rem으로 두어 글자 크기 배율(설정 H-2)을 따라 커진다 */}
-      <span className="flex h-[4.125rem] w-[5.5rem] shrink-0 items-center justify-center overflow-hidden rounded-bubble bg-primary-soft">
+      {/* 🟢 h-full과 aspect-[4/3]을 지정해 늘어난 카드 높이에 맞춰 표지 영역이 자연스럽게 커집니다 */}
+      <span className="flex aspect-[4/3] h-full shrink-0 items-center justify-center overflow-hidden rounded-bubble bg-primary-soft">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
           <img src={imageUrl} alt="" className="size-full object-cover" />
         ) : (
-          /* 표지 미수령 (assets.md §3-1). 규격 자리를 지켜 행 높이가 흔들리지 않게 한다 */
+          /* 표지 미수령 (assets.md §3-1) */
           <span className="text-xs font-bold text-muted">표지</span>
         )}
       </span>
 
-      <span className="flex min-w-0 flex-col gap-0.5">
+      {/* 🟢 gap-1.5로 요소를 살짝 넓히고 세로 중앙에 균형 있게 위치시킵니다 */}
+      <span className="flex min-w-0 flex-col justify-center gap-1.5">
         <span className="truncate text-parent-body font-bold text-text">
           {title}
         </span>
@@ -64,11 +71,11 @@ export function StoryListRow({
         ) : null}
 
         {topics.length > 0 ? (
-          <span className="mt-1 flex gap-1.5">
+          <span className="flex gap-1.5">
             {topics.slice(0, MAX_TOPICS).map((topic) => (
               <span
                 key={topic}
-                className="rounded-pill bg-accent-soft px-2.5 py-0.5 text-sm font-bold text-text"
+                className="rounded-pill bg-accent-soft px-2.5 py-0.5 text-xs font-bold text-text"
               >
                 {topic}
               </span>

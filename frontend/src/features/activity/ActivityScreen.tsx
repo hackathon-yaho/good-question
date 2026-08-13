@@ -74,9 +74,9 @@ export function ActivityScreen({
   const stt = useChildSpeech({
     maxDurationMs: 60_000,
     onTranscribeStart: () => dispatch({ type: "TRANSCRIBING" }),
-    // 백엔드 모드에서는 오지 않는다. 실시간 점등은 브라우저 모드 전용이다.
     onInterim: (text) => dispatch({ type: "INTERIM", text }),
-    onFinal: (text) => dispatch({ type: "TRANSCRIBED", text }),
+    // 🟢 onFinal에서는 단계(Step) 변경 없이 text 업데이트만 진행
+    onFinal: (text) => dispatch({ type: "TRANSCRIBED", text }), // 또는 TRANSCRIBED 내부에서 step 전환을 일으키지 않는 별도 처리
     onError: (code) => dispatch({ type: "STT_FAILED", code }),
   });
 
@@ -197,8 +197,14 @@ export function ActivityScreen({
           interimText={state.interimText}
           micLevel={displayedMicLevel}
           errorCode={state.errorCode}
-          onMicClick={startRecording}
-          onDone={() => stt.stop()}
+          // 마이크 클릭 시: 녹음 중이면 끄고, 아니면 시작
+          onMicClick={state.recording ? () => stt.stop() : startRecording}
+          // 🟢 '말 다 했어요' 수동 버튼 클릭 시: 녹음 중단 + 다음 단계 이동 액션 디스패치
+          onDone={() => {
+            stt.stop();
+            dispatch({ type: "COMPLETE_RETELLING" }); 
+            // 💡 machine.ts 내 리듀서에 정의된 다음 단계 이동 액션 타입(예: COMPLETE_RETELLING, GO_REVIEW 등)으로 채워주시면 됩니다.
+          }}
         />
       ) : null}
 

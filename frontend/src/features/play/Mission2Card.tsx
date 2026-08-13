@@ -55,7 +55,7 @@ export function Mission2Card({
         </p>
         <h3 className="text-parent-title font-bold text-text">{title}</h3>
         <p className="mt-1 text-parent-body text-muted">
-          단점처럼 보이지만 좋은 일에 쓸 수 있는 점을 찾아보자.
+          4명 중 한명의 친구를 선택해 친구에게 다른 점을 좋은 점으로 말해주자
         </p>
       </div>
 
@@ -72,37 +72,39 @@ export function Mission2Card({
         {MISSION_2_OPTIONS.map((option, index) => {
           const on = index === selectedIndex;
           return (
-            <li key={option.label}>
+            /* 1. li 요소를 flex로 만들어 높이 수용을 명확히 합니다 */
+            <li key={option.label} className="flex">
               <button
                 type="button"
                 role="radio"
                 aria-checked={on}
                 onClick={() => onSelect(index)}
                 className={[
-                  "relative flex w-full flex-col items-center gap-1.5 rounded-bubble border-2 p-2 transition-colors",
+                  /* 2. h-full을 추가하여 가장 높이가 큰 카드의 높이를 100% 따라가게 합니다 */
+                  "relative flex h-full w-full flex-col items-center gap-1.5 rounded-bubble border-2 p-2 transition-colors",
                   on
                     ? "border-primary bg-surface"
                     : "border-transparent bg-surface/60 hover:bg-surface",
                 ].join(" ")}
               >
-                {/* 그림 미수령 (assets.md §3-6). 규격 자리를 지켜 선택해도 카드가 흔들리지 않게 한다 */}
-                <span className="flex aspect-square w-full items-center justify-center rounded-bubble bg-primary-soft text-[0.6rem] leading-tight font-bold text-muted">
+                {/* 3. shrink-0을 추가해 텍스트 길이에 따라 그림 영역 크기가 왜곡되는 것을 방지합니다 */}
+                <span className="flex aspect-square w-full shrink-0 items-center justify-center rounded-bubble bg-primary-soft text-[0.6rem] leading-tight font-bold text-muted">
                   그림
                   <br />
                   준비 중
                 </span>
-                {/* data-label: 검사가 라벨만 집어 읽을 수 있게 둔다. 카드 안에는
-                    플레이스홀더 문구도 섞여 있어 textContent로는 갈라내기 어렵다. */}
+              
+                {/* 4. flex-1, flex, items-center를 추가해 1줄/2줄 상관없이 텍스트 영역 높이를 통일하고 세로 중앙 정렬합니다 */}
                 <span
                   data-friend-label={option.label}
                   className={[
-                    "text-center text-sm leading-tight",
+                    "flex flex-1 items-center justify-center text-center text-sm leading-tight",
                     on ? "font-bold text-text" : "text-muted",
                   ].join(" ")}
                 >
                   {option.label}
                 </span>
-
+                
                 {on ? (
                   <span
                     aria-hidden
@@ -127,7 +129,7 @@ export function Mission2Card({
             </span>{" "}
             <span
               aria-label="여기에 말할 내용이 들어가요"
-              className="mx-1 inline-block w-24 border-b-2 border-dotted border-muted align-middle"
+              className="mx-1 inline-block w-24 border-b-2 border-dotted border-muted align-baseline translate-y-[2px]"
             />{" "}
             {MISSION_2_SENTENCE_TAIL}
           </>
