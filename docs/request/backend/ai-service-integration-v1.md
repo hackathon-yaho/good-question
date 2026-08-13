@@ -11,8 +11,10 @@ AI 서버는 아이의 최신 확정 발화 한 건을 분석하거나, 백엔�
 이미지 선택은 AI 서버의 책임이 아니다.
 
 장면·대화·미션 이미지는 실시간 생성하지 않는다. 사전 제작한 정적 에셋을
-`backgroundImageUrl`·`characterImageUrl`으로 표시하며, 캐릭터 표정 전환은 백엔드/프론트가
-고정 매핑으로 처리한다. AI 응답에 이미지 URL·이미지 프롬프트·표정 판정을 추가하지 않는다.
+`backgroundImageUrl`·`characterImageUrl`으로 표시하며, 캐릭터 표정 파일 매핑은 백엔드/프론트가
+고정 목록으로 처리한다. AI는 이미지 URL·이미지 프롬프트·파일명을 반환하지 않는다. 단,
+`/respond`의 `characterState`는 다섯 상태 중 하나를 고르는 제한된 enum이며, 화면이 그 값으로
+이미 준비된 동일 캐릭터의 PNG를 선택한다.
 
 ## API 명세
 
@@ -103,12 +105,14 @@ AI 서버 기본 주소는 끝 슬래시 없이 `AI_SERVER_BASE_URL`에 둔다. 
 **Response (200)**
 
 ```json
-{ "text": "캐릭터의 짧은 한 문장" }
+{ "text": "캐릭터의 짧은 한 문장", "characterState": "MOVED" }
 ```
 
 - `CLOSING`은 이 엔드포인트로 보내지 않는다. 백엔드가 검수된 `character_closing`을 저장·재생한다.
 - `detectedElements`, 누적 요소, 턴 수는 이 요청에 넣지 않는다.
 - `mainPoint: null`이어도 호출 가능하며, AI는 아이 원문에 직접 반응한다.
+- `characterState`는 `NEUTRAL`·`HAPPY`·`WORRIED`·`SURPRISED`·`MOVED` 중 하나를 항상 포함한다.
+  이는 생성된 한 문장의 캐릭터 정서이며, 아이 발화의 채점·진행 상태가 아니다.
 
 ### `GET {AI_SERVER_BASE_URL}/health`
 
@@ -118,7 +122,7 @@ AI 서버 기본 주소는 끝 슬래시 없이 `AI_SERVER_BASE_URL`에 둔다. 
 {
   "status": "ok",
   "model": "gpt-5-mini",
-  "promptVersions": { "analyze": "analyze_v3", "respond": "respond_v3" }
+  "promptVersions": { "analyze": "analyze_v3", "respond": "respond_v4" }
 }
 ```
 
@@ -134,7 +138,8 @@ AI 서버 기본 주소는 끝 슬래시 없이 `AI_SERVER_BASE_URL`에 둔다. 
 - 응답 시간: `/analyze`, `/respond` 각각 최대 5초. SDK·백엔드 재시도는 각각 0회.
 - 모델: `gpt-5-mini`, Responses API 구조화 출력, `store=false`.
 - 실패: 분석 실패는 빈 분석으로 진행한다. 응답 실패는 **현재 장면을 닫지 않는 검수된 고정 중간 대사**로 대체한다. `character_closing`은 실제 종료 조건에서만 사용한다.
-- 이미지: 서버는 정적 이미지 URL만 내려주며, AI 서버는 이미지 생성·업로드·상태 선택을 하지 않는다.
+- 이미지: 서버는 정적 이미지 URL만 내려준다. AI 서버는 이미지 생성·업로드·파일 경로 선택을 하지 않으며,
+  `/respond`의 `characterState` enum만 반환한다.
 
 ## 완료 조건
 

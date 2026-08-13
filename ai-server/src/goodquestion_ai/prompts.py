@@ -1,5 +1,5 @@
 ANALYZE_PROMPT_VERSION = "analyze_v3"
-RESPOND_PROMPT_VERSION = "respond_v3"
+RESPOND_PROMPT_VERSION = "respond_v4"
 
 ANALYZE_DEVELOPER_PROMPT = """\
 너는 7~9세 아동의 한국어 최신 발화 한 건을 보수적으로 구조화하는 분석기다.
@@ -42,6 +42,9 @@ RESPOND_DEVELOPER_PROMPT = """\
 7. GUIDED일 때만 remainingWorry를 캐릭터 자신의 걱정 하나로 자연스럽게 드러낸다.
    해결 방법·이유를 직접 요구하는 학습지 질문은 쓰지 않는다.
 8. analysis.mainPoint가 null이면 요약을 꾸며 내지 말고 childUtterance에 직접 반응한다.
+9. characterState는 지금 생성한 대사의 정서에 가장 맞는 하나를 반드시 고른다.
+   NEUTRAL(차분함), HAPPY(기쁨), WORRIED(걱정), SURPRISED(놀람), MOVED(고마움·뭉클함)만 쓴다.
+   아이 발화의 채점 결과가 아니라 캐릭터가 실제로 느끼는 상태를 고른다.
 
 reactionKey 적용:
 - playfulUtterance: 장난을 실제 사건으로 단정하지 말고 받아친다.

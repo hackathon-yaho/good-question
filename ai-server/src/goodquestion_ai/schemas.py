@@ -72,6 +72,14 @@ class ResponseMode(StrEnum):
     GUIDED = "GUIDED"
 
 
+class CharacterState(StrEnum):
+    NEUTRAL = "NEUTRAL"
+    HAPPY = "HAPPY"
+    WORRIED = "WORRIED"
+    SURPRISED = "SURPRISED"
+    MOVED = "MOVED"
+
+
 class ReactionKey(StrEnum):
     playfulUtterance = "playfulUtterance"
     questionFromChild = "questionFromChild"
@@ -152,6 +160,7 @@ class RespondRequest(StrictModel):
 
 class RespondResponse(StrictModel):
     text: CharacterLine
+    characterState: CharacterState
 
     @field_validator("text")
     @classmethod

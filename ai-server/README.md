@@ -3,11 +3,13 @@
 굿퀘스천의 대화 AI 서버다. 이 서버는 상태·세션·DB·이미지·음성을 소유하지 않는다.
 
 - `POST /analyze`: 최신 아이 발화 한 건의 의도, 사고 요소, 원문 근거를 제안한다.
-- `POST /respond`: 백엔드가 결정한 `NORMAL` 또는 `GUIDED`에 맞는 캐릭터 한 문장을 제안한다.
+- `POST /respond`: 백엔드가 결정한 `NORMAL` 또는 `GUIDED`에 맞는 캐릭터 한 문장과
+  정적 표정 에셋에 쓸 `characterState`를 제안한다.
 
 백엔드는 근거 검증, 누적 요소, 턴 수, `NORMAL`/`GUIDED`/`CLOSING`, 미션, 고정 마지막
 대사를 결정한다. 장면·캐릭터 표정·미션 이미지는 미리 만든 정적 에셋을 프론트가 전환하며,
-AI 서버는 이미지 생성·선택을 하지 않는다.
+AI 서버는 이미지 생성·선택을 하지 않는다. `characterState`는 `NEUTRAL`·`HAPPY`·`WORRIED`·
+`SURPRISED`·`MOVED` 중 하나일 뿐이며, 프론트/백엔드가 사전 제작된 같은 이름의 PNG를 고정 매핑한다.
 
 정확한 연동 요청은
 [AI 서버 연동 v1](../docs/request/backend/ai-service-integration-v1.md)을 따른다.

@@ -12,3 +12,4 @@ def test_respond_prompt_contains_child_ux_guards() -> None:
     assert "평가 표현" in RESPOND_DEVELOPER_PROMPT
     assert "NORMAL에서는 장면을 끝내거나" in RESPOND_DEVELOPER_PROMPT
     assert "학습지 질문" in RESPOND_DEVELOPER_PROMPT
+    assert "characterState" in RESPOND_DEVELOPER_PROMPT

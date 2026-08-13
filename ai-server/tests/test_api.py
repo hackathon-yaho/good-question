@@ -60,7 +60,10 @@ class FakeService:
         )
 
     async def respond(self, request: RespondRequest, request_id: str) -> RespondResponse:
-        return RespondResponse(text="그런데 왜 꼭 말해야 하는지 아직 모르겠어.")
+        return RespondResponse(
+            text="그런데 왜 꼭 말해야 하는지 아직 모르겠어.",
+            characterState="WORRIED",
+        )
 
 
 class TimeoutService(FakeService):
@@ -85,7 +88,7 @@ async def test_health_is_public_and_exposes_prompt_versions() -> None:
     assert response.json() == {
         "status": "ok",
         "model": "gpt-5-mini",
-        "promptVersions": {"analyze": "analyze_v3", "respond": "respond_v3"},
+        "promptVersions": {"analyze": "analyze_v3", "respond": "respond_v4"},
     }
 
 

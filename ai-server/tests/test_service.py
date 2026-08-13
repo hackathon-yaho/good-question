@@ -144,7 +144,9 @@ async def test_model_call_uses_stateless_structured_output() -> None:
 
 @pytest.mark.parametrize("line", ["잘했어!", "그럼 그렇게 할게.", "해결 방법을 말해 봐."])
 async def test_response_rejects_unsafe_character_lines(line: str) -> None:
-    client = FakeOpenAI(RespondResponse(text=line).model_dump_json())
+    client = FakeOpenAI(
+        RespondResponse(text=line, characterState="NEUTRAL").model_dump_json()
+    )
     service = OpenAIService(settings(), client=client)
 
     with pytest.raises(ModelUpstreamError):

@@ -57,10 +57,18 @@ def test_respond_rejects_analysis_fields_owned_by_backend() -> None:
 
 def test_character_line_is_limited_to_44_characters() -> None:
     with pytest.raises(ValidationError):
-        RespondResponse(text="가" * 45)
+        RespondResponse(text="가" * 45, characterState="NEUTRAL")
 
 
 @pytest.mark.parametrize("text", ["첫 문장. 둘째 문장.", "첫 줄\n둘째 줄"])
 def test_character_line_is_exactly_one_sentence_and_line(text: str) -> None:
     with pytest.raises(ValidationError):
-        RespondResponse(text=text)
+        RespondResponse(text=text, characterState="NEUTRAL")
+
+
+def test_response_requires_one_of_the_five_character_states() -> None:
+    result = RespondResponse(text="네 말을 들으니 마음이 놓여.", characterState="MOVED")
+
+    assert result.characterState.value == "MOVED"
+    with pytest.raises(ValidationError):
+        RespondResponse(text="그랬구나.", characterState="ANGRY")
