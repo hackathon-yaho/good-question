@@ -366,10 +366,10 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| M-59 | Render 배포 (무료 티어) | 필수-기반 | 미착수 — Render 계정 필요 |
-| B-21 | Supabase Postgres 연결 | 필수-기반 | 로컬은 Docker Compose → [setup.md](setup.md). 미착수 — Supabase 계정 필요 |
+| M-59 | ~~Render 배포 (무료 티어)~~ | 필수-기반 | **완료.** `good-question` 서비스, `https://good-question-7yyt.onrender.com` |
+| B-21 | ~~Supabase Postgres 연결~~ | 필수-기반 | **완료.** 로컬은 Docker Compose → [setup.md](setup.md). 배포는 Supabase **Session Pooler** — direct connection(`db.<ref>.supabase.co`)은 IPv6 전용이라 Render에서 연결 불가, `aws-0-<region>.pooler.supabase.com:5432` 사용 |
 | B-22 | ~~헬스체크 엔드포인트 (`SELECT 1` 포함)~~ | 필수-기반 | **완료.** `health/controller/HealthController.java`, `GET /api/health`, 인증 불필요. Render 슬립 + Supabase 일시정지 동시 방어 |
-| B-23 | 외부 크론 10분 핑 설정 | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고. 미착수 — 배포 URL 확정 후 설정 |
+| B-23 | 외부 크론 10분 핑 설정 | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고. 배포 URL 확정됨(`https://good-question-7yyt.onrender.com/api/health`) — 크론 설정만 남음 |
 | B-24 | ~~CORS 설정 (Vercel 오리진)~~ | 필수-기반 | **완료** (Phase 2) |
 
 ### 검증 — B-22 (2026-08-12)
@@ -377,9 +377,11 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 - 정상: `GET /api/health` → `{"status":"ok"}` 200, 인증 없이 호출됨
 - 에러: 로컬 Postgres 컨테이너를 `docker stop`으로 잠깐 내린 뒤 호출 → `{"status":"down"}` 503. 컨테이너 복구 후 다시 200으로 돌아옴 (HikariCP 재연결 확인)
 
-### 주의
+### 검증 — M-59·B-21 (2026-08-13)
 
-- **B-23·M-59·B-21은 배포 계정(Render·Supabase)이 있어야 진행 가능** — 로컬 작업만으로 끝낼 수 없어 사용자 확인 대기
+- 정상: Render `good-question` 서비스 배포 → `GET https://good-question-7yyt.onrender.com/api/health` → `{"status":"ok"}` 200. JPA `ddl-auto=update`로 테이블 12개 자동 생성, 시드·TTS 프리워밍 정상 실행
+- 에러 케이스로 확인됨(진행 중 실제로 발생): DB URL이 로컬 기본값으로 남아 `Connection to localhost:5432 refused` → Supabase 접속 정보로 교체. 이어서 direct connection 사용 시 `The connection attempt failed`(IPv6 미지원) → Session Pooler로 교체 후 해결
+- Supabase 보안 advisor: 12개 테이블 모두 RLS 비활성(critical) 확인 → 정책 없이 RLS만 활성화(백엔드는 `postgres` 계정 직접 접속이라 BYPASSRLS, 영향 없음). 적용 후 재확인 → critical 해소, INFO 수준(정책 없음)만 남음
 
 ---
 

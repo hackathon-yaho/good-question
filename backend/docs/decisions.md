@@ -926,6 +926,34 @@ D-35에서 "재료를 새로 안 만들고 `guidanceStyle`을 재사용한다"�
 
 ---
 
+### D-37 · Render↔Supabase 배포 연결은 Session Pooler로, 신규 테이블은 RLS만 켜둔다
+
+M-59(Render 배포)·B-21(Supabase 연결) 첫 실제 연결 시도에서 두 가지가 막혔다.
+
+1. **Direct connection(`db.<ref>.supabase.co:5432`)은 Render 무료 티어에서 연결이 안 된다.**
+   Supabase가 direct connection host를 IPv6 전용으로 바꿔서다(유료 IPv4 add-on 없이는
+   해당 호스트에 도달 불가). Render는 아웃바운드 IPv6을 지원하지 않아 `The connection
+   attempt failed`로 타임아웃난다. **Session Pooler**(`aws-0-<region>.pooler.supabase.com:5432`,
+   IPv4)로 바꾸니 바로 붙었다. 이후 배포 환경(`SPRING_DATASOURCE_URL` 등)은 항상 pooler
+   호스트를 쓴다 — direct host는 로컬에서 psql로 직접 붙을 때만 의미가 있다.
+2. **Supabase는 새 테이블을 만들면 기본적으로 PostgREST(REST API)에도 노출한다.** JPA
+   `ddl-auto=update`(D-14)로 12개 테이블이 생성되자마자 Supabase 보안 advisor가 전부
+   RLS 비활성(critical)으로 잡았다 — anon key만 있으면 `parents`·`children`·`messages` 등을
+   REST로 직접 읽고 쓸 수 있는 상태였다는 뜻이다. 이 프로젝트는 Supabase Auth·클라이언트
+   라이브러리를 쓰지 않고(D-13) 백엔드가 `postgres` 계정으로 JDBC 직접 연결만 하므로,
+   **정책(policy) 없이 RLS만 `ENABLE`** 했다 — 테이블 소유자/superuser는 RLS를 안 받아
+   백엔드 동작에는 영향이 없고, PostgREST 경로(안 쓰는 경로)만 전부 막힌다. 정책을 실제로
+   설계해서 붙이는 일은 지금 하지 않는다 — PostgREST를 쓸 계획이 생기기 전까지는 불필요한
+   선행 작업이다.
+
+**검증**: `GET https://good-question-7yyt.onrender.com/api/health` → `{"status":"ok"}` 200
+(pooler 연결 전: `Connection to localhost:5432 refused` → direct connection 시도: `The
+connection attempt failed` → pooler로 교체 후 정상). RLS 적용 전후로 헬스체크 재호출해
+백엔드 접근에 영향 없음을 확인. Supabase 보안 advisor 재조회 → critical 항목 0건(RLS
+활성화 후 정책 없음을 알리는 INFO만 남음, 의도된 상태).
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
