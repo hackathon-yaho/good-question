@@ -48,4 +48,17 @@ class DialogueContentsTest {
         assertThat(DialogueContents.forSceneOrder(5).ttsVoice())
                 .isNotEqualTo(DialogueContents.forSceneOrder(7).ttsVoice());
     }
+
+    @Test
+    void ttsGuideStyle은_guidanceStyle과_다른_별개_필드다() {
+        DialogueSceneConstants scene3 = DialogueContents.forSceneOrder(3);
+
+        assertThat(scene3.ttsGuideStyle()).isNotEqualTo(scene3.guidanceStyle());
+    }
+
+    @Test
+    void 같은_캐릭터라도_대화1과_대화4는_ttsGuideStyle이_다르다() {
+        assertThat(DialogueContents.forSceneOrder(3).ttsGuideStyle())
+                .isNotEqualTo(DialogueContents.forSceneOrder(9).ttsGuideStyle());
+    }
 }

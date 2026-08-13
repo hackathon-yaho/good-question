@@ -241,7 +241,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | B-13 | ~~`POST /api/stt` — 오디오 업로드 → 텍스트~~ | 필수 | **완료.** `voice/controller/SttController.java`. `multipart/form-data`. 타임아웃 8초 |
 | B-14 | ~~Whisper 연동~~ | 필수 | **완료.** `voice/client/OpenAiSttClientImpl.java` (`whisper-1`, D-21) |
 | B-15 | ~~**오디오 즉시 폐기**~~ | 필수 | **완료.** 오디오는 바이트 배열로 메모리에서만 다루고 디스크에 별도로 쓰지 않음 ([PRD 10.3](../../docs/product/prd.md)) |
-| B-16 | ~~`GET /api/tts?messageId=` — 오디오 반환~~ | 필수 | **완료.** `voice/controller/TtsController.java`. 캐시 히트 시 즉시, 미스 시 생성 후 저장. `?text=`도 지원(D-26, `messageId` 없는 내레이션/단어 발음용). 둘 다 없으면 400. 캐릭터별 목소리·연기 지시(D-35) |
+| B-16 | ~~`GET /api/tts?messageId=` — 오디오 반환~~ | 필수 | **완료.** `voice/controller/TtsController.java`. 캐시 히트 시 즉시, 미스 시 생성 후 저장. `?text=`도 지원(D-26, `messageId` 없는 내레이션/단어 발음용). 둘 다 없으면 400. 캐릭터별 목소리·연기 지시(D-35, 문구 분리·확정 D-36) |
 | B-17 | ~~`tts_cache` 저장·조회~~ | 필수 | **완료.** DB(`bytea`). **파일시스템 금지** — Render 재배포 시 초기화됨 |
 | B-18 | ~~기동 시 고정 대사 **프리워밍 11건**~~ | 필수 | **완료.** `voice/support/TtsPrewarmRunner.java` (`@Order(2)`, ContentSeeder 다음). 없는 것만 생성 |
 
@@ -366,10 +366,10 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| M-59 | Render 배포 (무료 티어) | 필수-기반 | 미착수 — Render 계정 필요 |
-| B-21 | Supabase Postgres 연결 | 필수-기반 | 로컬은 Docker Compose → [setup.md](setup.md). 미착수 — Supabase 계정 필요 |
+| M-59 | ~~Render 배포 (무료 티어)~~ | 필수-기반 | **완료.** `good-question` 서비스, `https://good-question-7yyt.onrender.com` |
+| B-21 | ~~Supabase Postgres 연결~~ | 필수-기반 | **완료.** 로컬은 Docker Compose → [setup.md](setup.md). 배포는 Supabase **Session Pooler** — direct connection(`db.<ref>.supabase.co`)은 IPv6 전용이라 Render에서 연결 불가, `aws-0-<region>.pooler.supabase.com:5432` 사용 |
 | B-22 | ~~헬스체크 엔드포인트 (`SELECT 1` 포함)~~ | 필수-기반 | **완료.** `health/controller/HealthController.java`, `GET /api/health`, 인증 불필요. Render 슬립 + Supabase 일시정지 동시 방어 |
-| B-23 | 외부 크론 10분 핑 설정 | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고. 미착수 — 배포 URL 확정 후 설정 |
+| B-23 | ~~외부 크론 10분 핑 설정~~ | 필수-기반 | [open-questions Q-14](../../docs/open-questions.md) 권고. **완료.** cron-job.org, `GET /api/health` 10분 간격 |
 | B-24 | ~~CORS 설정 (Vercel 오리진)~~ | 필수-기반 | **완료** (Phase 2) |
 
 ### 검증 — B-22 (2026-08-12)
@@ -377,9 +377,16 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 - 정상: `GET /api/health` → `{"status":"ok"}` 200, 인증 없이 호출됨
 - 에러: 로컬 Postgres 컨테이너를 `docker stop`으로 잠깐 내린 뒤 호출 → `{"status":"down"}` 503. 컨테이너 복구 후 다시 200으로 돌아옴 (HikariCP 재연결 확인)
 
-### 주의
+### 검증 — M-59·B-21 (2026-08-13)
 
-- **B-23·M-59·B-21은 배포 계정(Render·Supabase)이 있어야 진행 가능** — 로컬 작업만으로 끝낼 수 없어 사용자 확인 대기
+- 정상: Render `good-question` 서비스 배포 → `GET https://good-question-7yyt.onrender.com/api/health` → `{"status":"ok"}` 200. JPA `ddl-auto=update`로 테이블 12개 자동 생성, 시드·TTS 프리워밍 정상 실행
+- 에러 케이스로 확인됨(진행 중 실제로 발생): DB URL이 로컬 기본값으로 남아 `Connection to localhost:5432 refused` → Supabase 접속 정보로 교체. 이어서 direct connection 사용 시 `The connection attempt failed`(IPv6 미지원) → Session Pooler로 교체 후 해결
+- Supabase 보안 advisor: 12개 테이블 모두 RLS 비활성(critical) 확인 → 정책 없이 RLS만 활성화(백엔드는 `postgres` 계정 직접 접속이라 BYPASSRLS, 영향 없음). 적용 후 재확인 → critical 해소, INFO 수준(정책 없음)만 남음
+
+### 검증 — B-23 (2026-08-13)
+
+- 1차 시도: GitHub Actions `schedule` 트리거(`.github/workflows/keep-alive.yml`, `*/10 * * * *`)로 구현 → **실측으로 불안정함을 확인하고 폐기.** 등록 후 첫 자동 실행까지 1시간 11분, 그 뒤 41분(10분 주기면 4회 기대)간 0회 — YAML·권한·fork 여부 전부 정상이라 GitHub `schedule` 트리거 자체의 알려진 한계(부하 시 지연·스킵)로 판단. 워크플로우 파일은 백업으로 남겨둠(비용 없음)
+- 2차: **cron-job.org**로 전환(사용자가 직접 가입·등록, 10분 간격 `GET /api/health`). 검증: 마지막 GitHub Actions 실행(15:31, 콜드스타트) 이후 71분간 GitHub Actions는 0회였는데도 16:44 요청이 0.78초(콜드스타트 아님)로 응답 → 그 사이 cron-job.org가 슬립을 막았음을 타이밍으로 확인. cron-job.org 자체 실행 로그(16:50 응답)의 `x-render-origin-server: Render`·`rndr-id` 헤더로 실제 배포 서버가 응답했음을 재확인
 
 ---
 

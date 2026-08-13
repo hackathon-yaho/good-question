@@ -859,14 +859,14 @@ false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답�
   | 캐릭터 | voice |
   | --- | --- |
   | 나레이션(도입/전개, 단어 발음, `?text=` 전체) | `alloy` |
-  | 며느리 (대화1·4) | `shimmer` |
+  | 며느리 (대화1·4) | ~~`shimmer`~~ **`marin`로 교체(D-36)** |
   | 시아버지 (대화2) | `onyx` |
   | 마을 이장 (대화3) | `echo` |
 
 - **instructions는 새로 만들지 않고 기존 `guidanceStyle`(PRD 7.5.3, GUIDED 유도 재료)을
   그대로 재사용**한다 — "조심스럽고 걱정이 많은 말투" 같은 문구가 텍스트 생성 지시와 TTS
   연기 지시로 동시에 맞는 내용이라 별도 필드를 만들 이유가 없었다. 나레이션은 새 상수
-  하나(`VoiceProfile.NARRATOR`)만 추가.
+  하나(`VoiceProfile.NARRATOR`)만 추가. **→ D-36에서 전용 필드로 분리.**
 - **목소리 선정 방법**: `tts-1`이 지원하는 9종 목소리를 실제로 같은 문장으로 생성해서
   들어보고 골랐다(스크립트로 6종 우선 비교 후 사용자 확인).
 - **캐시 키 확장**: `TtsCache`는 텍스트 해시만 키였는데(D-05), 같은 문장이라도 화자가 다르면
@@ -883,6 +883,92 @@ false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답�
 마을 이장(대화7) 메시지 각각의 `messageId`로 요청 → 둘 다 200, 바이트 크기·해시가 서로 다름을
 확인(같은 문장·다른 목소리가 실제로 다른 오디오를 만든다는 증거). 404(`messageId` 없음)·400
 (`messageId`/`text` 둘 다 없음) 기존 에러 케이스 회귀 없음 확인.
+
+---
+
+### D-36 · TTS instructions — `guidanceStyle` 재사용을 그만두고 `ttsGuideStyle` 필드로 분리
+
+D-35에서 "재료를 새로 안 만들고 `guidanceStyle`을 재사용한다"고 했었는데, 사용자가 `/grill-me`로
+검토하다가 이 재사용 전제 자체를 짚었다 — `guidanceStyle`은 **AI가 대사 "내용"을 생성할 때** 쓰는
+지시고, TTS instructions는 **이미 만들어진 대사를 "어떻게 읽을지"** 지시하는 것이라 목적이 다르다.
+"조심스럽고 걱정이 많은 말투" 한 줄로는 둘 다 대충 맞았지만, 목소리 연기를 더 다듬으려면(자연스러운
+발화 vs 성우 연기 톤 구분 등) 결국 TTS 전용 문구가 따로 필요해져서, 처음부터 필드를 분리하기로
+했다. `guidanceStyle`(AI 프롬프트용)은 전혀 안 건드렸다.
+
+- `DialogueSceneConstants`에 `ttsGuideStyle` 필드 추가(`guidanceStyle` 옆). `VoiceProfile.forScene`이
+  이제 `ttsGuideStyle()`을 읽는다.
+- **며느리 voice를 `shimmer`→`marin`으로 교체.** `tts-1`용으로 골랐던 D-35의 6종 후보에는
+  `marin`이 없었다(`gpt-4o-mini-tts` 전용 목소리라 그때는 들어볼 수 없었음) — 이번에
+  `marin`/`shimmer`/`coral`을 실제 `guidanceStyle` instructions로 생성해서 비교 후 확정.
+- **instructions 작성 원칙이 바뀌었다** — "she is warm, shy, considerate..." 식 성격 나열이
+  아니라, TTS가 실제로 수행할 수 있는 발화 지시(속도·쉼·톤 변화) 중심으로 쓴다. "young"처럼
+  나이를 과하게 반복하면 모델이 그 특징을 과장 연기하는 경향이 있어 한 번만 언급한다. 캐릭터
+  구분은 "감정"보다 "말하는 방식"(며느리: 짧은 pause·부드러운 말끝 / 시아버지: 반응이 커지고
+  빨라짐·안 위협적 / 이장: 발음 명확·여유 있는 반응)으로 준다. 4개 장면 전부 영문으로 작성했다
+  (D-35 예시가 한국어 지시보다 자연스러운 결과를 냈다는 것을 확인 후 결정).
+- **며느리 대화1·4는 같은 사람이 성장하는 것으로 쓴다** — voice·기본 성격은 그대로 두고,
+  대화4 쪽 문구에만 "지금은 더 편안해졌다", "예전보다 망설이는 pause가 적다", "같은 사람인데
+  조금 더 자신감 있다"는 지시를 넣어 톤만 바꿨다. 목소리 자체가 바뀌는 게 아니라 "같은 목소리가
+  자란다"는 느낌을 노린 것이다.
+- **speed 파라미터는 도입하지 않는다.** `gpt-4o-mini-tts`가 `speed`(0.25~4.0, 공식 문서 확인)를
+  지원하긴 하지만, 실측 근거 없이 캐릭터마다 숫자를 추측해 넣지 않기로 하고 전부 기본값(1.0,
+  파라미터 자체를 안 보냄)으로 뒀다. 필요해지면 `OpenAiTtsClient`에 파라미터 하나만 추가하면
+  되는 구조라 지금 안 만들어도 나중에 붙이기 쉽다.
+- **목소리·문구 확정 방법**: 이번에도 텍스트 설명만으로 정하지 않고, 후보 조합을 실제
+  `gpt-4o-mini-tts` API로 생성해서 들어보고 골랐다(며느리 voice 후보 3종 1차 비교, 최종
+  대화1~4 4개 장면 전부 실제 대사+instructions로 생성해서 확인).
+
+**검증**: `DialogueContentsTest`에 2건 추가(`ttsGuideStyle`이 `guidanceStyle`과 다른 값인지,
+같은 캐릭터라도 대화1·4의 `ttsGuideStyle`이 다른지), `./gradlew test` 전체 통과. 서버 재기동 후
+같은 `messageId`(며느리 대화9, 마을 이장 대화7) 두 건을 D-35 적용 당시 저장해둔 오디오와
+재비교 — 둘 다 바이트 크기가 달라짐을 확인(voice·instructions가 실제로 바뀌어 반영됐다는 증거).
+404·400 에러 케이스 회귀 없음 재확인.
+
+---
+
+### D-37 · Render↔Supabase 배포 연결은 Session Pooler로, 신규 테이블은 RLS만 켜둔다
+
+M-59(Render 배포)·B-21(Supabase 연결) 첫 실제 연결 시도에서 두 가지가 막혔다.
+
+1. **Direct connection(`db.<ref>.supabase.co:5432`)은 Render 무료 티어에서 연결이 안 된다.**
+   Supabase가 direct connection host를 IPv6 전용으로 바꿔서다(유료 IPv4 add-on 없이는
+   해당 호스트에 도달 불가). Render는 아웃바운드 IPv6을 지원하지 않아 `The connection
+   attempt failed`로 타임아웃난다. **Session Pooler**(`aws-0-<region>.pooler.supabase.com:5432`,
+   IPv4)로 바꾸니 바로 붙었다. 이후 배포 환경(`SPRING_DATASOURCE_URL` 등)은 항상 pooler
+   호스트를 쓴다 — direct host는 로컬에서 psql로 직접 붙을 때만 의미가 있다.
+2. **Supabase는 새 테이블을 만들면 기본적으로 PostgREST(REST API)에도 노출한다.** JPA
+   `ddl-auto=update`(D-14)로 12개 테이블이 생성되자마자 Supabase 보안 advisor가 전부
+   RLS 비활성(critical)으로 잡았다 — anon key만 있으면 `parents`·`children`·`messages` 등을
+   REST로 직접 읽고 쓸 수 있는 상태였다는 뜻이다. 이 프로젝트는 Supabase Auth·클라이언트
+   라이브러리를 쓰지 않고(D-13) 백엔드가 `postgres` 계정으로 JDBC 직접 연결만 하므로,
+   **정책(policy) 없이 RLS만 `ENABLE`** 했다 — 테이블 소유자/superuser는 RLS를 안 받아
+   백엔드 동작에는 영향이 없고, PostgREST 경로(안 쓰는 경로)만 전부 막힌다. 정책을 실제로
+   설계해서 붙이는 일은 지금 하지 않는다 — PostgREST를 쓸 계획이 생기기 전까지는 불필요한
+   선행 작업이다.
+
+**검증**: `GET https://good-question-7yyt.onrender.com/api/health` → `{"status":"ok"}` 200
+(pooler 연결 전: `Connection to localhost:5432 refused` → direct connection 시도: `The
+connection attempt failed` → pooler로 교체 후 정상). RLS 적용 전후로 헬스체크 재호출해
+백엔드 접근에 영향 없음을 확인. Supabase 보안 advisor 재조회 → critical 항목 0건(RLS
+활성화 후 정책 없음을 알리는 INFO만 남음, 의도된 상태).
+
+---
+
+### D-38 · B-23 슬립 방지 크론은 GitHub Actions가 아니라 cron-job.org로 한다
+
+처음엔 레포에 이미 있는 GitHub Actions로 `schedule: */10 * * * *` 워크플로우를 만들었다
+(계정 추가 가입이 필요 없어서). 그런데 실측해보니 등록 후 **첫 자동 실행까지 1시간 11분**,
+그 뒤로도 10분 주기면 4번은 돌았어야 할 41분 동안 **0번** 돌았다. YAML·레포 권한·fork 여부
+전부 정상이었으므로 우리 설정 문제가 아니라 **GitHub `schedule` 트리거 자체의 알려진 한계**다
+(GitHub 공식 문서도 "고부하 시 지연되거나 스킵될 수 있다"고 명시. 특히 10분처럼 짧은 주기가
+더 자주 조용해진다).
+
+슬립 방지는 "정해진 간격보다 늦지 않게 도는 것"이 핵심 요구인데, GitHub Actions는 그 보장을
+안 해준다. **외부 전용 크론 서비스(cron-job.org)로 교체.** 정확히 설정한 주기대로 돈다.
+GitHub Actions 워크플로우(`​.github/workflows/keep-alive.yml`)는 지워도 그만이라 백업으로
+그냥 남겨뒀다 — 가끔 더 도는 건 손해가 아니다.
+
+**검증**: work-items.md B-23 참조.
 
 ---
 
@@ -914,6 +1000,7 @@ false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답�
 | **U-05** | Supabase 무료 티어 일시정지 기간·용량 한도 | 신규 가입. 가입 시 확인 필요 | 시연 전 확인 |
 | **U-06** | `highlightWords` 데이터 출처 | 장면별 고정 목록(팀 창작) vs `/respond` 응답 확장(AI 재합의) | 단어장 구현 시 |
 | **U-07** | 보호자 리포트 응답 스키마 | 선택 항목(O-01). 내부 분석 태그를 보호자 화면에 노출 금지 | Phase 7 착수 시 |
+| **U-08** | 미션2 성공 판정 — 자연 발동 시 `mission2Satisfied`(프론트, before/after diff)가 항상 실패 | 원인·해결 방향 정리 완료, 프론트 확인 대기. `missionProgress` 체크리스트 1항목 채우는 안 제안 | 프론트 확인 후 구현 |
 
 ### 프론트에 알려야 할 것
 
@@ -922,3 +1009,6 @@ D-01·D-02가 프론트 작업 범위를 바꿉니다.
 
 D-34 — 도입부 텍스트 확장 요청 반려, 페이싱은 프론트 UI로 처리 요청.
 → [docs/request/frontend/intro-pacing-declined.md](../../docs/request/frontend/intro-pacing-declined.md)
+
+U-08 — 미션2 성공 판정이 자연 발동 시 항상 실패하는 구조적 문제, 해결 방향 확인 요청.
+→ [docs/request/frontend/mission2-success-signal-gap.md](../../docs/request/frontend/mission2-success-signal-gap.md)

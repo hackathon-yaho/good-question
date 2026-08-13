@@ -17,10 +17,100 @@ import java.util.Map;
  */
 public final class DialogueContents {
 
+    private static final String DAUGHTER_IN_LAW_SCENE3_TTS_GUIDE = """
+            Natural conversational speech from a young adult Korean woman.
+
+            Speak softly and naturally, as if talking to someone she trusts.
+            She is slightly hesitant and worried, but remains calm and composed.
+
+            Use subtle emotional expression and natural Korean conversational intonation.
+            Allow brief, natural pauses between thoughts, but do not overuse pauses.
+
+            Her speech should feel gentle, careful, and considerate.
+            She tends to think about how others may react before speaking.
+
+            Do not exaggerate the emotion.
+            Do not sound theatrical or like a voice actor performing a character.
+            Do not sound overly cute, childish, elderly, or motherly.
+
+            Keep the delivery relaxed, warm, and human.
+            She should sound like an ordinary young woman having a quiet conversation,
+            not a narrator or a dramatic character.""";
+
+    private static final String FATHER_IN_LAW_SCENE5_TTS_GUIDE = """
+            Natural conversational speech from an older Korean man.
+
+            He is an old-fashioned father-in-law who cares strongly about dignity,
+            family reputation, and what other people think.
+
+            Speak with confident, slightly formal Korean conversational phrasing.
+            He is stubborn and certain about his own opinions.
+
+            In this scene, he is genuinely flustered and surprised.
+            His energy rises naturally when he reacts, and he may speak a little louder
+            or faster when caught off guard.
+
+            His reactions should feel humorous and exaggerated in a charming way,
+            like a funny older man who gets worked up easily.
+
+            Do not sound harsh, intimidating, threatening, or genuinely angry.
+            His frustration should feel more like flustered stubbornness than aggression.
+
+            Do not sound theatrical or like a stage performance.
+            Keep the delivery conversational, warm, and suitable for a children's story.""";
+
+    private static final String VILLAGE_CHIEF_SCENE7_TTS_GUIDE = """
+            Natural conversational speech from a friendly Korean man in his 50s.
+
+            He is a warm and approachable village chief who is used to talking
+            with many different people and helping solve everyday problems.
+
+            Speak clearly and naturally, with an easygoing and friendly conversational tone.
+            He is practical and curious, and he genuinely wants to find a solution.
+
+            In this scene, he is a little stuck and frustrated because he cannot
+            figure out the problem immediately.
+            Show mild confusion and impatience, but keep him good-natured and hopeful.
+
+            When he hears an interesting idea, let genuine curiosity appear in his voice.
+            When something seems useful, react openly and positively.
+
+            Do not sound intimidating, angry, overly loud, or overly comedic.
+            Do not sound theatrical or like a voice actor performing a character.
+
+            Keep the delivery warm, conversational, energetic, and human.
+            He should feel like a friendly village elder that children can comfortably talk to.""";
+
+    private static final String DAUGHTER_IN_LAW_SCENE9_TTS_GUIDE = """
+            Natural conversational speech from the same young adult Korean woman.
+
+            She is now more at ease than earlier in the story.
+            She still has a gentle and slightly shy personality,
+            but she is noticeably calmer and more confident.
+
+            Speak warmly and naturally, as if talking to someone she trusts
+            and has gradually become more comfortable with.
+
+            Use natural Korean conversational intonation.
+            Allow brief pauses where natural, but use fewer hesitant pauses than earlier.
+
+            Her confidence should feel subtle and gradual.
+            She is beginning to accept herself, so there is a quiet sense of comfort
+            and self-assurance beneath her words.
+
+            Do not exaggerate the emotion.
+            Do not sound theatrical or like a voice actor performing a character.
+            Do not sound overly cute, childish, elderly, or motherly.
+
+            Keep the delivery relaxed, warm, and human.
+            She should still sound like the same person from the earlier scene,
+            just slightly more comfortable and confident.""";
+
     private static final Map<Integer, DialogueSceneConstants> BY_SCENE_ORDER = Map.of(
             3, new DialogueSceneConstants(
                     "방귀쟁이 며느리",
-                    "shimmer",
+                    "marin",
+                    DAUGHTER_IN_LAW_SCENE3_TTS_GUIDE,
                     "조심스럽고 걱정이 많은 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.PERSPECTIVE, "가족들이 내 사정을 알아줄지 도무지 모르겠어."),
@@ -32,6 +122,7 @@ public final class DialogueContents {
             5, new DialogueSceneConstants(
                     "시아버지",
                     "onyx",
+                    FATHER_IN_LAW_SCENE5_TTS_GUIDE,
                     "완고하고 언성이 높은 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.PERSPECTIVE, "며느리에게 무슨 사정이 있었는지 나는 알 길이 없구나."),
@@ -43,6 +134,7 @@ public final class DialogueContents {
             7, new DialogueSceneConstants(
                     "마을 이장",
                     "echo",
+                    VILLAGE_CHIEF_SCENE7_TTS_GUIDE,
                     "사람 좋고 답답해하는 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.SOLUTION, "배를 딸 방도가 도무지 떠오르지 않는구려."),
@@ -53,7 +145,8 @@ public final class DialogueContents {
             ),
             9, new DialogueSceneConstants(
                     "방귀쟁이 며느리",
-                    "shimmer",
+                    "marin",
+                    DAUGHTER_IN_LAW_SCENE9_TTS_GUIDE,
                     "조금 밝아졌으나 아직 조심스러운 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.EMOTION, "아직은 마음이 조금 어색해."),
