@@ -6,6 +6,7 @@ public record RetellingResponse(
         String sessionStatus,
         Instant completedAt,
         ActivityStatsResponse stats,
-        boolean reportAvailable
+        boolean reportAvailable,
+        int earnedStarDust
 ) {
 }

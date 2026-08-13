@@ -8,6 +8,16 @@
 
 ## 수정 이력
 
+### 2026-08-13 — 별가루 잔액·적립량 응답 노출
+
+근거: [request/backend/star-dust-exposure.md](../request/backend/star-dust-exposure.md), [backend/docs/decisions.md D-33](../../backend/docs/decisions.md)
+
+| 절 | 변경 |
+| --- | --- |
+| 3.3 | `GET /api/home`의 `child`에 `starDust`(누적 별가루 잔액) 신규 |
+| 3.6 | `POST .../activity/retelling` 응답에 `earnedStarDust`(이번 활동 적립량) 신규 |
+| 3.9 | `GET /api/mypage`의 `child`에 `starDust` 신규. Q-12의 "별가루 필드는 안 만든다"는 낡은 문장이었음(B-20·D-09로 이미 채택된 상태) |
+
 ### 2026-08-13 — 카드 순서 칸별 정오 slotResults 추가
 
 근거: [request/backend/order-slot-results.md](../request/backend/order-slot-results.md), [backend/docs/decisions.md D-32](../../backend/docs/decisions.md)
@@ -332,7 +342,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 
 ```json
 {
-  "child": { "id": "uuid", "name": "민준", "avatarId": "fox" },
+  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "starDust": 200 },
   "inProgress": {
     "sessionId": "uuid",
     "storyId": "uuid",
@@ -754,12 +764,15 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
   "sessionStatus": "completed",
   "completedAt": "...",
   "stats": { "childUtteranceCount": 12, "characterCount": 3, "newWordCount": 2 },
-  "reportAvailable": false
+  "reportAvailable": false,
+  "earnedStarDust": 100
 }
 ```
 
 `stats`는 D-7 통계 카드 3개("말한 횟수 / 함께한 친구 / 새 단어")용입니다.
 `reportAvailable`은 보호자 리포트(O-01) 구현 여부에 따릅니다.
+`earnedStarDust`는 **신규(D-33)** — 이번 활동으로 적립된 별가루 양. 이미 완료된
+세션에 재요청하면 `0`(중복 지급 안 함).
 
 ### 3.7 단어장 (선택 · A-02) ✅ 백엔드 구현 완료 (2026-08-12)
 
@@ -824,7 +837,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 
 ```json
 {
-  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "age": 8 },
+  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "age": 8, "starDust": 200 },
   "stats": { "completedStories": 1, "savedWords": 3, "activeDays": 2 },
   "completedStories": [
     { "sessionId": "uuid", "storyId": "uuid", "title": "방귀 뀌는 며느리", "coverImageUrl": "...", "completedAt": "..." }
@@ -838,7 +851,9 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 - `retellings[].text`는 `post_activity_results.retelling_text`입니다. **오디오가 아닙니다.**
   F-1 "내 이야기 들어보기"는 이 텍스트를 TTS로 읽습니다 → [Q-07](../open-questions.md)
 - `stats`에 점수·등급을 넣지 않습니다. 활동량만입니다 ([PRD 10.1](../product/prd.md))
-- "별가루" 필드는 만들지 않습니다 → [Q-12](../open-questions.md)
+- `child.starDust`(누적 별가루 잔액)는 **신규(D-33)** — 프론트가 화면(B-20)을 이미 구현해뒀는데
+  읽을 응답이 없어서 요청받아 추가했습니다. Q-12가 "별가루 필드는 만들지 않는다"고 했던 건
+  MVP 제외 권고였을 뿐 지금은 B-20·D-09로 별가루 자체가 채택된 상태라 낡은 문장입니다
 
 ### 3.8 보호자 (선택) ✅ 응답 형태 확정 (2026-08-12)
 

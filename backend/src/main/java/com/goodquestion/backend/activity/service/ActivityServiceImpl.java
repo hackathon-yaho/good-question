@@ -118,6 +118,7 @@ public class ActivityServiceImpl implements ActivityService {
         result.completeRetelling(request.retellingText());
         boolean alreadyCompleted = session.getStatus() == SessionStatus.COMPLETED;
         session.complete();
+        int earnedStarDust = alreadyCompleted ? 0 : STORY_COMPLETION_STAR_DUST;
         if (!alreadyCompleted) {
             session.getChild().addStarDust(STORY_COMPLETION_STAR_DUST);
         }
@@ -135,7 +136,8 @@ public class ActivityServiceImpl implements ActivityService {
                 session.getStatus().name().toLowerCase(),
                 session.getCompletedAt(),
                 new ActivityStatsResponse((int) childUtteranceCount, (int) characterCount, 0),
-                true);
+                true,
+                earnedStarDust);
     }
 
     private PostActivityResult getOrCreateResult(StorySession session) {

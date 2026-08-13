@@ -107,7 +107,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
-| M-08 | ~~진행 중 이야기 · 이어하기~~ | 필수 | `GET /api/home?childId=` — **완료** |
+| M-08 | ~~진행 중 이야기 · 이어하기~~ | 필수 | `GET /api/home?childId=` — **완료.** `child.starDust` 추가 (선택, 프론트 요청 — D-33) |
 | M-10 | ~~이야기 목록~~ | 필수 | `GET /api/stories?childId=&topic=` — **완료** |
 | M-11 | ~~주제별 필터링~~ | 필수 | 〃 (`stories.topics` 기준) — **완료** |
 | — | ~~이야기 상세~~ | 필수 | `GET /api/stories/{storyId}?childId=` — **완료** |
@@ -321,7 +321,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | M-53 | ~~**정답 판정 서버 계산**~~ | 필수 | `POST /api/sessions/{id}/activity/order` — **완료.** `slotResults`(칸별 정오) 추가 (선택, 프론트 요청 — D-32) |
 | M-54 | ~~정답 시 `retellingKeywords` 응답~~ | 필수 | 〃 — **완료** |
 | B-19 | ~~**재시도 3회 제한**~~ | 필수 | 3회째에 `correctOrder` 공개 (D-10) — **완료** |
-| — | ~~재구성 발화 수신~~ | 필수 | `POST /api/sessions/{id}/activity/retelling` — **완료** |
+| — | ~~재구성 발화 수신~~ | 필수 | `POST /api/sessions/{id}/activity/retelling` — **완료.** `earnedStarDust` 추가 (선택, 프론트 요청 — D-33) |
 | M-56 | ~~`post_activity_results` 저장~~ | 필수 | 세션당 1건 — **완료** |
 | M-57 | ~~세션 완료 처리 (`status = completed`)~~ | 필수 | **완료** |
 | B-20 | ~~별가루 지급 +100~~ | 선택-후순위 | **완료** (Phase 7 착수). 완료 시 `children.star_dust` +100 (D-09). 이미 `completed`인 세션에 재요청하면 건너뜀 |
@@ -496,7 +496,7 @@ CLOSING).
 
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
-| — | ~~아이 마이페이지~~ | api.md에 "(선택) ⚪"로 표기 | `GET /api/mypage?childId=` — **완료** |
+| — | ~~아이 마이페이지~~ | api.md에 "(선택) ⚪"로 표기 | `GET /api/mypage?childId=` — **완료.** `child.starDust` 추가 (선택, 프론트 요청 — D-33) |
 
 api.md 3.9에 스펙까지 있었는데 어느 Phase 표에도 걸리지 않아 놓치고 있던 것을 문서 전체
 점검(2026-08-12) 중 발견했다. `screens.md` F-1이 이미 "✅ 구현"으로 표시돼 있어 프론트가

@@ -807,6 +807,23 @@ false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답�
 
 ---
 
+### D-33 · 별가루 잔액·적립량 응답 노출
+
+프론트 요청([request/backend/star-dust-exposure.md](../../docs/request/backend/star-dust-exposure.md))
+— 별가루 UI(B-20)는 이미 화면에 그려져 있는데 그 값을 읽을 응답이 없어서, 실서버로 붙이면
+별가루 UI가 통째로 안 보이는 상태였다. `children.star_dust` 컬럼은 이미 있어서(D-09)
+응답에 실어주기만 하면 됐다.
+
+- `GET /api/home`·`GET /api/mypage`의 `child` 객체에 `starDust`(누적 잔액) 추가
+- `POST .../activity/retelling` 응답에 `earnedStarDust`(이번 활동으로 적립된 양) 추가.
+  `ActivityServiceImpl.submitRetelling`이 이미 계산해 두던 "처음 완료라 지급했는지"
+  분기(`alreadyCompleted`)를 그대로 재사용 — 이미 완료된 세션이면 0
+
+**검증**: 완료 세션 2건(각 +100) 있는 아이로 `GET /home`·`GET /mypage` → 둘 다
+`starDust: 200` 확인. 새 세션 완주 → `retelling` 응답에 `earnedStarDust: 100` 확인.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

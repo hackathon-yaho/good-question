@@ -441,6 +441,7 @@ GET /home?childId=3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5
 | child.id | 아이 id | UUID(string) | N | "3ba024ff-..." |
 | child.name | 아이 이름 | String | N | "민준" |
 | child.avatarId | 아바타 id | String | Y | "fox" |
+| child.starDust | **신규(D-33).** 이 아이의 누적 별가루 잔액 | Integer | N | 200 |
 | inProgress | 진행 중(또는 후속활동 중)인 세션 1건. **없으면 `null`** — 이때 프론트는 "오늘의 이야기" 단일 카드로 빈 영역을 대체해야 합니다 | object | Y | 아래 참조 |
 | inProgress.sessionId | 세션 id | UUID(string) | N | "58291471-..." |
 | inProgress.storyId | 이야기 id | UUID(string) | N | "c1143ded-..." |
@@ -463,7 +464,7 @@ GET /home?childId=3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5
 
 ```json
 {
-  "child": { "id": "3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5", "name": "민준", "avatarId": "fox" },
+  "child": { "id": "3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5", "name": "민준", "avatarId": "fox", "starDust": 200 },
   "inProgress": {
     "sessionId": "58291471-0cc9-4f21-b80d-b576901ab1ae",
     "storyId": "c1143ded-ed81-4b79-b4c0-c12c2694d5ab",
@@ -483,7 +484,7 @@ GET /home?childId=3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5
 
 ```json
 {
-  "child": { "id": "3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5", "name": "민준", "avatarId": "fox" },
+  "child": { "id": "3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5", "name": "민준", "avatarId": "fox", "starDust": 200 },
   "inProgress": null,
   "recommended": [ /* 위와 동일 */ ]
 }
@@ -1420,6 +1421,7 @@ Content-Type: application/json
 | stats.characterCount | 이 세션에서 만난 캐릭터 수(중복 제거) | Integer | N | 3 |
 | stats.newWordCount | 새로 배운 단어 수. **현재 항상 0으로 고정**(집계 기준 미정, 아래 참고) | Integer | N | 0 |
 | reportAvailable | 보호자 리포트가 생성됐는지. **이 API 호출 이후 항상 `true`** | boolean | N | true |
+| earnedStarDust | **신규(D-33).** 이번 활동으로 적립된 별가루 양(B-20 기준 100). 이미 완료됐던 세션에 재요청하면 `0`(중복 지급 안 함) | Integer | N | 100 |
 
 **Example**
 
@@ -1428,7 +1430,8 @@ Content-Type: application/json
   "sessionStatus": "completed",
   "completedAt": "2026-08-12T12:01:54.409122Z",
   "stats": { "childUtteranceCount": 18, "characterCount": 3, "newWordCount": 0 },
-  "reportAvailable": true
+  "reportAvailable": true,
+  "earnedStarDust": 100
 }
 ```
 
@@ -1904,6 +1907,7 @@ GET /mypage?childId=3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5
 | child.name | 아이 이름 | String | N | "민준" |
 | child.avatarId | 아바타 id | String | Y | "fox" |
 | child.age | 나이 | Integer | N | 8 |
+| child.starDust | **신규(D-33).** 이 아이의 누적 별가루 잔액 | Integer | N | 200 |
 | stats.completedStories | 완료한 이야기 수 | Integer | N | 2 |
 | stats.savedWords | 단어장에 저장한 단어 수(필터 없이 전체) | Integer | N | 1 |
 | stats.activeDays | 활동한 날짜 수(distinct, 이 아이의 모든 세션의 모든 메시지 날짜 기준) | Integer | N | 1 |
@@ -1925,7 +1929,7 @@ GET /mypage?childId=3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5
 
 ```json
 {
-  "child": { "id": "3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5", "name": "민준", "avatarId": "fox", "age": 8 },
+  "child": { "id": "3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5", "name": "민준", "avatarId": "fox", "age": 8, "starDust": 200 },
   "stats": { "completedStories": 2, "savedWords": 1, "activeDays": 1 },
   "completedStories": [
     { "sessionId": "58291471-0cc9-4f21-b80d-b576901ab1ae", "storyId": "c1143ded-ed81-4b79-b4c0-c12c2694d5ab", "title": "방귀 뀌는 며느리", "coverImageUrl": null, "completedAt": "2026-08-12T12:01:54.409122Z" }
