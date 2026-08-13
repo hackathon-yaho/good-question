@@ -824,6 +824,24 @@ false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답�
 
 ---
 
+### D-34 · 도입부 텍스트 4~6문장 확장 요청 반려
+
+프론트 요청([request/backend/star-dust-exposure.md](../../docs/request/backend/star-dust-exposure.md)
+"함께 요청" 항목) — C-1 도입부가 "다음"으로 한 문장씩 넘기는 화면인데 지금 3문장뿐이라
+너무 빨리 끝난다며 4~6문장으로 늘려달라는 요청이었다.
+
+**반려 사유**: 도입부 `scene_description`은 [PRD 7.4](../../docs/product/prd.md)에 명시된
+**주최측 제공·자문위원 난이도 검수 완료 텍스트**로 "원칙적으로 수정할 수 없다"고 규정되어
+있다. 유일한 예외인 전개2([I-04](../../docs/open-questions.md))도 팀이 늘리거나 새로 쓴 게
+아니라 "이미 주최측이 제공한 두 버전 중 하나를 정본으로 택한" 경우였다 — 이번처럼 검수
+완료 텍스트에 팀이 문장을 새로 창작해 끼워 넣는 것과는 성격이 다르다. `conflict`·
+`elementCriteria`(D-19)처럼 애초에 주최측 값이 없어 팀이 채운 항목도 아니다.
+
+**처리**: 도입부 텍스트는 3문장 그대로 유지. 페이싱 문제는 프론트 쪽 UI 처리로 넘긴다 —
+[request/frontend/intro-pacing-declined.md](../../docs/request/frontend/intro-pacing-declined.md)로 회신.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
@@ -857,3 +875,6 @@ false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답�
 
 D-01·D-02가 프론트 작업 범위를 바꿉니다.
 → [docs/request/frontend/stt-tts-integration.md](../../docs/request/frontend/stt-tts-integration.md)
+
+D-34 — 도입부 텍스트 확장 요청 반려, 페이싱은 프론트 UI로 처리 요청.
+→ [docs/request/frontend/intro-pacing-declined.md](../../docs/request/frontend/intro-pacing-declined.md)
