@@ -20,6 +20,7 @@ public final class DialogueContents {
     private static final Map<Integer, DialogueSceneConstants> BY_SCENE_ORDER = Map.of(
             3, new DialogueSceneConstants(
                     "방귀쟁이 며느리",
+                    "shimmer",
                     "조심스럽고 걱정이 많은 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.PERSPECTIVE, "가족들이 내 사정을 알아줄지 도무지 모르겠어."),
@@ -30,6 +31,7 @@ public final class DialogueContents {
             ),
             5, new DialogueSceneConstants(
                     "시아버지",
+                    "onyx",
                     "완고하고 언성이 높은 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.PERSPECTIVE, "며느리에게 무슨 사정이 있었는지 나는 알 길이 없구나."),
@@ -40,6 +42,7 @@ public final class DialogueContents {
             ),
             7, new DialogueSceneConstants(
                     "마을 이장",
+                    "echo",
                     "사람 좋고 답답해하는 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.SOLUTION, "배를 딸 방도가 도무지 떠오르지 않는구려."),
@@ -50,6 +53,7 @@ public final class DialogueContents {
             ),
             9, new DialogueSceneConstants(
                     "방귀쟁이 며느리",
+                    "shimmer",
                     "조금 밝아졌으나 아직 조심스러운 말투",
                     List.of(
                             new RemainingWorry(ThoughtElement.EMOTION, "아직은 마음이 조금 어색해."),

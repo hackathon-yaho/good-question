@@ -10,22 +10,19 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 import java.util.Map;
 
-/** D-05. OpenAI TTS 호출. 모델·목소리 선택 근거는 decisions.md D-21. */
+/** D-05. OpenAI TTS 호출. 모델·목소리 선택 근거는 decisions.md D-21·D-35. */
 @Component
 public class OpenAiTtsClientImpl implements OpenAiTtsClient {
 
     private final RestClient restClient;
     private final String apiKey;
     private final String model;
-    private final String voice;
 
     public OpenAiTtsClientImpl(@Value("${openai.api-key}") String apiKey,
                                 @Value("${openai.tts.model}") String model,
-                                @Value("${openai.tts.voice}") String voice,
                                 @Value("${openai.tts.timeout-seconds}") long timeoutSeconds) {
         this.apiKey = apiKey;
         this.model = model;
-        this.voice = voice;
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
@@ -38,12 +35,12 @@ public class OpenAiTtsClientImpl implements OpenAiTtsClient {
     }
 
     @Override
-    public byte[] synthesize(String text) {
+    public byte[] synthesize(String text, String voice, String instructions) {
         return restClient.post()
                 .uri("/audio/speech")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("model", model, "voice", voice, "input", text))
+                .body(Map.of("model", model, "voice", voice, "input", text, "instructions", instructions))
                 .retrieve()
                 .body(byte[].class);
     }

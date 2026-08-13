@@ -36,4 +36,16 @@ class DialogueContentsTest {
         assertThatThrownBy(() -> DialogueContents.forSceneOrder(1))
                 .isInstanceOf(BusinessException.class);
     }
+
+    @Test
+    void 같은_캐릭터인_대화1과_대화4는_ttsVoice가_같다() {
+        assertThat(DialogueContents.forSceneOrder(3).ttsVoice())
+                .isEqualTo(DialogueContents.forSceneOrder(9).ttsVoice());
+    }
+
+    @Test
+    void 서로_다른_캐릭터인_대화2와_대화3은_ttsVoice가_다르다() {
+        assertThat(DialogueContents.forSceneOrder(5).ttsVoice())
+                .isNotEqualTo(DialogueContents.forSceneOrder(7).ttsVoice());
+    }
 }

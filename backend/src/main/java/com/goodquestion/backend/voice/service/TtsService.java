@@ -11,5 +11,5 @@ public interface TtsService {
     byte[] getAudioForText(String text);
 
     /** 기동 시 프리워밍(B-18) 전용. 이미 캐시에 있으면 아무것도 하지 않고 false를 반환한다. */
-    boolean ensureCached(String text);
+    boolean ensureCached(String text, String voice, String instructions);
 }

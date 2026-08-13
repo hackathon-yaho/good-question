@@ -452,8 +452,8 @@ PRD·api.md 어디에도 구체적인 모델명이 없어 팀이 정합니다.
 | 항목 | 값 | 근거 |
 | --- | --- | --- |
 | STT 모델 | `whisper-1` | [PRD 9.3](../../docs/product/prd.md)·[decisions.md D-01](decisions.md)이 "Whisper"까지만 지정 |
-| TTS 모델 | `tts-1` | 캐시를 쓰므로(D-05) 지연시간보다 비용이 우선 — `tts-1-hd`는 쓰지 않음 |
-| TTS 목소리 | `alloy` | 다국어 목소리 중 하나. 한국어 전용 옵션이 없어 팀이 임의 선택 — 시연 중 톤이 안 맞으면 `application.yml`의 `openai.tts.voice` 값만 바꾸면 됨(재배포 불필요, env로도 덮어쓰기 가능) |
+| TTS 모델 | ~~`tts-1`~~ **`gpt-4o-mini-tts`로 교체(D-35)** | 캐시를 쓰므로(D-05) 지연시간보다 비용이 우선 — `tts-1-hd`는 쓰지 않음 |
+| TTS 목소리 | ~~`alloy` 전체 공통~~ **캐릭터별로 분리(D-35)** | 다국어 목소리 중 하나. 한국어 전용 옵션이 없어 팀이 임의 선택 |
 | TTS 생성 타임아웃 | 8초 | [D-03](decisions.md)의 표에 TTS가 빠져 있음(Whisper만 명시). 캐시 미스 시에만 타는 경로라 실제 호출은 드물지만, Whisper와 같은 값으로 맞춰 둠 |
 
 TTS 실패(타임아웃 포함)는 `/analyze`·`/respond`처럼 별도 폴백을 두지 않습니다.
@@ -839,6 +839,50 @@ false,true]`류) 확인. 3회째 오답 → `slotResults` 키 자체가 응답�
 
 **처리**: 도입부 텍스트는 3문장 그대로 유지. 페이싱 문제는 프론트 쪽 UI 처리로 넘긴다 —
 [request/frontend/intro-pacing-declined.md](../../docs/request/frontend/intro-pacing-declined.md)로 회신.
+
+---
+
+### D-35 · TTS 캐릭터별 목소리·연기 지시 — `tts-1`→`gpt-4o-mini-tts` 교체
+
+사용자 요청 — 나레이션·며느리·시아버지·마을 이장이 전부 같은 목소리(`alloy`, D-21)로 나가서
+캐릭터 구분이 안 됐다. `tts-1`은 목소리(`voice`)만 고를 수 있고 말투를 지시하는 방법이 없어,
+**`gpt-4o-mini-tts`로 모델을 교체**하고 `instructions`(억양·감정·속도·톤 지시, 공식 문서 확인—
+`developers.openai.com/api/docs/guides/text-to-speech`)를 함께 쓰기로 했다.
+
+- **비용**: `tts-1`은 $15/1M자, `gpt-4o-mini-tts`는 텍스트 $0.60/1M토큰 + 오디오 출력
+  $12/1M토큰(공식 pricing 문서 확인). D-21이 `tts-1`을 고른 이유가 "캐시로 커버되니 비용 우선"
+  이었는데, 사용자 판단으로 "대사가 짧아서 차이가 크지 않다"고 보고 교체를 확정했다 — 캐릭터
+  응답(NORMAL/GUIDED)은 매 턴 새 텍스트라 캐시가 안 먹는다는 점은 그대로 남는 트레이드오프다.
+- **voice 매핑** — `DialogueSceneConstants`에 `ttsVoice` 필드 추가, 같은 캐릭터(며느리:
+  대화1·4)는 같은 값을 쓴다.
+
+  | 캐릭터 | voice |
+  | --- | --- |
+  | 나레이션(도입/전개, 단어 발음, `?text=` 전체) | `alloy` |
+  | 며느리 (대화1·4) | `shimmer` |
+  | 시아버지 (대화2) | `onyx` |
+  | 마을 이장 (대화3) | `echo` |
+
+- **instructions는 새로 만들지 않고 기존 `guidanceStyle`(PRD 7.5.3, GUIDED 유도 재료)을
+  그대로 재사용**한다 — "조심스럽고 걱정이 많은 말투" 같은 문구가 텍스트 생성 지시와 TTS
+  연기 지시로 동시에 맞는 내용이라 별도 필드를 만들 이유가 없었다. 나레이션은 새 상수
+  하나(`VoiceProfile.NARRATOR`)만 추가.
+- **목소리 선정 방법**: `tts-1`이 지원하는 9종 목소리를 실제로 같은 문장으로 생성해서
+  들어보고 골랐다(스크립트로 6종 우선 비교 후 사용자 확인).
+- **캐시 키 확장**: `TtsCache`는 텍스트 해시만 키였는데(D-05), 같은 문장이라도 화자가 다르면
+  다른 오디오여야 하므로 해시 입력을 `voice + "|" + instructions + "|" + text`로 바꿨다.
+  스키마 변경은 없다 — 해시 함수에 넣는 입력만 바뀐 것이라 `ddl-auto: update`로 충분하다.
+- **API 계약은 안 바뀐다.** `GET /tts`의 `messageId`/`text` 파라미터·응답 형태 그대로 —
+  어떤 목소리를 쓸지는 서버가 메시지의 장면·화자 정보로 알아서 정한다. `api.md`/`api-spec.md`
+  수정 없음.
+- Custom Voice(성우 클로닝)는 문서상 "eligible customers" 제한이 있어 이번엔 쓰지 않았다.
+
+**검증**: `DialogueContentsTest`에 ttsVoice 일관성 테스트 2건 추가(대화1·4 같음, 대화2·3 다름),
+`./gradlew test` 전체 통과. 서버 기동 후 새 문장으로 `GET /tts?text=` → 200·오디오 생성 확인.
+같은 원문("그랬구나, 네 말을 들으니 마음이 좀 놓이는구나.")을 며느리(대화9) 메시지와
+마을 이장(대화7) 메시지 각각의 `messageId`로 요청 → 둘 다 200, 바이트 크기·해시가 서로 다름을
+확인(같은 문장·다른 목소리가 실제로 다른 오디오를 만든다는 증거). 404(`messageId` 없음)·400
+(`messageId`/`text` 둘 다 없음) 기존 에러 케이스 회귀 없음 확인.
 
 ---
 

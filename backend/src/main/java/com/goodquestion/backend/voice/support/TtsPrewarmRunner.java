@@ -34,20 +34,21 @@ public class TtsPrewarmRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         int generated = 0;
         for (StoryScene scene : storySceneRepository.findAll()) {
+            VoiceProfile profile = VoiceProfile.forScene(scene);
             if (scene.isDialogue()) {
-                generated += warmIfFixed(scene.getCharacterOpening());
-                generated += warmIfFixed(scene.getCharacterClosing());
+                generated += warmIfFixed(scene.getCharacterOpening(), profile);
+                generated += warmIfFixed(scene.getCharacterClosing(), profile);
             } else {
-                generated += warmIfFixed(scene.getSceneDescription());
+                generated += warmIfFixed(scene.getSceneDescription(), profile);
             }
         }
         log.info("[TtsPrewarmRunner] 고정 대사 프리워밍 완료 — 신규 생성 {}건.", generated);
     }
 
-    private int warmIfFixed(String text) {
+    private int warmIfFixed(String text, VoiceProfile profile) {
         if (text == null || text.contains("ㅇㅇ")) return 0;
         try {
-            return ttsService.ensureCached(text) ? 1 : 0;
+            return ttsService.ensureCached(text, profile.voice(), profile.instructions()) ? 1 : 0;
         } catch (Exception e) {
             log.warn("[TtsPrewarmRunner] 프리워밍 실패, 건너뜁니다 (첫 재생 시 GET /api/tts가 재시도합니다): {}", e.getMessage());
             return 0;

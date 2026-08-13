@@ -61,8 +61,7 @@ openai:
     model: whisper-1
     timeout-seconds: 8        # D-03
   tts:
-    model: tts-1
-    voice: alloy
+    model: gpt-4o-mini-tts     # D-35 — 캐릭터별 voice+instructions 연기를 쓰려고 tts-1에서 교체
     timeout-seconds: 8        # D-03에 없어 STT와 동일하게 맞춤 (D-21)
 
 cors:
