@@ -729,6 +729,36 @@ PERSPECTIVE 단독을 선택했다.
 
 ---
 
+### D-30 · 미션 체크리스트 항목 단위 진행 — `missionProgress` 필드 신설
+
+프론트 요청([request/backend/mission-progress.md](../../docs/request/backend/mission-progress.md))
+— 미션을 한 항목씩 순차로 보여주는 화면으로 바뀌면서 "몇 번째까지 끝났는지"가 필요해졌다.
+문제는 미션1 체크리스트의 1·2번이 **둘 다 `SOLUTION`**이라는 점이다 — `accumulatedElements`는
+집합이라 "SOLUTION을 두 번 채웠다"를 표현하지 못하고, 서버가 `SOLUTION`을 처음 확정하는
+순간 1·2번이 동시에 완료된 것처럼 보인다.
+
+**해결**: 미션 노출 이후 아이 발화를 **턴 순서대로** 훑어서, 각 턴에서 확인된 요소 종류마다
+아직 안 채워진 같은 종류의 체크리스트 칸을 하나씩 채운다(`MissionProgressCalculator`,
+순수 함수). 데이터 출처는 `accumulatedElements`(집합, 순서 정보 없음)가 아니라
+`utterance_analyses.detected_elements`를 메시지(턴) 단위로 그대로 읽는다 — 이건 이미
+저장돼 있는 값이라 새 컬럼이 필요 없다.
+
+- `POST /messages` 응답에 `missionProgress: { missionId, satisfiedIndexes }` 추가.
+  미션이 없거나 아직 노출 전이면 `null`, 장면이 이번 턴에 닫히면(`CLOSING`) 그것도 `null`
+  — 프론트가 "미션 진행 중일 때만" 값을 받는다는 요청 그대로
+- 한 턴에 서로 다른 요소가 여러 개 확인되면 그 턴에서 체크리스트 칸 여러 개가 동시에
+  채워질 수 있다(요청 문서가 명시적으로 금지하지 않았고, 실제로 그런 발화가 가능함)
+- `MessageRepository`에 미션의 `system` 메시지를 턴 순서까지 포함해 찾는 메서드,
+  `UtteranceAnalysisRepository`에 메시지 단건 조회 메서드를 추가
+
+**검증**: `MissionProgressCalculatorTest` 6건(반복 요소 순서대로 채움, 세 번째 확인은
+더 채울 칸이 없어 무시, 한 턴에 여러 칸 동시 충족, 체크리스트에 없는 요소 무시, 전체
+충족 시 순서 등). 라이브로는 로컬 mock이 `PERSPECTIVE`만 내놔서 실제로 칸이 채워지는
+모습은 못 봤지만, `missionProgress`가 노출 전 `null` → 노출 시점부터 `{missionId,
+satisfiedIndexes:[]}` → 장면 종료 시 다시 `null`로 정확히 전환되는 건 확인했다.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

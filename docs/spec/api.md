@@ -8,6 +8,14 @@
 
 ## 수정 이력
 
+### 2026-08-13 — 미션 체크리스트 항목 단위 진행 필드 추가
+
+근거: [request/backend/mission-progress.md](../request/backend/mission-progress.md), [backend/docs/decisions.md D-30](../../backend/docs/decisions.md)
+
+| 절 | 변경 |
+| --- | --- |
+| 3.5 | `POST /messages` 응답에 `missionProgress` 신규 — `{ missionId, satisfiedIndexes }`. 체크리스트에 같은 사고 요소가 반복돼도(미션1의 1·2번) 항목 단위로 순서대로 채워진다. 미션 노출 전·`CLOSING`이면 `null` |
+
 ### 2026-08-13 — O-12 캐릭터 마음 변화 필드 추가
 
 근거: [request/ai/story-image-assets.md](../request/ai/story-image-assets.md), [backend/docs/decisions.md D-27](../../backend/docs/decisions.md)
@@ -597,6 +605,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. 장면별 후보 단어가 **이번 턴 `characterMessage`에 실제로 있을 때만** 채워진다. 없는 턴은 빈 배열 `[]` ([D-11](../../backend/docs/decisions.md) · [D-22](../../backend/docs/decisions.md)) |
 | `messageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)). 필드명 `characterMessageId`→`messageId` 정정은 [D-26](../../backend/docs/decisions.md) |
 | `characterState` | **신규 (O-12).** 대화 중 캐릭터 이미지 전환용 상태값. AI가 대사 내용에 맞춰 판단해 내려줌. `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 중 하나, `CLOSING`이면 항상 `null` ([D-27](../../backend/docs/decisions.md)). 상태별 캐릭터 이미지는 [request/ai/story-image-assets.md](../request/ai/story-image-assets.md) 도착 대기 중 |
+| `missionProgress` | **신규.** 미션 체크리스트 항목 단위 진행(`{ missionId, satisfiedIndexes }`). 미션 노출 전이거나 `CLOSING`이면 `null` ([D-30](../../backend/docs/decisions.md), [request/backend/mission-progress.md](../request/backend/mission-progress.md)) |
 
 **프론트가 하지 말아야 할 것**
 

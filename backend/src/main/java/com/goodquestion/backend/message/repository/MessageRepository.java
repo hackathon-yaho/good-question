@@ -16,6 +16,9 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 
     Optional<Message> findFirstBySessionAndSpeakerTypeOrderByTurnOrderDesc(StorySession session, SpeakerType speakerType);
 
+    Optional<Message> findFirstBySessionAndSceneAndSpeakerTypeOrderByTurnOrderDesc(
+            StorySession session, StoryScene scene, SpeakerType speakerType);
+
     boolean existsBySessionAndSceneAndSpeakerType(StorySession session, StoryScene scene, SpeakerType speakerType);
 
     long countBySessionAndSpeakerType(StorySession session, SpeakerType speakerType);

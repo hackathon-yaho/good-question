@@ -298,6 +298,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | M-47 | ~~미션1 노출 조건 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) **4개 조건 전부 구현** (D-20). 주최측 확정으로 "장면 종료 직전 턴엔 무조건 노출" 안전장치 추가 (D-29) |
 | M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — `PERSPECTIVE` 누적 시점. 원래 `PERSPECTIVE`+`REASON`(D-20)이었으나 장면9엔 REASON이 없어 한 번도 트리거된 적 없던 조건이었음 → `PERSPECTIVE` 단독으로 정정 (D-28). 주최측이 "항상 노출"로 확정한 뒤, GOAL_MET 조기 종료가 미션 판정을 건너뛸 수 있던 경쟁 조건을 없애고 강제 노출 턴 추가 (D-29) |
 | M-49 | ~~노출 기록 `speaker_type = system` 메시지~~ | 필수 | 중복 노출 방지 ([PRD I-07](../../docs/product/prd.md)) — **완료.** curl로 재노출 안 됨 확인 |
+| — | ~~미션 체크리스트 항목 단위 진행 (`missionProgress`)~~ | 선택(프론트 요청) | [request/backend/mission-progress.md](../../docs/request/backend/mission-progress.md) — **완료.** `session/engine/MissionProgressCalculator.java` (D-30) |
 
 ### 주의
 

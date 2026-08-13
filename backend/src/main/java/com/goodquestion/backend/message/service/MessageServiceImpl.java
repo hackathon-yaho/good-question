@@ -6,6 +6,7 @@ import com.goodquestion.backend.common.global.exception.BusinessException;
 import com.goodquestion.backend.message.dto.request.MessageCreateRequest;
 import com.goodquestion.backend.message.dto.response.HighlightWordResponse;
 import com.goodquestion.backend.message.dto.response.MessageCreateResponse;
+import com.goodquestion.backend.message.dto.response.MissionProgressResponse;
 import com.goodquestion.backend.message.dto.response.MissionTriggeredResponse;
 import com.goodquestion.backend.message.entity.DetectedElement;
 import com.goodquestion.backend.message.entity.Message;
@@ -25,6 +26,7 @@ import com.goodquestion.backend.message.service.ai.RespondAnalysisPayload;
 import com.goodquestion.backend.session.engine.AccumulatedElementsCalculator;
 import com.goodquestion.backend.session.engine.AnalysisPostProcessor;
 import com.goodquestion.backend.session.engine.GuidanceSelector;
+import com.goodquestion.backend.session.engine.MissionProgressCalculator;
 import com.goodquestion.backend.session.engine.MissionTrigger;
 import com.goodquestion.backend.session.engine.MissionTriggerContext;
 import com.goodquestion.backend.session.engine.ProgressDecision;
@@ -174,8 +176,34 @@ public class MessageServiceImpl implements MessageService {
                 missionTriggered,
                 detectHighlightWords(scene.getSceneOrder(), characterTurn.text()),
                 characterMessage.getId(),
-                characterTurn.characterState() == null ? null : characterTurn.characterState().name()
+                characterTurn.characterState() == null ? null : characterTurn.characterState().name(),
+                characterTurn.sceneEnded() ? null : missionProgress(session, scene)
         );
+    }
+
+    /**
+     * 미션 체크리스트 항목 단위 진행 (request/backend/mission-progress.md). 미션이 없거나
+     * 아직 노출 전이면 null — "미션 진행 중일 때만" 값을 준다.
+     */
+    private MissionProgressResponse missionProgress(StorySession session, StoryScene scene) {
+        MissionDefinition mission = Missions.forSceneOrder(scene.getSceneOrder());
+        if (mission == null) return null;
+
+        Optional<Message> systemMessage = messageRepository
+                .findFirstBySessionAndSceneAndSpeakerTypeOrderByTurnOrderDesc(session, scene, SpeakerType.SYSTEM);
+        if (systemMessage.isEmpty()) return null;
+
+        List<List<String>> perTurnDetectedTypes = messageRepository.findAllBySessionOrderByTurnOrderAsc(session).stream()
+                .filter(m -> m.getScene().getId().equals(scene.getId()))
+                .filter(m -> m.getSpeakerType() == SpeakerType.CHILD)
+                .filter(m -> m.getTurnOrder() > systemMessage.get().getTurnOrder())
+                .map(m -> utteranceAnalysisRepository.findByMessage(m)
+                        .map(a -> a.getDetectedElements().stream().map(DetectedElement::type).toList())
+                        .orElse(List.<String>of()))
+                .toList();
+
+        List<Integer> satisfiedIndexes = MissionProgressCalculator.satisfiedIndexes(mission.checklist(), perTurnDetectedTypes);
+        return new MissionProgressResponse(mission.id(), satisfiedIndexes);
     }
 
     /** D-22. 후보 단어가 이번 턴 캐릭터 응답에 실제로 있을 때만 골라낸다 (D-11의 LLM 불일치 문제 해결). */

@@ -1014,6 +1014,9 @@ Content-Type: application/json
 | highlightWords[].meaning | 아이 눈높이 뜻풀이 | String | N | "남에게 보이기 부끄럽고 수줍은 마음" |
 | messageId | 방금 저장된 캐릭터 메시지의 id. **`GET /tts?messageId=`로 이 대사를 음성 재생할 때 사용**. (필드명 `characterMessageId`→`messageId` 정정: D-26) | UUID(string) | N | "d82d423b-..." |
 | characterState | 대화 중 캐릭터 이미지를 바꾸는 데 쓰는 상태값(O-12, D-27). AI가 그때그때 생성한 대사에 맞춰 판단해서 내려줌. `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 중 하나. **`closing`이면 AI를 호출하지 않으므로 항상 `null`** | String | Y | "MOVED" |
+| missionProgress | 미션 체크리스트 **항목 단위** 진행(D-30). 미션 노출 전이거나 `closing`이면 `null` | object | Y | 아래 참조 |
+| missionProgress.missionId | 진행 중인 미션 id | String | N | "mission_1" |
+| missionProgress.satisfiedIndexes[] | 채워진 체크리스트 인덱스(0-based), **채워진 순서대로**. 같은 사고 요소가 체크리스트에 반복돼도(미션1의 1·2번이 둘 다 SOLUTION) 항목별로 순서대로 채워짐 — `accumulatedElements`(집합)로는 이 구분이 안 돼서 별도 필드로 뺐습니다 | Integer[] | N | [0] |
 
 **"사고 요소"(thought element)란**: 아이 발화에서 AI가 감지하는 8가지 분류입니다 — `DECISION`, `REASON`, `PERSPECTIVE`, `SOLUTION`, `RESULT`, `EMOTION`, `EMPATHY`, `REQUEST`. **화면에 영문 코드를 그대로 노출하지 마세요.** 아이 화면용으로는 4그룹(마음=EMOTION·EMPATHY, 이유=REASON, 생각=PERSPECTIVE·DECISION·RESULT, 방법=SOLUTION·REQUEST)으로 묶어 표시하는 걸 권장합니다.
 
@@ -1045,7 +1048,8 @@ Content-Type: application/json
   "missionTriggered": null,
   "highlightWords": [],
   "messageId": "586f5bcb-3a06-40ec-a133-55b9fa317c5d",
-  "characterState": "MOVED"
+  "characterState": "MOVED",
+  "missionProgress": null
 }
 ```
 
@@ -1073,7 +1077,8 @@ Content-Type: application/json
   },
   "highlightWords": [],
   "messageId": "070547b1-9fd1-49ae-b9b8-5ec1534ce1e4",
-  "characterState": "SURPRISED"
+  "characterState": "SURPRISED",
+  "missionProgress": { "missionId": "mission_1", "satisfiedIndexes": [] }
 }
 ```
 
@@ -1092,7 +1097,8 @@ Content-Type: application/json
   "missionTriggered": null,
   "highlightWords": [],
   "messageId": "6aecabad-0d8e-44f2-ab6d-093e3e266165",
-  "characterState": null
+  "characterState": null,
+  "missionProgress": null
 }
 ```
 
@@ -1111,7 +1117,8 @@ Content-Type: application/json
   "missionTriggered": null,
   "highlightWords": [{ "word": "부끄러워", "meaning": "남에게 보이기 부끄럽고 수줍은 마음" }],
   "messageId": "d82d423b-e4af-43c6-b99c-3b34e1941cfc",
-  "characterState": null
+  "characterState": null,
+  "missionProgress": null
 }
 ```
 
@@ -2022,6 +2029,7 @@ DB는 장면을 1~9번(도입1·전개4·대화4)으로 관리하지만, 화면�
 | `highlightWords` | 대부분의 턴에서 빈 배열 | 캐릭터 응답에 미리 정해둔 후보 단어가 실제로 등장한 턴에서만 채워집니다. 매 턴 채워지는 게 아니라 정상입니다. |
 | `mypage`의 `stats.savedWords`, 후속활동 `stats.newWordCount` | `newWordCount`는 항상 0 | "이번 세션에서 새로 저장한 단어" 집계 기준이 아직 없습니다(단어장이 세션과 직접 연결되지 않은 구조라서). `mypage.stats.savedWords`는 전체 누적이라 정상 동작합니다. |
 | `characterState` | `closing` 응답에서 항상 `null` | `closing`은 AI를 호출하지 않고 미리 검수된 고정 문구(`character_closing`)를 쓰므로 AI가 상태값을 줄 기회가 없습니다. `normal`/`guided`에서는 AI가 실제로 값을 주면 채워집니다(D-27) — 다만 실제 AI 서버가 아직 없어 로컬은 목(mock) 서버 고정값(`MOVED`)만 옵니다. |
+| `missionProgress` | 미션 노출 전·`closing`에서 `null`, 노출 시점 이후엔 `satisfiedIndexes`가 대부분 빈 배열 | 대화3·4가 아닌 장면(미션 없음)에선 항상 `null`입니다. 노출 시점 직후엔 아직 아이가 항목을 말하기 전이라 빈 배열이 정상이고, 발화가 쌓일수록 채워집니다(D-30). |
 
 ---
 

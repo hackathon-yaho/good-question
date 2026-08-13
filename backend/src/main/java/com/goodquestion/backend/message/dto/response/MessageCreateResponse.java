@@ -15,6 +15,7 @@ public record MessageCreateResponse(
         MissionTriggeredResponse missionTriggered,
         List<HighlightWordResponse> highlightWords,
         UUID messageId,
-        String characterState
+        String characterState,
+        MissionProgressResponse missionProgress
 ) {
 }
