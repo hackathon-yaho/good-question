@@ -120,19 +120,19 @@ class MissionTriggerTest {
     // ── 미션2 ────────────────────────────────────────────────────────
 
     @Test
-    void 미션2_PERSPECTIVE와_REASON이_모두_누적되면_노출() {
+    void 미션2_PERSPECTIVE가_누적되면_노출() {
         MissionTriggerContext context = new MissionTriggerContext(
                 1, ChildIntent.PERSPECTIVE, "부끄러워하지 않아도 돼요.",
-                List.of("PERSPECTIVE", "REASON"), List.of("RESULT"), ResponseMode.NORMAL, null);
+                List.of("PERSPECTIVE"), List.of("RESULT"), ResponseMode.NORMAL, null);
 
         assertThat(MissionTrigger.shouldRevealMission2(context)).isTrue();
     }
 
     @Test
-    void 미션2_이유가_아직_없으면_노출되지_않는다() {
+    void 미션2_PERSPECTIVE가_아직_없으면_노출되지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
-                2, ChildIntent.PERSPECTIVE, "부끄러워하지 않아도 돼요.",
-                List.of("PERSPECTIVE"), List.of("REASON", "RESULT"), ResponseMode.NORMAL, null);
+                2, ChildIntent.EMOTION, "속상했을 것 같아요.",
+                List.of(), List.of("PERSPECTIVE", "RESULT"), ResponseMode.NORMAL, null);
 
         assertThat(MissionTrigger.shouldRevealMission2(context)).isFalse();
     }
@@ -141,7 +141,7 @@ class MissionTriggerTest {
     void 미션2_아이가_아직_말하지_않았으면_노출되지_않는다() {
         MissionTriggerContext context = new MissionTriggerContext(
                 0, ChildIntent.PERSPECTIVE, null,
-                List.of("PERSPECTIVE", "REASON"), List.of(), ResponseMode.NORMAL, null);
+                List.of("PERSPECTIVE"), List.of(), ResponseMode.NORMAL, null);
 
         assertThat(MissionTrigger.shouldRevealMission2(context)).isFalse();
     }

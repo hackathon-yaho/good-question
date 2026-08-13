@@ -1812,7 +1812,7 @@ character_opening
 | O-09 | 좋아하는 단어 저장 | A-02 세부 | 백엔드 |  |
 | O-10 | `wordbook` 테이블 | 확장 테이블 | 백엔드 | O-06 선행 |
 | O-11 | 단어장 화면 | A-02 | 프론트 | 주최측이 후순위 가능으로 명시 |
-| O-12 | 캐릭터 마음 변화 | 주최측 추가 요건 A-03 | 프론트·AI | 표정 또는 태도 변화 |
+| O-12 | 캐릭터 마음 변화 | 주최측 추가 요건 A-03 | 프론트·AI·백엔드 | 표정 또는 태도 변화. 상태값(`characterState`, 5종) 필드는 백엔드가 중계 — [request/ai/story-image-assets.md](../request/ai/story-image-assets.md) |
 | O-13 | NORMAL soft-cue | 6.14 | 백엔드 | 미구현 시 NORMAL 일반 반응으로 동작 |
 | O-14 | `analysis_versions` 관리 | 확장 테이블 | 백엔드 | 문자열 `mvp_v1`로 대체 가능 |
 | ~~O-15~~ | ~~TTS 고정 대사 사전 캐싱~~ | 9.3 | 백엔드 | **필수로 승격** (2026-08-12). 2안 확정으로 백엔드가 TTS를 담당하게 됨 |

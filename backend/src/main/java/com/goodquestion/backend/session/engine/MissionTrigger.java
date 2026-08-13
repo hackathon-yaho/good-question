@@ -23,7 +23,6 @@ public final class MissionTrigger {
     private static final String FART_KEYWORD = "방귀";
     private static final String SOLUTION = ThoughtElement.SOLUTION.name();
     private static final String PERSPECTIVE = ThoughtElement.PERSPECTIVE.name();
-    private static final String REASON = ThoughtElement.REASON.name();
 
     private MissionTrigger() {
     }
@@ -77,13 +76,13 @@ public final class MissionTrigger {
      * 미션2 (대화4). PRD 7.6은 조건식 대신 흐름만 준다 —
      * "특징을 부끄러워하지 않아도 된다고 말함 → 긍정하는 이유 확인 → 관점 확장".
      *
-     * 대화4의 `element_criteria`상 앞 두 단계가 각각 PERSPECTIVE("특징을 그 사람 입장에서
-     * 바라보고 말한 경우")와 REASON("판단의 까닭")에 대응하므로, 둘이 모두 누적된 시점을
-     * "관점을 넓힐 준비가 된 시점"으로 본다.
+     * 원래는 마지막 단계("관점 확장")를 PERSPECTIVE로, "긍정하는 이유"를 REASON으로 매핑했으나
+     * 대화4(장면9)의 element_criteria엔 REASON이 없다(EMOTION·PERSPECTIVE·RESULT·SOLUTION
+     * 4개뿐) — 애초에 감지될 수 없는 요소를 조건에 넣은 착오였다(D-28). PERSPECTIVE 단독으로
+     * 정정한다.
      */
     public static boolean shouldRevealMission2(MissionTriggerContext context) {
         return context.turnCount() >= MIN_TURNS_BEFORE_ANY_REVEAL
-                && context.accumulatedElements().contains(PERSPECTIVE)
-                && context.accumulatedElements().contains(REASON);
+                && context.accumulatedElements().contains(PERSPECTIVE);
     }
 }

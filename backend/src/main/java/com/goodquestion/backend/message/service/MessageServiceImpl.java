@@ -10,6 +10,7 @@ import com.goodquestion.backend.message.dto.response.MissionTriggeredResponse;
 import com.goodquestion.backend.message.entity.DetectedElement;
 import com.goodquestion.backend.message.entity.Message;
 import com.goodquestion.backend.message.entity.UtteranceAnalysis;
+import com.goodquestion.backend.message.enums.CharacterState;
 import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.enums.UtteranceValidity;
 import com.goodquestion.backend.message.repository.MessageRepository;
@@ -168,7 +169,8 @@ public class MessageServiceImpl implements MessageService {
                 nextSceneId,
                 missionTriggered,
                 detectHighlightWords(scene.getSceneOrder(), characterTurn.text()),
-                characterMessage.getId()
+                characterMessage.getId(),
+                characterTurn.characterState() == null ? null : characterTurn.characterState().name()
         );
     }
 
@@ -205,7 +207,7 @@ public class MessageServiceImpl implements MessageService {
                                                            boolean hasNewlyAccumulatedElement, ThoughtElement previousGuidanceTarget) {
         if (decision.mode() == ResponseMode.CLOSING) {
             String closingText = NameSubstitutor.substitute(scene.getCharacterClosing(), session.getChild().getName());
-            return new CharacterTurnResult(ResponseMode.CLOSING, closingText, true, decision.endReason(), null);
+            return new CharacterTurnResult(ResponseMode.CLOSING, closingText, true, decision.endReason(), null, null);
         }
 
         String reactionKey = ReactionKeyMapper.map(analysis.childIntent(), analysis.utteranceValidity(), decision.mode());
@@ -228,10 +230,10 @@ public class MessageServiceImpl implements MessageService {
         if (!respondResult.success()) {
             // B-12: /respond 실패 → character_closing으로 장면을 종료한다. 사유 코드는 규칙엔진이 낸 것이 아니라 없음(null).
             String fallbackText = NameSubstitutor.substitute(scene.getCharacterClosing(), session.getChild().getName());
-            return new CharacterTurnResult(ResponseMode.CLOSING, fallbackText, true, null, null);
+            return new CharacterTurnResult(ResponseMode.CLOSING, fallbackText, true, null, null, null);
         }
 
-        return new CharacterTurnResult(decision.mode(), respondResult.text(), false, null, guidanceTarget);
+        return new CharacterTurnResult(decision.mode(), respondResult.text(), false, null, guidanceTarget, respondResult.characterState());
     }
 
     /** 대화3(미션1)·대화4(미션2)에서만 판정한다. 이미 노출됐으면 다시 노출하지 않는다 (PRD I-07). */
@@ -257,6 +259,6 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private record CharacterTurnResult(ResponseMode effectiveMode, String text, boolean sceneEnded,
-                                        SceneEndReason endReason, String guidanceTarget) {
+                                        SceneEndReason endReason, String guidanceTarget, CharacterState characterState) {
     }
 }

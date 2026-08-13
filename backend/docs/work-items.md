@@ -296,7 +296,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | ID | 항목 | 등급 | 조건 위치 |
 | --- | --- | --- | --- |
 | M-47 | ~~미션1 노출 조건 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) **4개 조건 전부 구현** (D-20) |
-| M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — `PERSPECTIVE`+`REASON` 누적 시점 (D-20) |
+| M-48 | ~~미션2 노출 시점 판정~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — `PERSPECTIVE` 누적 시점. 원래 `PERSPECTIVE`+`REASON`(D-20)이었으나 장면9엔 REASON이 없어 한 번도 트리거된 적 없던 조건이었음 → `PERSPECTIVE` 단독으로 정정 (D-28) |
 | M-49 | ~~노출 기록 `speaker_type = system` 메시지~~ | 필수 | 중복 노출 방지 ([PRD I-07](../../docs/product/prd.md)) — **완료.** curl로 재노출 안 됨 확인 |
 
 ### 주의
@@ -424,7 +424,26 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 엔드포인트 전부 curl로 응답 형태 확인. 완료 전 세션의 리포트 조회 → 404, 다른 보호자
 접근 → 403, 존재하지 않는 `childId` → 404.
 | O-13 | ~~NORMAL soft-cue~~ | [PRD 6.14](../../docs/product/prd.md) | **완료.** `session/engine/GuidanceSelector.selectForTurn()` (D-23) |
+| O-12 | ~~캐릭터 마음 변화 — `characterState` 필드~~ | 주최측 추가 요건 A-03 | **필드 배관 완료 (D-27).** 이미지 자체는 미도착 — [request/ai/story-image-assets.md](../../docs/request/ai/story-image-assets.md) 대기 |
 | O-14 | `analysis_versions` | 확장 테이블 | 문자열 `mvp_v1` 저장으로 대체 가능 |
+
+### O-12 캐릭터 마음 변화 — `characterState` 필드 (2026-08-13)
+
+PRD 담당이 원래 "프론트·AI"로만 적혀 있어 백엔드 문서에 추적된 적이 없었다(D-25
+마이페이지와 같은 종류의 누락). 이미지 에셋 재작업을 AI 파트에 요청하면서 함께
+설계했다(D-27).
+
+- `message/enums/CharacterState.java` — `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 5종 고정
+- `AiRespondClientImpl`이 `/respond` 응답의 `characterState`를 파싱해 `RespondAiResult`로 전달.
+  못 알아듣는 값이면 예외 없이 `null` 폴백
+- `MessageCreateResponse.characterState` — `CLOSING`(고정 문구 사용, AI 미호출)에서는 항상 `null`
+- 로컬 `AiMockController`도 `characterState: "MOVED"` 고정값을 함께 반환하도록 갱신
+
+**검증**: 대화 중 턴 응답에 `characterState: "MOVED"`(목 서버 값) 확인 → 마지막 턴(`closing`)
+응답에 `characterState: null` 확인.
+
+**남은 일**: 캐릭터 상태별 이미지(3명×5상태=15장) 도착 후 프론트가 이 값으로 이미지를
+바꾸는 작업. 이 문서 범위 밖.
 
 ### NORMAL soft-cue 구현 (2026-08-12)
 
