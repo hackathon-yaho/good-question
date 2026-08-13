@@ -143,6 +143,14 @@ export type PlayApi = {
     sessionId: string,
     sceneId: string
   ): Promise<SceneCompleteResponse>;
+  /**
+   * C-13 "이야기 나가기" — `PATCH /api/sessions/{id}`로 세션을 `stopped`로 바꾼다.
+   * (backend/docs/api-spec.md 5.4)
+   *
+   * 이걸 부르지 않으면 세션이 `in_progress`로 남아 **홈의 이어하기 카드가 계속
+   * 떠 있고** 아이가 나갔다는 사실이 서버에 남지 않는다. 멱등이라 여러 번 불러도 된다.
+   */
+  stopSession(sessionId: string): Promise<void>;
 };
 
 /* ── 말하기 후 활동 — api.md 3.6 ─────────────────────────────────── */
@@ -191,6 +199,17 @@ export type OrderResult = {
    *    없으면 D-3으로 돌린다. 제한 규칙은 서버 소관이다. (§0-2)
    */
   correctOrder?: string[];
+  /**
+   * 제출한 순서대로 **각 칸이 정답 위치인지.** `[true, false, false, true]`
+   *
+   * **선택 필드다.** 없으면 프론트는 배치 전체를 오답으로 표시한다 —
+   * 지금 백엔드가 주지 않으므로 실서버에서는 그쪽으로 동작한다.
+   *
+   * ⚠️ 정답 순서 자체가 아니다. "이 칸이 맞는지"만 알려주므로 프론트가 정답을
+   *    역산할 수 없다. 정답을 모른다는 원칙(§0-2)을 지키면서 틀린 칸만 표시할 수
+   *    있는 최소 필드다. (docs/request/backend/order-slot-results.md)
+   */
+  slotResults?: boolean[];
 };
 
 /** POST /api/sessions/{sessionId}/activity/retelling */
@@ -205,6 +224,8 @@ export type RetellingResult = {
   };
   /** 보호자 리포트(O-01) 구현 여부 */
   reportAvailable: boolean;
+  /** 이번 이야기로 얻은 별가루. 서버가 줄 때만 표시한다 (계획 D4·D16) */
+  earnedStarDust?: number;
 };
 
 export type ActivityApi = {
@@ -286,9 +307,19 @@ export type HomeInProgress = {
   lastActivityAt: string;
 };
 
+/**
+ * 별가루 — 팀이 추가한 보상 (백엔드 B-20 · [Q-12](../../../docs/open-questions.md))
+ *
+ * ⚠️ **선택 필드다.** 백엔드가 이야기 완료 시 `children.star_dust`를 올리지만
+ *    어떤 응답 DTO에도 노출하지 않는다(2026-08-13 확인). 값이 없으면 화면이
+ *    칩을 숨긴다 — "별가루 0"을 보여주는 것보다 낫다.
+ *    백엔드가 추가하면 코드 변경 없이 나타난다. (계획 D4)
+ */
+type WithStarDust = { starDust?: number };
+
 /** GET /api/home?childId={id} */
 export type HomeSnapshot = {
-  child: { id: string; name: string; avatarId: string };
+  child: { id: string; name: string; avatarId: string } & WithStarDust;
   /** 진행 중 세션이 없으면 null. 프론트는 그 자리를 빈 채로 두지 않는다. */
   inProgress: HomeInProgress | null;
   recommended: HomeStory[];
@@ -347,6 +378,14 @@ export type StoryDetail = {
   childRole: string;
   characters: StoryCharacter[];
   existingSession: ExistingSession | null;
+  /**
+   * 아직 재생할 수 없는 이야기. **선택 필드**이므로 없으면 재생 가능이다.
+   *
+   * 목 카탈로그의 "준비 중" 편을 위해 있다(`mocks/story-catalog.ts`). 서버가
+   * 장면이 없는 이야기를 목록에 올린다면 같은 필드로 표현하면 된다 — 그러면
+   * B-3이 시작 버튼을 비활성으로 두고 안내를 띄운다.
+   */
+  comingSoon?: boolean;
 };
 
 /**
@@ -390,7 +429,7 @@ export type WordbookResult = {
 /* ── 마이페이지 (F-1) ────────────────────────────────────────────── */
 
 export type MypageSnapshot = {
-  child: { id: string; name: string; avatarId: string; age: number };
+  child: { id: string; name: string; avatarId: string; age: number } & WithStarDust;
   /** 점수·등급이 아니라 활동량이다. (PRD 10.1) */
   stats: {
     completedStories: number;

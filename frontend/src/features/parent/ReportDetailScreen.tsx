@@ -21,10 +21,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
+import { BackButton } from "@/components/ui/BackButton";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
 import { parentApi } from "@/lib/api";
@@ -90,12 +90,7 @@ export function ReportDetailScreen({
 
   return (
     <CenteredShell width="wide">
-      <Link
-        href="/parent/reports"
-        className="text-parent-body text-muted underline"
-      >
-        ← 리포트 목록
-      </Link>
+      <BackButton href="/parent/reports" label="리포트 목록" />
 
       <h1 className="mt-4 text-parent-title font-bold text-text">
         {report.storyTitle}

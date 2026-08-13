@@ -17,7 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
-import { AVATAR_IDS, ChildAvatar } from "@/components/ui/ChildAvatar";
+import { AVATAR_IDS, AVATAR_LABEL, ChildAvatar } from "@/components/ui/ChildAvatar";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
 import { errorCodeOf } from "@/lib/api/errors";
@@ -137,13 +137,13 @@ export function ChildRegisterScreen({
           <legend className="text-parent-body font-bold text-text">
             캐릭터 선택
           </legend>
-          {/* 아바타 일러스트 6종 미수령. 색상 6종으로 대체한다. (assets.md §3-3) */}
+          {/* 일러스트 6종. avatarId는 color1~6을 유지한다 — ChildAvatar 주석 참조 */}
           <ul className="mt-3 grid grid-cols-6 gap-3">
             {AVATAR_IDS.map((id) => (
               <li key={id}>
                 <button
                   type="button"
-                  aria-label={`캐릭터 ${id}`}
+                  aria-label={`캐릭터 ${AVATAR_LABEL[id]}`}
                   aria-pressed={avatarId === id}
                   onClick={() => setAvatarId(id)}
                   className="flex min-h-touch w-full items-center justify-center rounded-bubble p-1"

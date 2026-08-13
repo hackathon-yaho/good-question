@@ -19,6 +19,8 @@ const SUITES = [
   ["turn", "C-3~C-6 대화 1턴 · 세 모드"],
   // 이 스위트만 ?speech=backend로 2안(백엔드 STT/TTS) 경로를 태운다.
   ["speech", "2안 STT/TTS — 녹음·업로드·오디오 재생"],
+  // 미션은 [브리프 → 발화 → 브리프]를 4번 도는 흐름이라 따로 본다.
+  ["mission", "C-10·C-11 미션 순차 진행"],
   ["handoff", "/play 완주 → /activity 인계"],
   ["activity", "D-1~D-7 말하기 후 활동"],
   ["drag", "D-2 카드 드래그 (마우스·터치)"],

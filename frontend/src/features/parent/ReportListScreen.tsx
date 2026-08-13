@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
+import { BackButton } from "@/components/ui/BackButton";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
 import { parentApi } from "@/lib/api";
 import type { ParentApi, ReportListResult } from "@/lib/api/types";
@@ -62,9 +63,7 @@ export function ReportListScreen({ api = parentApi }: { api?: ParentApi }) {
 
   return (
     <CenteredShell width="wide">
-      <Link href="/parent" className="text-parent-body text-muted underline">
-        ← 보호자 홈
-      </Link>
+      <BackButton href="/parent" label="보호자 홈" />
       <h1 className="mt-4 text-parent-title font-bold text-text">리포트</h1>
 
       {data.children.length > 1 ? (

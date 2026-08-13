@@ -15,6 +15,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { BackButton } from "@/components/ui/BackButton";
+import { CharacterPortrait } from "@/features/play/CharacterPortrait";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
@@ -195,22 +197,29 @@ export function StoryDetailScreen({
 
   return (
     <div className="flex min-h-dvh w-full flex-col bg-bg lg:flex-row">
-      {/* 좌 45% 표지 */}
-      <div className="flex min-h-60 w-full items-center justify-center bg-primary-soft lg:min-h-dvh lg:w-[45%]">
-        {/* 표지 미수령 (assets.md §3-1) */}
-        <span className="text-parent-body font-bold text-muted">표지 준비 중</span>
+      {/* 좌 45% 표지 — 여백을 두고 라운드 처리한다. 화면 끝에 붙은 사각형은
+          앱이 아니라 배너처럼 보인다. */}
+      <div className="flex min-h-60 w-full shrink-0 items-center justify-center p-6 lg:min-h-dvh lg:w-[45%]">
+        {/* 뒤로가기는 표지 위에 얹되 **표지 컨테이너 기준으로** 20px 들여놓는다.
+            바깥 패딩(p-6 = 24px)을 기준으로 top-6을 주면 버튼이 표지가 시작하는
+            좌표 정확히 그 지점에 앉아 모서리에 딱 붙는다. 기준을 표지 자신으로
+            바꾸면 나중에 패딩을 조정해도 다시 붙지 않는다.
+            20px은 rounded-card(28px) 곡선 안쪽이다 — (20,20)은 모서리 원 중심
+            (28,28)에서 11.3px이고 반지름 28px보다 작다. */}
+        <div className="relative flex size-full items-center justify-center overflow-hidden rounded-card bg-primary-soft">
+          <BackButton className="absolute top-5 left-5 z-10" />
+          {story.coverImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
+            <img src={story.coverImageUrl} alt="" className="size-full object-cover" />
+          ) : (
+            /* 표지 미수령 (assets.md §3-1). 규격 자리를 지켜 레이아웃이 흔들리지 않게 한다. */
+            <span className="text-parent-body font-bold text-muted">표지 준비 중</span>
+          )}
+        </div>
       </div>
 
       {/* 우 55% 정보 */}
       <div className="flex min-w-0 flex-1 flex-col gap-5 px-8 py-10 lg:overflow-y-auto">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="self-start text-parent-body text-muted underline"
-        >
-          ← 돌아가기
-        </button>
-
         <h1 className="text-parent-title font-bold text-text">{story.title}</h1>
         <p className="text-parent-body leading-relaxed text-text">
           {story.summary}
@@ -258,29 +267,56 @@ export function StoryDetailScreen({
 
         {story.characters.length > 0 ? (
           <div>
-            <p className="text-parent-body font-bold text-text">등장 캐릭터</p>
-            <ul className="mt-2 flex flex-wrap gap-2">
+            <p className="text-parent-body font-bold text-text">함께 만날 친구들</p>
+            {/* 원형 초상 + 이름. imageUrl이 오면 CharacterPortrait가 알아서 이미지로
+                바뀐다 — 지금은 이니셜 폴백이 규격 자리를 지킨다. (assets.md §2-2) */}
+            {/* ⚠️ 폭을 고정하지 않는다. `w-20`(80px)이면 text-sm 한글 6.6자가 한계라
+                "방귀쟁이 며느리"(8자·97px 필요)가 두 줄로 깨진다. `min-w-20`으로
+                최소 폭만 지키고 이름은 줄바꿈하지 않는다 — 부모가 flex-wrap이라
+                항목이 길어지면 다음 줄로 넘어간다. */}
+            <ul className="mt-3 flex flex-wrap gap-6">
               {story.characters.map((character) => (
                 <li
                   key={character.name}
-                  className="rounded-pill bg-secondary-soft px-4 py-1.5 text-sm font-bold text-text"
+                  className="flex min-w-20 flex-col items-center gap-2"
                 >
-                  {character.displayName}
+                  <CharacterPortrait
+                    displayName={character.displayName}
+                    imageUrl={character.imageUrl}
+                    size={72}
+                  />
+                  <span className="text-sm font-bold whitespace-nowrap text-text">
+                    {character.displayName}
+                  </span>
                 </li>
               ))}
             </ul>
           </div>
         ) : null}
 
-        <PillButton
-          size="kid-lg"
-          className="mt-2"
-          fullWidth
-          disabled={starting}
-          onClick={onStart}
-        >
-          {starting ? "준비하고 있어요…" : "이야기 시작하기"}
-        </PillButton>
+        {/* 아직 장면이 없는 이야기는 시작을 막는다. 버튼을 살려두면 `/play`에서
+            깨지는 막다른 길이 된다. 이유를 함께 적는다 — 비활성 버튼만 있으면
+            아이·보호자가 왜 안 되는지 알 수 없다. */}
+        {story.comingSoon ? (
+          <div className="mt-2 flex flex-col gap-3">
+            <p className="rounded-bubble bg-accent-soft px-5 py-4 text-parent-body leading-relaxed text-text">
+              이 이야기는 아직 준비 중이에요. 조금만 기다려 줄래?
+            </p>
+            <PillButton size="kid-lg" fullWidth disabled>
+              준비 중이에요
+            </PillButton>
+          </div>
+        ) : (
+          <PillButton
+            size="kid-lg"
+            className="mt-2"
+            fullWidth
+            disabled={starting}
+            onClick={onStart}
+          >
+            {starting ? "준비하고 있어요…" : "이야기 시작하기"}
+          </PillButton>
+        )}
       </div>
 
       {/* B-4 이어하기 확인 — 바깥 클릭으로 닫히지 않는다 (선택을 강제) */}

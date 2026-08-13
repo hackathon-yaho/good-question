@@ -1,7 +1,7 @@
 // 9단계 검증 — A-6 보호자 홈 · G-1~G-4 리포트 · H-1~H-7 설정
 import { chromium } from "playwright-core";
 
-import { SHOT, BASE, chromeExecutable } from "./_browser.mjs";
+import { SHOT, BASE, chromeExecutable, passMissionBrief } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -91,11 +91,21 @@ await page.getByText("탭하면 이야기가 시작돼요").click({ timeout: 800
 
 const LONG = "며느리가 창피해서 계속 참았던 것 같아요. 가족들에게 솔직하게 말하면 좋겠어요. 그러면 마음이 편해질 거예요.";
 let utterances = 0;
-// 대화 장면 4개를 끝까지 간다. handoff 스위트와 같은 예산이 필요하다.
-for (let step = 0; step < 120; step++) {
+/**
+ * 대화 장면 4개를 끝까지 간다. 제한은 **시간**이다.
+ *
+ * ⚠️ 반복 횟수(`step < 120`)로 세지 않는다. 한 번 도는 동안 화면 상태 하나에만
+ *    반응하므로 캐릭터 발화·응답 대기 구간에서는 반복만 소모한다. 미션이
+ *    [브리프 → 발화]를 네 번 돌게 되면서 필요한 반복이 늘었고, 병렬 실행에서는
+ *    더 늘어난다 — 숫자를 올릴 때마다 또 모자란다. (handoff와 같은 방식)
+ */
+const COMPLETE_DEADLINE_MS = 180_000;
+const completeStartedAt = Date.now();
+while (Date.now() - completeStartedAt < COMPLETE_DEADLINE_MS) {
   if (path().startsWith("/activity/")) break;
   const body = await bodyText();
   if (body.includes("계속하기")) await page.getByRole("button", { name: "계속하기" }).click().catch(() => {});
+  else if (body.includes("말해볼래요")) await passMissionBrief(page);
   else if (body.includes("이제 말해 볼까?")) { await page.evaluate((t) => window.__say(t), LONG); utterances += 1; }
   else if (body.includes("이렇게 말한 게 맞아?")) await page.getByRole("button", { name: "보내기" }).click().catch(() => {});
   else if (body.includes("다음") || body.includes("이야기 시작하기")) {
@@ -120,6 +130,17 @@ const CARD_ORDER = [
   "며느리의 방귀로 높은 배나무의 배가 우수수 떨어졌어요.",
   "시아버지가 며느리에게 미안하다고 말했어요.",
 ];
+/**
+ * ⚠️ 완주에 실패했으면 여기서 멈춘다. 예전에는 `/activity`에 못 갔는데도 활동
+ *    시작 버튼을 눌러 **스위트 전체가 예외로 죽었고**, 뒤쪽 G·H 검사 60여 건이
+ *    통째로 사라졌다. 앞선 실패 1건이 나머지를 가리면 안 된다.
+ */
+if (!path().startsWith("/activity/")) {
+  console.log("  FAIL 완주하지 못해 리포트 상세 검사를 건너뛴다");
+  await browser.close();
+  process.exit(1);
+}
+
 await page.getByRole("button", { name: "시작하기" }).click({ timeout: 8000 });
 await page.getByText("이야기 순서대로 놓아볼까?").waitFor({ timeout: 8000 });
 for (const text of CARD_ORDER) {
@@ -162,6 +183,8 @@ for (let step = 0; step < 40; step++) {
   } else if (body.includes("이렇게 말한 게 맞아?")) {
     await page.getByRole("button", { name: "보내기" }).click().catch(() => {});
     submitted = true;
+  } else if (body.includes("말해볼래요")) {
+    await passMissionBrief(page);
   } else if (body.includes("이제 말해 볼까?")) {
     await page.evaluate((t) => window.__say(t), LONG);
   } else if (body.includes("다음") || body.includes("이야기 시작하기")) {
@@ -307,7 +330,7 @@ ok(
 await page.getByRole("button", { name: "민준 프로필 수정" }).click();
 await page.getByLabel("이름").waitFor({ timeout: 5000 }).catch(() => {});
 await page.getByLabel("이름").fill("민준이");
-await page.getByRole("button", { name: "캐릭터 color5" }).click();
+await page.getByRole("button", { name: "캐릭터 거북이" }).click();
 await page.getByRole("button", { name: "저장" }).click();
 await page.waitForTimeout(900);
 ok(await page.getByText("민준이", { exact: true }).isVisible(), "이름 수정 반영");

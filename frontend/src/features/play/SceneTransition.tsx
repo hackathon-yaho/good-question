@@ -58,9 +58,14 @@ export function SceneTransition({
 
       <CharacterPortrait displayName={displayName} size={120} />
 
-      <div className="z-10 w-full max-w-shell-card">
-        <SpeechBubble speaker="character" emphasis>
-          {closingText}
+      {/* 마무리 대사가 이 화면의 주인공이다. 폭을 넓히고 가운데 정렬해
+          "장면이 닫혔다"는 느낌을 준다. 평가 문구가 아니라 연결이다.
+          `align="center"`가 필요한 이유는 SpeechBubble 주석에 적어뒀다.
+          폭은 shell-wide(720px) — 31px 글자로 한글 26자다. 22자 규칙(§1-3)보다
+          약간 넓은데, 이건 아이가 읽는 본문이 아니라 캐릭터가 읽어주는 대사다. */}
+      <div className="z-10 w-full max-w-shell-wide">
+        <SpeechBubble speaker="character" emphasis align="center">
+          <span className="block text-center leading-relaxed">{closingText}</span>
         </SpeechBubble>
       </div>
 
@@ -68,7 +73,8 @@ export function SceneTransition({
         <ThinkingElementStars accumulatedElements={accumulatedElements} />
       </div>
 
-      <p className="z-10 text-kid-body text-muted">
+      {/* 다음 장면 안내 — 아이가 이 줄을 보고 "계속하기"를 누른다. 눈에 들어와야 한다 */}
+      <p className="z-10 text-narration font-bold text-text">
         {nextScreenIndex
           ? `장면 ${nextScreenIndex}${numberRo(nextScreenIndex)} 넘어갈게요`
           : "이야기가 끝났어요"}

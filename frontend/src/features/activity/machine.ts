@@ -26,6 +26,19 @@ export type ActivityState = {
    * D-4를 "맞췄어!"가 아니라 "이런 순서였어"로 그린다. 실패를 지적하지는 않는다.
    */
   orderRevealed: boolean;
+  /**
+   * 직전 제출이 오답이었는지. D-2 슬롯에 테두리로 표시한다.
+   * **카드를 다시 옮기면 꺼진다** — 고치는 중에도 계속 지적하면 위축된다.
+   */
+  orderMismatched: boolean;
+  /**
+   * 칸별 정오. 서버가 `slotResults`를 실어 보냈을 때만 값이 있다.
+   *
+   * 있으면 **틀린 칸만** 표시한다. 없으면 `orderMismatched`로 배치 전체를 표시한다 —
+   * 서버가 어느 칸이 틀렸는지 알려주지 않으면 프론트는 알 방법이 없다.
+   * 정답을 알아내려 하면 채점하는 셈이 된다. (§0-2)
+   */
+  slotResults: boolean[] | null;
   retellingKeywords: string[];
   /** D-5에서 아이가 실제로 말한 키워드 */
   spokenKeywords: string[];
@@ -44,6 +57,8 @@ export const initialActivityState: ActivityState = {
   slots: [null, null, null, null],
   attemptCount: 0,
   orderRevealed: false,
+  orderMismatched: false,
+  slotResults: null,
   retellingKeywords: [],
   spokenKeywords: [],
   retellingText: "",
@@ -145,7 +160,8 @@ export function activityReducer(
         else tray = [...tray, displaced];
       }
 
-      return { ...state, slots, tray };
+      // 다시 놓기 시작하면 오답 표시를 끈다.
+      return { ...state, slots, tray, orderMismatched: false, slotResults: null };
     }
 
     case "REMOVE": {
@@ -153,11 +169,11 @@ export function activityReducer(
       if (!card) return state;
       const slots = [...state.slots];
       slots[action.slotIndex] = null;
-      return { ...state, slots, tray: [...state.tray, card] };
+      return { ...state, slots, tray: [...state.tray, card], orderMismatched: false, slotResults: null };
     }
 
     case "SUBMIT_ORDER":
-      return state;
+      return { ...state, orderMismatched: false, slotResults: null };
 
     case "ORDER_RESULT": {
       const { result } = action;
@@ -168,6 +184,8 @@ export function activityReducer(
           attemptCount: result.attemptCount,
           retellingKeywords: result.retellingKeywords ?? [],
           orderRevealed: false,
+          orderMismatched: false,
+          slotResults: null,
         };
       }
 
@@ -188,6 +206,10 @@ export function activityReducer(
           attemptCount: result.attemptCount,
           retellingKeywords: result.retellingKeywords ?? [],
           orderRevealed: true,
+          // 3회째에는 표시하지 않는다. 정답을 보여주며 넘어가는 판이다.
+          // 다음 시도가 없는데 지적만 남기는 게 되므로 칸별 표시도 끈다.
+          orderMismatched: false,
+          slotResults: null,
           // 화면에 보여줄 순서를 정답으로 바꾼다. 돌아갈 길이 없으므로
           // 슬롯을 덮어써도 안전하고, 화면이 실제로 그 순서를 그린다.
           slots: arrangeBy(result.correctOrder, state) ?? state.slots,
@@ -199,6 +221,10 @@ export function activityReducer(
         ...state,
         step: ActivityStep.FEEDBACK,
         attemptCount: result.attemptCount,
+        orderMismatched: true,
+        // 서버가 칸별 정오를 줬으면 그걸 쓴다. 없으면 null로 두고
+        // `orderMismatched`가 배치 전체를 표시한다.
+        slotResults: result.slotResults ?? null,
       };
     }
 

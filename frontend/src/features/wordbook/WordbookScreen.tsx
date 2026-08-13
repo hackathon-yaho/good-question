@@ -104,7 +104,9 @@ export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
           </p>
         </div>
       ) : (
-        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        // 4열 분기는 `lg:`(1024px)다. `xl:`(1280px)이면 태블릿 1133·1180px이
+        // 2열로 떨어진다 — 이야기 목록과 같은 이유다.
+        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {words.map((word, index) => (
             <li
               key={word.id}

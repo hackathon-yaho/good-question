@@ -11,18 +11,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
+import { BackButton } from "@/components/ui/BackButton";
 import { PillButton } from "@/components/ui/PillButton";
 import { parentApi } from "@/lib/api";
 import type { NoticeItem, ParentApi } from "@/lib/api/types";
 
-const BACK = (
-  <Link href="/parent/settings" className="text-parent-body text-muted underline">
-    ← 설정
-  </Link>
-);
+const BACK = <BackButton href="/parent/settings" label="설정" />;
 
 /* ── H-3 공지사항 ──────────────────────────────────────────────────── */
 

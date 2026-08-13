@@ -301,6 +301,10 @@ await page.route("**/localhost:8080/api/**", async (route) => {
   if (path === `/sessions/${SESSION_ID}` && request.method() === "GET") {
     return json(snapshot());
   }
+  if (path === `/sessions/${SESSION_ID}` && request.method() === "PATCH") {
+    server.status = "stopped";
+    return json({ status: "stopped" });
+  }
   if (path.endsWith("/complete")) {
     // 서술 장면만 여기로 온다. 프론트가 dialogue에 부르면 실서버는 400이다.
     const current = SCENES[server.sceneIndex];
@@ -457,6 +461,14 @@ await page.getByText("민준").first().click();
 await page.waitForURL("**/home**", { timeout: 8000 }).catch(() => {});
 await page.waitForTimeout(700);
 ok(seen("GET", "/home"), "GET /home 호출");
+/**
+ * 실서버 응답에는 `starDust`가 없다(백엔드가 노출하지 않는다). 그때 칩이 숨어야 한다 —
+ * "별가루 0"을 보여주면 아이가 모은 것이 사라진 것처럼 읽힌다. (계획 D4)
+ */
+ok(
+  (await page.getByText(/별가루/).count()) === 0,
+  "starDust 필드가 없으면 별가루 칩을 숨긴다"
+);
 ok(
   lastOf("/home")?.query.includes(`childId=${CHILD_ID}`),
   "childId 쿼리 포함",
@@ -663,6 +675,19 @@ ok(
   typeof retellBody?.retellingText === "string" && retellBody.retellingText.length > 0,
   "retelling 본문이 { retellingText }"
 );
+
+/* ── C-13 이야기 나가기 ─────────────────────────────────────────── */
+
+console.log("\n=== C-13 이야기 나가기 (PATCH) ===");
+server.sceneIndex = 2;
+server.status = "in_progress";
+await page.goto(`${BASE}/play/${SESSION_ID}?api=backend`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "잠시 멈춤" }).click({ timeout: 10000 }).catch(() => {});
+await page.getByRole("button", { name: /이야기 나가기/ }).click({ timeout: 8000 }).catch(() => {});
+await page.waitForTimeout(900);
+const stopCall = calls.filter((c) => c.method === "PATCH" && c.path === `/sessions/${SESSION_ID}`).at(-1);
+ok(stopCall !== undefined, "PATCH /sessions/{id} 호출 — 세션을 stopped로 저장");
+ok(stopCall?.body?.status === "stopped", "본문이 { status: \"stopped\" }", JSON.stringify(stopCall?.body));
 
 /* ── 단어장 쓰기 · 아이 등록 (본문 모양) ────────────────────────── */
 

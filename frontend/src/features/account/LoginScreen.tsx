@@ -85,15 +85,14 @@ export function LoginScreen() {
     <div className="flex min-h-dvh w-full bg-bg">
       {/* 좌 55% 일러스트 패널 — 일러스트 미수령이라 색면 + 로고타입으로 대체 */}
       <aside className="relative hidden w-[55%] shrink-0 flex-col justify-between bg-primary-soft p-12 lg:flex">
-        <span className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-12 items-center justify-center rounded-bubble bg-primary text-2xl font-bold text-white"
-          >
-            Q
-          </span>
-          <span className="text-2xl font-bold text-primary">굿퀘스천</span>
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
+        <img
+          src="/logo-wordmark.webp"
+          alt="굿퀘스천"
+          width={200}
+          height={72}
+          className="h-auto w-50"
+        />
 
         <p className="max-w-md text-parent-title leading-relaxed font-bold text-text">
           옛이야기 속 인물과 이야기를 나누며

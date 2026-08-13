@@ -56,6 +56,15 @@ export const playApiClient: PlayApi = {
       { method: "POST" }
     );
   },
+
+  /** C-13 이야기 나가기. `status`는 `"stopped"` 고정이고 다른 값이면 400이다. */
+  stopSession(sessionId) {
+    return request<void>(`/sessions/${sessionId}`, {
+      method: "PATCH",
+      body: { status: "stopped" },
+      expectEmpty: true,
+    });
+  },
 };
 
 export const activityApiClient: ActivityApi = {

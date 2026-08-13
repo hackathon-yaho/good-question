@@ -9,6 +9,8 @@
 import { Modal } from "@/components/ui/Modal";
 import { MicButton } from "@/components/ui/MicButton";
 import { PillButton } from "@/components/ui/PillButton";
+import { StarDustIcon } from "@/components/ui/StarDust";
+import { StarDustRain } from "@/components/ui/StarDustRain";
 import type { ActivityCard, RetellingResult } from "@/lib/api/types";
 
 /** D-1 활동 인트로 */
@@ -395,20 +397,8 @@ export function ActivityComplete({
 
   return (
     <div className="relative flex size-full flex-col items-center justify-center gap-6 overflow-hidden px-10">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        {[
-          [10, 20], [26, 70], [42, 18], [58, 62], [74, 28], [88, 72],
-          [18, 48], [66, 10],
-        ].map(([left, top], i) => (
-          <span
-            key={i}
-            style={{ left: `${left}%`, top: `${top}%`, animationDelay: `${i * 0.2}s` }}
-            className="absolute animate-pulse text-3xl text-accent"
-          >
-            ✦
-          </span>
-        ))}
-      </div>
+      {/* 별가루가 떨어진다. 반짝이는 점 대신 실제로 모은 것이 쏟아지는 느낌을 준다. */}
+      <StarDustRain />
 
       <div
         aria-hidden
@@ -420,6 +410,14 @@ export function ActivityComplete({
       <h1 className="z-10 text-hero leading-tight font-bold text-text">
         이야기를 끝까지 해냈어!
       </h1>
+
+      {/* 획득 별가루 — 서버가 값을 줄 때만. 없으면 이 줄이 사라진다. (계획 D4) */}
+      {typeof result.earnedStarDust === "number" ? (
+        <p className="z-10 flex items-center gap-2 text-kid-button font-bold text-text">
+          <StarDustIcon size={28} className="text-accent" />
+          별가루 +{result.earnedStarDust.toLocaleString("ko-KR")}
+        </p>
+      ) : null}
 
       <ul className="z-10 flex gap-4">
         {stats.map((stat) => (

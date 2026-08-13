@@ -158,6 +158,8 @@ export function ActivityScreen({
             tray={state.tray}
             slots={orderedSlots}
             attemptCount={state.attemptCount}
+            mismatched={state.orderMismatched}
+            slotResults={state.slotResults}
             submitting={submitting}
             canSubmit={isOrderComplete(state)}
             onPlace={(cardId, slotIndex) =>

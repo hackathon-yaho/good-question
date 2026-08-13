@@ -12,142 +12,106 @@ import { PillButton } from "@/components/ui/PillButton";
 import { MicButton } from "@/components/ui/MicButton";
 import { SpeechBubble } from "@/components/ui/SpeechBubble";
 import { ThinkingElementStars } from "@/components/ui/ThinkingElementStars";
-import { CharacterPortrait } from "@/features/play/CharacterPortrait";
 import { ConversationHistory } from "@/features/play/ConversationHistory";
-import { HighlightedText } from "@/features/play/HighlightedText";
-import type { HighlightWord, Message } from "@/lib/api/types";
+import type { Message } from "@/lib/api/types";
+import { subjectParticle } from "@/lib/korean";
 
-/** C-2 우측 — 대기 상태. "지금은 아니야"가 확실히 읽혀야 한다. */
+/**
+ * C-1 · C-2 우측 — 이야기를 듣는 동안. "지금은 아니야"가 확실히 읽혀야 한다.
+ *
+ * ── 캐릭터 영역을 뺐다 ─────────────────────────────────────────────
+ * 예전에는 실루엣 초상 140px이 여기 있었다. 그런데 이 순간 아이가 볼 것은
+ * **좌측 장면과 자막**이다. 우측에 큰 얼굴이 있으면 시선이 갈라지고, 곧 등장할
+ * 캐릭터를 미리 흐릿하게 보여주는 것도 이야기의 재미를 깎는다.
+ * 지금은 마이크가 꺼져 있다는 신호만 남긴다.
+ */
 export function WaitingPanel({ displayName }: { displayName: string | null }) {
   return (
     <div className="panel-inactive flex size-full flex-col items-center justify-center gap-6 px-8">
-      <CharacterPortrait
-        displayName={displayName ?? "?"}
-        size={140}
-        silhouette
-      />
       <p className="text-center text-kid-body text-muted">
         {displayName
-          ? `잠시 후 ${displayName}이(가) 이야기해요`
+          ? `잠시 후 ${displayName}${subjectParticle(displayName)} 이야기해요`
           : "잠시 후 이야기가 이어져요"}
       </p>
       <MicButton state="disabled" size={96} />
+      <p className="text-center text-parent-body text-muted">
+        이야기가 끝나면 말할 차례가 와요
+      </p>
     </div>
   );
 }
 
 /**
- * C-3 / C-7 — 캐릭터 발화 중
+ * C-3 / C-7 우측 — 이 캐릭터와 주고받은 대화 내역
  *
- * ── 미션과 함께 뜰 때 무엇이 접히는가 ───────────────────────────────
- * 미션 카드가 우측 패널의 절반을 쓰면 이 패널에 400px 남는데, 펼친 높이는 485px다.
- * 예전에는 아무 방어가 없어서 **푸터(마이크)가 패널 밖 250~300px로 밀려나** 아예
- * 보이지 않고, 말풍선끼리·헤더와 겹쳤다.
+ * ── 대사가 좌측으로 갔다 ────────────────────────────────────────────
+ * 예전에는 이 패널이 **현재 대사**를 들고 있었다. 지금은 좌측(`CharacterStage`)이
+ * 얼굴·이름·대사를 함께 보여주고, 여기는 **지금까지의 흐름**만 담는다.
+ * 아이가 "무슨 이야기를 하고 있었지?"를 확인하는 자리다.
  *
- * 두 가지로 막는다.
- *   1. 고정 영역(헤더·별 뱃지·푸터)에 shrink-0. 눌려서 내용이 삐져나오지 않게.
- *   2. **현재 대사 영역이 남는 높이를 받아 스크롤**한다. 줄어들 곳을 한 곳으로 몰면
- *      어디가 깨질지 예측할 수 있다.
+ * ── 그 캐릭터와 나눈 이야기 **전체**를 보여준다 ─────────────────────
+ * 처음에는 현재 장면 것만 보여줬다. 그런데 같은 캐릭터가 여러 장면에 나온다
+ * (PRD I-13 · 방귀쟁이 며느리는 장면 1과 4에 모두 등장). 지금 장면 것만 보여주면
+ * 아이가 "이 친구랑 아까 무슨 이야기 했었지?"를 확인할 수 없다.
  *
- * compact(미션이 열린 상태)에서는 지난 대화 기록과 푸터의 비활성 마이크를 접는다.
- * 지난 기록은 맥락일 뿐이고, "지금은 들을 차례"는 헤더의 "말하는 중" 칩과
- * 푸터 문구가 이미 전한다.
+ * ⚠️ **다른 캐릭터 대사는 여전히 섞지 않는다.** 세션 전체를 그대로 부으면 누가
+ *    말했는지 알 수 없다. 필터는 호출부(`PlayScreen`)가 하고, 지난 장면 묶음 앞에는
+ *    `ConversationHistory`가 "지난 이야기" 구분선을 넣는다 — 장면 1의 대화와 장면 4의
+ *    대화는 서로 다른 순간이라 이어 붙이면 한 대화로 읽힌다.
+ *
+ * GUIDED에서만 사고 요소 뱃지를 노출한다. "GUIDED"라는 개념 자체는 아이에게
+ * 보이지 않는다 — 화면에 뜨는 것은 "오늘 모은 생각"이다.
  */
-export function CharacterPanel({
+export function ConversationPanel({
   displayName,
-  text,
-  turnCount,
-  maxTurns,
   messages,
+  currentSceneId,
   accumulatedElements,
   guided,
-  onReplay,
-  highlightWords = [],
-  onWordClick,
-  compact = false,
 }: {
   displayName: string;
-  text: string;
-  turnCount: number;
-  maxTurns: number;
   messages: readonly Message[];
+  /** 지금 장면 id — 지난 장면 대화 앞에 구분선을 넣는 데 쓴다 */
+  currentSceneId?: string;
   accumulatedElements: readonly string[];
   guided: boolean;
-  /**
-   * "다시 듣기". **재생 중에도 누를 수 있어야 한다.**
-   *
-   * 이 패널은 캐릭터가 말하는 동안만 떠 있고, 재생이 끝나면 곧바로 아이 차례(C-4)로
-   * 바뀐다. 재생 중을 막으면 **누를 수 있는 순간이 아예 없다.** 실제로 그랬다.
-   * 눌리면 처음부터 다시 재생한다.
-   */
-  onReplay: () => void;
-  /** 서버가 지정한 밑줄 단어. 탭하면 C-9가 열린다. */
-  highlightWords?: readonly HighlightWord[];
-  onWordClick?: (word: HighlightWord) => void;
-  /** 미션 카드가 함께 떠 있어 공간이 좁을 때 */
-  compact?: boolean;
 }) {
   return (
     <div className="flex size-full min-h-0 flex-col">
-      {/* 헤더 아래에 구분선을 두지 않는다. 캐릭터 이름은 말풍선의 임자이므로
-          말풍선과 한 덩어리로 읽혀야 하는데, 선을 그으면 **제목 바**처럼 보인다.
-          아바타와 작은 muted 글씨로 이미 충분히 구분된다.
-          C-4와 같은 자리이므로 양쪽에서 같이 뺀다. 매 턴 C-3↔C-4를 오갈 때
-          같은 y에서 선이 생기고 사라지면 그게 더 거슬린다. */}
-      <header className="flex shrink-0 items-center gap-3 px-6 pt-4">
-        <CharacterPortrait
-          displayName={displayName}
-          size={compact ? 56 : 72}
-          speaking
-        />
-        <div className="min-w-0">
-          <p className="truncate text-kid-body font-bold text-text">
-            {displayName}
-          </p>
-          <span className="rounded-pill bg-info px-2.5 py-0.5 text-sm font-bold text-white">
-            말하는 중
-          </span>
-        </div>
-        <span className="ml-auto shrink-0 text-parent-body font-bold text-muted">
-          {Math.min(turnCount, maxTurns)} / {maxTurns}
+      {/* 셸의 "잠시 멈춤" 버튼이 y=24~68을 쓴다. `pr-28`은 칩이 그 아래로 들어가지
+          않게 하고, `min-h-[4.5rem]`(72px)은 **아래 대화 내역이 버튼 밑으로
+          스크롤되지 않게** 한다. 헤더가 버튼보다 낮으면 말풍선이 버튼에 가려
+          글자가 잘린다. */}
+      <header className="flex min-h-[4.5rem] shrink-0 items-center gap-3 px-6 pt-4 pr-28">
+        <p className="min-w-0 truncate text-parent-body font-bold text-muted">
+          {displayName}와 나눈 이야기
+        </p>
+        <span className="shrink-0 rounded-pill bg-info px-2.5 py-0.5 text-sm font-bold text-white">
+          말하는 중
         </span>
       </header>
 
-      {/* 남는 높이를 여기서 받는다. 좁아지면 이 영역만 스크롤된다. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-        <SpeechBubble speaker="character" emphasis>
-          {onWordClick && highlightWords.length > 0 ? (
-            <HighlightedText
-              text={text}
-              words={highlightWords}
-              onWordClick={onWordClick}
-            />
-          ) : (
-            text
-          )}
-        </SpeechBubble>
-        <div className="mt-3 flex justify-end">
-          <PillButton variant="outlined" onClick={onReplay}>
-            다시 듣기
-          </PillButton>
-        </div>
-      </div>
+      {messages.length === 0 ? (
+        <p className="flex min-h-0 flex-1 items-center justify-center px-8 text-center text-parent-body text-muted">
+          이제 첫 이야기를 시작해요
+        </p>
+      ) : (
+        <ConversationHistory messages={messages} currentSceneId={currentSceneId} />
+      )}
 
-      {/* GUIDED에서만 별 뱃지를 노출한다. "GUIDED"라는 개념은 아이에게 보이지 않는다. */}
       {guided ? (
         <div className="shrink-0 bg-accent-soft/50 py-4">
           <ThinkingElementStars accumulatedElements={accumulatedElements} />
         </div>
       ) : null}
 
-      {/* 미션이 열려 있으면 지난 기록을 접는다. 두 영역이 flex-1을 나눠 가지면
-          둘 다 너무 좁아진다. */}
-      {compact ? null : <ConversationHistory messages={messages} />}
-
       <footer className="flex shrink-0 flex-col items-center gap-2 px-6 pb-5">
-        {compact ? null : <MicButton state="disabled" size={96} />}
+        {/* 미션 브리프는 이제 이 패널을 아예 대체하므로 좁아질 일이 없다.
+            예전의 compact 분기를 지웠다. */}
+        <MicButton state="disabled" size={96} />
         <p className="text-parent-body text-muted">
-          {displayName}이(가) 말하고 있어요
+          {displayName}
+          {subjectParticle(displayName)} 말하고 있어요
         </p>
       </footer>
     </div>
@@ -169,8 +133,7 @@ export function CharacterPanel({
  * → `ThinkingPanel`
  */
 export function ChildTurnPanel({
-  displayName,
-  previousText,
+  missionItem = null,
   recording,
   transcribing = false,
   interimText,
@@ -178,10 +141,12 @@ export function ChildTurnPanel({
   onMicClick,
   onSubmit,
   submitDisabled,
-  compact = false,
 }: {
-  displayName: string;
-  previousText: string;
+  /**
+   * 미션 진행 중이면 **지금 말할 항목**. 미션 카드는 감추지만(계획 D17) 방금 읽은
+   * 항목을 잊지 않게 한 줄로 남긴다. 카드가 아니라 라벨이다.
+   */
+  missionItem?: string | null;
   recording: boolean;
   /** ① 변환 중. 마이크를 끄고 문구를 바꾼다. */
   transcribing?: boolean;
@@ -190,8 +155,6 @@ export function ChildTurnPanel({
   onMicClick: () => void;
   onSubmit: () => void;
   submitDisabled: boolean;
-  /** 미션 카드가 함께 떠 있어 공간이 좁을 때. 지난 대사 줄을 접는다. */
-  compact?: boolean;
 }) {
   const micState = transcribing
     ? "disabled"
@@ -201,28 +164,32 @@ export function ChildTurnPanel({
 
   return (
     <div className="flex size-full min-h-0 flex-col">
-      {/* 구분선 없음 — 이유는 CharacterPanel 헤더 주석 참조 */}
-      <header className="flex shrink-0 items-center gap-3 px-6 pt-4">
-        <CharacterPortrait displayName={displayName} size={56} />
-        <p className="truncate text-parent-body font-bold text-muted">
-          {displayName}
-        </p>
-      </header>
-
-      {/* 미션 카드가 열려 있으면 이 줄을 접는다. 흐린 지난 대사는 맥락일 뿐이고,
-          아이에게 지금 필요한 것은 미션 내용과 마이크다. 둘 다 펼치면 우측 패널에
-          들어가지 않는다. */}
-      {compact ? null : (
-        <div className="shrink-0 px-6 py-4">
-          <SpeechBubble speaker="character" dimmed>
-            {previousText}
-          </SpeechBubble>
-        </div>
-      )}
+      {/* NPC 프로필과 지난 대사를 뺐다. 좌측(`CharacterStage`)이 얼굴·이름·대사를
+          이미 보여주므로 같은 정보를 우측에 또 두면 마이크 자리를 잡아먹는다.
+          이 패널은 **말하는 일**에만 쓴다. */}
 
       {/* overflow-hidden이 없으면 좁아졌을 때 마이크가 위아래로 삐져나와
-          말풍선과 푸터를 덮는다. */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-6">
+          말풍선과 푸터를 덮는다.
+          ⚠️ `pt-20`이 없으면 "이제 말해 볼까?"의 위쪽이 **잘린다.** 아래 마이크 칸이
+             `flex-1`로 남은 높이를 다 가져가 열이 꽉 차고, 그러면 `justify-center`가
+             할 일이 없어져 문구가 y=0에 앉는다. text-turn은 32px이라 그대로 잘린다.
+          ⚠️ 80px인 이유: 셸의 "잠시 멈춤" 버튼이 y=24~68을 쓴다. 그 아래에서 시작하면
+             **세로로 겹치지 않으므로 가로 위치와 무관하게 안전하다.**
+             예전에는 `pr-28`(112px)로 오른쪽을 비워 피했는데, 그 버튼은 우상단
+             모서리에만 있는데도 열 전체에 여백이 걸려 **마이크까지 43px 왼쪽으로
+             밀렸다.** 좌우 여백을 대칭으로 두면 모든 요소가 패널 진짜 중심에 온다. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-6 pt-20">
+        {missionItem ? (
+          <p className="flex shrink-0 items-center gap-2 self-start">
+            <span className="rounded-pill bg-primary px-2.5 py-0.5 text-xs font-bold text-white">
+              미션
+            </span>
+            <span className="text-parent-body font-bold text-text">
+              {missionItem}
+            </span>
+          </p>
+        ) : null}
+
         <p className="shrink-0 text-center text-turn leading-tight font-bold text-primary">
           {transcribing ? "잘 들었어!" : "이제 말해 볼까?"}
         </p>
@@ -335,16 +302,14 @@ export function ConfirmPanel({
  * C-6 — 응답 대기(②). 기술적인 스피너를 쓰지 않는다.
  * "캐릭터가 생각하고 있다"로 읽혀야 한다.
  *
- * ①(변환 중)과 **다른 화면이다.** ①은 아이 차례 틀에서 마이크만 꺼지고,
- * 여기는 캐릭터 초상화가 나온다. 요청 문서가 두 구간을 구분해 달라고 요구한다.
- * 예산은 10초. (docs/request/frontend/stt-tts-integration.md)
+ * ①(변환 중)과 **다른 화면이다.** ①은 아이 차례 틀에서 마이크만 꺼지고, 여기는
+ * 내 말이 말풍선으로 올라간 뒤 캐릭터가 생각하는 구간이다. 요청 문서가 두 구간을
+ * 구분해 달라고 요구한다. 예산은 10초. (docs/request/frontend/stt-tts-integration.md)
  */
 export function ThinkingPanel({
-  displayName,
   childText,
   elapsedMs,
 }: {
-  displayName: string;
   childText: string;
   elapsedMs: number;
 }) {
@@ -357,11 +322,9 @@ export function ThinkingPanel({
         <SpeechBubble speaker="child">{childText}</SpeechBubble>
       </div>
 
-      {/* overflow-hidden이 없으면 좁아졌을 때 초상화가 위아래로 삐져나와
-          말풍선과 푸터를 덮는다. */}
+      {/* 초상화를 여기 두지 않는다. 좌측 패널이 같은 얼굴을 상시 그리고 있어
+          한 화면에 두 번 나온다 (2026-08-13 개편). 기다리는 신호만 남긴다. */}
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 overflow-hidden">
-        <CharacterPortrait displayName={displayName} size={120} thinking />
-
         <div className="flex items-center gap-1.5 rounded-bubble border border-border bg-surface px-5 py-3">
           {[0, 1, 2].map((i) => (
             <span
@@ -384,11 +347,9 @@ export function ThinkingPanel({
 
 /** I-2 — 인식 실패. 빨간색·경고 아이콘을 쓰지 않는다. 아이 잘못이 아니다. */
 export function MicErrorPanel({
-  displayName,
   onRetry,
   onSkip,
 }: {
-  displayName: string;
   onRetry: () => void;
   onSkip: () => void;
 }) {
@@ -397,8 +358,8 @@ export function MicErrorPanel({
     // 모자라면 위에서부터 채워 스크롤로 닿게 한다.
     <div className="flex size-full min-h-0 flex-col overflow-y-auto px-8 py-6">
       <div className="m-auto flex w-full flex-col items-center gap-5">
-        <CharacterPortrait displayName={displayName} size={120} />
-
+        {/* 초상화 없음 — 좌측 패널에 이미 있다 (ThinkingPanel과 같은 이유).
+            자리가 빠진 만큼 미션과 함께 떠도 넘치지 않는다. */}
         <p className="text-headline font-bold text-primary">잘 안 들렸어</p>
         <p className="text-kid-body text-muted">조금 더 크게 말해줄래?</p>
 

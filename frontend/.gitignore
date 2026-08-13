@@ -52,3 +52,5 @@ scripts/verify/.shots/
 public/characters/
 public/logo.png
 
+# 분리 빌드 출력 (GQ_DIST_DIR)
+/.next-build/
