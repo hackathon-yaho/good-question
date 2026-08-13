@@ -18,13 +18,26 @@ import type {
   ConsentValues,
   HomeSnapshot,
 } from "@/lib/api/types";
-import { activeMockSession } from "@/lib/api/mock";
+import { activeMockSession, mockSessionsOf } from "@/lib/api/mock";
 import { STORY_META } from "@/mocks/story-banggui";
+import { CATALOG_STORIES } from "@/mocks/story-catalog";
 
 /** 아이 최대 등록 인원 — PRD I-09 */
 const CHILD_LIMIT = 3;
 
 const STORE_KEY = "gq.mock.account";
+
+/**
+ * 이야기 1편 완료당 별가루. 백엔드 B-20이 정한 값이다.
+ * 시안에는 `+5`로 그려져 있지만 **숫자는 데이터이지 디자인이 아니다** — 목이 규칙을
+ * 다르게 재현하면 실연동에서 값이 튄다. (계획 D16)
+ */
+const STAR_DUST_PER_STORY = 100;
+
+/** 완료한 이야기 수. 실제로는 서버가 `children.star_dust`를 직접 들고 있다. */
+function completedCount(childId: string): number {
+  return mockSessionsOf(childId).filter((s) => s.status === "completed").length;
+}
 
 type StoredChild = {
   id: string;
@@ -149,7 +162,13 @@ export const mockAccountApi: AccountApi = {
     const active = activeMockSession(childId);
 
     const snapshot: HomeSnapshot = {
-      child: { id: child.id, name: child.name, avatarId: child.avatarId },
+      child: {
+        id: child.id,
+        name: child.name,
+        avatarId: child.avatarId,
+        // 백엔드 B-20: 이야기 완료 1편당 +100
+        starDust: completedCount(child.id) * STAR_DUST_PER_STORY,
+      },
       inProgress: active
         ? {
             sessionId: active.sessionId,
@@ -162,6 +181,7 @@ export const mockAccountApi: AccountApi = {
           }
         : null,
       // 추천 로직은 구현 대상이 아니다. published 목록을 그대로 내려준다. (PRD F-02)
+      // 재생 가능한 1편 + 카탈로그 전용 2편 = 3편. (계획 D3a · story-catalog.ts)
       recommended: [
         {
           id: STORY_META.id,
@@ -170,6 +190,13 @@ export const mockAccountApi: AccountApi = {
           estimatedMinutes: STORY_META.estimatedMinutes,
           topics: [...STORY_META.topics],
         },
+        ...CATALOG_STORIES.map((story) => ({
+          id: story.id,
+          title: story.title,
+          coverImageUrl: story.coverImageUrl,
+          estimatedMinutes: story.estimatedMinutes,
+          topics: [...story.topics],
+        })),
       ],
     };
     return snapshot;

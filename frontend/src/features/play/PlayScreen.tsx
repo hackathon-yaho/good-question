@@ -19,21 +19,25 @@ import {
   currentSentence,
   initialPlayState,
   isLastSentence,
+  missionDoneCount,
   playReducer,
   visibleMessages,
 } from "@/features/play/machine";
 import { IntroFullscreen } from "@/features/play/IntroFullscreen";
 import { MissionCard } from "@/features/play/MissionCard";
+import { Mission2Card } from "@/features/play/Mission2Card";
+import { isChoiceMission } from "@/features/play/mission2";
 import {
   DEFAULT_PLAY_SETTINGS,
   PauseSheet,
   type PlaySettings,
 } from "@/features/play/PauseSheet";
+import { CharacterStage } from "@/features/play/CharacterStage";
 import { SceneStage } from "@/features/play/SceneStage";
 import { SceneTransition } from "@/features/play/SceneTransition";
 import {
-  CharacterPanel,
   ChildTurnPanel,
+  ConversationPanel,
   ConfirmPanel,
   MicErrorPanel,
   ThinkingPanel,
@@ -42,12 +46,13 @@ import {
 
 import { WordPopup } from "@/features/play/WordPopup";
 import { useNetworkError, withTimeout } from "@/features/system/NetworkErrorHost";
-import { mockPlayApi } from "@/lib/api/mock";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { errorCodeOf } from "@/lib/api/errors";
+import { playApi } from "@/lib/api";
+import { contentApi as defaultContentApi } from "@/lib/api";
 import type { ContentApi, HighlightWord, PlayApi } from "@/lib/api/types";
 import { getSelectedChildId } from "@/lib/client-store";
 import { STORY_ID } from "@/mocks/story-banggui";
-import { PlayState, isCharacterTurn } from "@/lib/play-state";
+import { PlayState, isCharacterTurn, type SceneType } from "@/lib/play-state";
 import { playTurnChime } from "@/lib/sound";
 import { RESPOND_TIMEOUT_MS } from "@/lib/api/speech";
 import { useCharacterVoice, useChildSpeech } from "@/lib/speech";
@@ -60,8 +65,8 @@ import { TOTAL_SCREEN_SCENES, toScreenIndex } from "@/mocks/story-banggui";
  */
 export function PlayScreen({
   sessionId,
-  api = mockPlayApi,
-  contentApi = mockContentApi,
+  api = playApi,
+  contentApi = defaultContentApi,
 }: {
   sessionId: string;
   api?: PlayApi;
@@ -99,6 +104,31 @@ export function PlayScreen({
 
   const scene = state.scene;
   const displayName = scene?.characterDisplayName ?? "";
+
+  /**
+   * 장면 id → 캐릭터 표시명. "이 캐릭터와 나눈 이야기 전체"를 모으는 데 쓴다.
+   *
+   * ── 왜 프론트가 모으나 ──────────────────────────────────────────
+   * 서버가 주는 `messages[]`는 세션 전체지만 각 메시지에 **캐릭터 정보가 없다.**
+   * `sceneId`만 있고, 캐릭터는 `currentScene`에만 실려 온다
+   * (backend/docs/api-spec.md 6.1·5.2). 그래서 지난 장면의 대사가 누구 것인지
+   * 응답만으로는 알 수 없다.
+   *
+   * 이야기를 이어서 진행하는 동안에는 장면이 로드될 때마다 그 짝을 볼 수 있으므로
+   * 여기서 누적해 둔다. 같은 캐릭터가 여러 장면에 나오기 때문에(PRD I-13)
+   * 이 매핑이 있어야 "며느리와 나눈 이야기"를 장면 3·9에서 함께 모을 수 있다.
+   *
+   * ⚠️ **이어하기로 중간 진입하면 지난 장면의 짝을 모른다.** 그때는 모르는 장면을
+   *    **빼고** 보여준다 — 다른 캐릭터 대사를 섞는 것보다 덜 보여주는 쪽이 안전하다.
+   *    서버가 `messages[].characterName`을 실어주면 이 한계가 사라진다.
+   *    (docs/request/backend/message-character.md)
+   */
+  const sceneCharacterRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (scene?.sceneId && scene.characterDisplayName) {
+      sceneCharacterRef.current.set(scene.sceneId, scene.characterDisplayName);
+    }
+  }, [scene?.sceneId, scene?.characterDisplayName]);
 
   /**
    * 지금 화면에 떠 있는 장면. 응답이 늦게 도착했을 때 "아직 같은 장면인가"를
@@ -172,31 +202,60 @@ export function PlayScreen({
   // --- 다음 장면으로 진행 ------------------------------------------------
   // 이름 있는 함수 표현식으로 둔다. 실패 시 재시도가 자기 자신을 다시 불러야 하는데,
   // ref에 담아 두면 React 19 린트가 "훅에 넘긴 값을 다시 대입한다"고 막는다.
+  /**
+   * 장면 전환. 두 경로가 하나로 합쳐져 있다.
+   *
+   *   서술 장면(intro·narrative) — `POST .../complete`로 넘긴 뒤 세션을 다시 읽는다
+   *   대화 장면(dialogue)        — 서버가 이미 넘겨 놨다. **다시 읽기만** 한다
+   *
+   * dialogue에 `.../complete`를 부르면 400이 온다. 대화 종료 판단은 서버가
+   * `POST .../messages` 안에서 하고 `session.advanceToScene()`까지 이미 실행한다.
+   * (backend/docs/api-spec.md 5.3 · 6.1)
+   *
+   * 후속 활동 진입은 `status === "post_activity"`로 판단한다. 서버가 마지막 대화
+   * 장면을 닫을 때 세션 상태를 그렇게 바꾼다 — 프론트가 장면 수를 세지 않는다.
+   */
   const advanceScene = useCallback(
-    async function advance(sceneId: string): Promise<void> {
+    async function advance(
+      sceneId: string,
+      sceneType: SceneType
+    ): Promise<void> {
       if (advancingRef.current) return;
       advancingRef.current = true;
       setAdvancing(true);
       try {
-        const result = await withTimeout(api.completeScene(sessionId, sceneId));
-        if (result.postActivityReady || !result.nextScene) {
+        if (sceneType !== "dialogue") {
+          await withTimeout(api.completeScene(sessionId, sceneId));
+        }
+        // 자막(sceneDescription)이 complete 응답에 없어서 어느 경로든 다시 읽는다.
+        const snapshot = await withTimeout(api.getSession(sessionId));
+
+        if (snapshot.status === "post_activity") {
           dispatch({ type: "POST_ACTIVITY_READY" });
           router.push(`/activity/${sessionId}`);
           return;
         }
-        const { openingMessage, highlightWords, ...nextScene } =
-          result.nextScene;
-        dispatch({
-          type: "SCENE_LOADED",
-          scene: nextScene,
-          openingMessage,
-          highlightWords,
-        });
+        dispatch({ type: "SCENE_LOADED", snapshot });
       } catch (error) {
         console.error("[play] 장면 전환 실패", error);
+        // 이미 넘어간 장면을 다시 넘기려 한 경우(409)는 재시도해도 같다.
+        // 세션을 다시 읽어 화면을 최신으로 맞추는 것이 해소 방법이다.
+        if (errorCodeOf(error) === "SCENE_ALREADY_CLOSED") {
+          try {
+            const snapshot = await api.getSession(sessionId);
+            if (snapshot.status === "post_activity") {
+              router.push(`/activity/${sessionId}`);
+            } else {
+              dispatch({ type: "SCENE_LOADED", snapshot });
+            }
+            return;
+          } catch {
+            // 재조회도 실패했다. 아래 I-3으로 넘긴다.
+          }
+        }
         // 장면 전환이 막히면 이야기가 더 진행되지 않는다. 토스트로는 부족하다.
         // I-3을 띄우고 같은 요청을 그대로 다시 보낼 수 있게 한다. (명세 I-3)
-        network.show({ retry: () => advance(sceneId) });
+        network.show({ retry: () => advance(sceneId, sceneType) });
       } finally {
         advancingRef.current = false;
         setAdvancing(false);
@@ -236,7 +295,7 @@ export function PlayScreen({
           rate: settings.rate,
           volume: settings.volume,
           onDone: () => {
-            if (isLastSentence(state)) void advanceScene(scene.sceneId);
+            if (isLastSentence(state)) void advanceScene(scene.sceneId, scene.sceneType);
             else dispatch({ type: "SENTENCE_NEXT" });
           },
         }
@@ -381,11 +440,23 @@ export function PlayScreen({
     );
   }, [settings, speak, state.characterMessageId, state.characterText]);
 
+  /**
+   * C-13 "이야기 나가기" · 도입에서 나가기.
+   *
+   * **세션을 `stopped`로 저장한 뒤** 홈으로 보낸다. 이 호출이 없으면 세션이
+   * `in_progress`로 남아 홈의 이어하기 카드가 계속 떠 있고, 아이가 나갔다는
+   * 사실이 서버에 남지 않는다. (api-spec 5.4)
+   *
+   * 실패해도 화면은 홈으로 보낸다 — 나가려는 아이를 붙잡아 둘 이유가 없다.
+   */
   const exit = useCallback(() => {
     cancelTts();
     stt.stop();
+    void api.stopSession(sessionId).catch((error) => {
+      console.error("[play] 이야기 나가기 저장 실패", error);
+    });
     router.push("/home");
-  }, [cancelTts, router, stt]);
+  }, [api, cancelTts, router, sessionId, stt]);
 
   const openPause = useCallback(() => {
     cancelTts();
@@ -463,7 +534,7 @@ export function PlayScreen({
             // 게이트를 건너뛰고 바로 넘긴 경우에도 이후 문장은 소리가 나야 한다.
             unlockAudio();
             setAudioUnlocked(true);
-            if (isLastSentence(state)) void advanceScene(scene.sceneId);
+            if (isLastSentence(state)) void advanceScene(scene.sceneId, scene.sceneType);
             else dispatch({ type: "SENTENCE_NEXT" });
           }}
           onExit={exit}
@@ -503,7 +574,7 @@ export function PlayScreen({
           closingText={state.characterText}
           accumulatedElements={state.accumulatedElements}
           nextScreenIndex={nextIndex}
-          onContinue={() => void advanceScene(scene.sceneId)}
+          onContinue={() => void advanceScene(scene.sceneId, scene.sceneType)}
           continueDisabled={advancing}
         />
       </ImmersiveShell>
@@ -513,6 +584,58 @@ export function PlayScreen({
   const dimmed = state.status === PlayState.CHILD_TURN;
   const warm = state.status === PlayState.GUIDED;
 
+  /**
+   * 좌측에 장면 이미지를 보여줄지, 캐릭터 무대를 보여줄지.
+   *
+   * ⚠️ 기준이 `mission !== null`이 아니라 **`missionBriefOpen`** 이다. 미션은 4항목을
+   *    도는 동안 계속 살아 있으므로, mission으로 판단하면 아이가 말하는 동안에도
+   *    캐릭터 얼굴이 안 보인다. 브리프를 읽을 때만 장면 이미지를 보여준다.
+   */
+  const showScene =
+    state.status === PlayState.SCENE_NARRATION || state.missionBriefOpen;
+
+  /** 미션 체크리스트에서 완료로 표시할 항목 수 (machine.ts 주석 참조) */
+  const missionDone = state.mission
+    ? missionDoneCount(state.mission, state.missionTurns)
+    : 0;
+
+  /**
+   * 미션 2는 **택 1** 방식이라 카드가 다르다 (화면 명세 C-11).
+   * 판단 근거는 서버가 주는 `id`다 — `mission_2`는 계약에 박힌 고정 문자열이다.
+   */
+  const isMission2 = state.mission ? isChoiceMission(state.mission.id) : false;
+
+  /**
+   * 미션이 살아 있고 브리프가 닫혀 있으면 — 아이가 말하는 중이다.
+   * 카드는 감추되 **지금 말할 항목은 한 줄로 남긴다.** 카드를 통째로 없애면
+   * 방금 읽은 항목을 잊는다. (계획 D17)
+   */
+  const missionNowItem =
+    state.mission && !state.missionBriefOpen
+      ? (state.mission.checklist[missionDone]?.label ?? null)
+      : null;
+
+  /**
+   * 이 장면에서 주고받은 대화만. 세션 전체를 보여주면 지난 장면의 다른 캐릭터
+   * 대사가 섞여 누가 말했는지 알 수 없다.
+   */
+  /**
+   * **이 캐릭터와 나눈 이야기 전체.** 지금 장면 것만이 아니다.
+   *
+   * 같은 캐릭터가 여러 장면에 나오므로(PRD I-13 · 방귀쟁이 며느리는 장면 1과 4에
+   * 모두 등장) 그 캐릭터와의 대화를 모아 보여준다. 아이가 "이 친구와 무슨 이야기를
+   * 했었지?"를 그 자리에서 확인할 수 있다.
+   *
+   * ⚠️ 다른 캐릭터 대사는 섞지 않는다. 누가 말했는지 알 수 없어진다.
+   *    짝을 모르는 장면(이어하기로 중간 진입한 경우)도 뺀다 — 위 `sceneCharacterRef`
+   *    주석 참조. 지금 장면은 매핑과 무관하게 언제나 포함한다.
+   */
+  const npcMessages = messages.filter((m) => {
+    if (m.sceneId === scene.sceneId) return true;
+    if (!displayName) return false;
+    return sceneCharacterRef.current.get(m.sceneId) === displayName;
+  });
+
   return (
     <ImmersiveShell
       topRight={topRight}
@@ -520,67 +643,128 @@ export function PlayScreen({
       glowing={state.status === PlayState.CHILD_TURN}
       fontScale={settings.fontScale}
       left={
-        <SceneStage
-          progress={progress}
-          sceneLabel={`장면 ${progress?.current ?? 1}`}
-          chip={
-            state.status === PlayState.SCENE_NARRATION
-              ? "이야기 듣는 중"
-              : undefined
-          }
-          backgroundImageUrl={scene.backgroundImageUrl}
-          subtitle={
-            state.status === PlayState.SCENE_NARRATION
-              ? currentSentence(state)
-              : undefined
-          }
-          dimmed={dimmed}
-          warm={warm}
-        />
+        /**
+         * 좌측은 두 가지다.
+         *   서술 중(C-2) · 미션 노출 — 장면 이미지 + 자막
+         *   그 외(C-3~C-6)          — 배경을 흐리고 캐릭터 얼굴·이름·대사
+         *
+         * 미션이 떠 있으면 대사를 좌측에 겹치지 않는다. 아이가 볼 것은 미션 내용이고,
+         * 장면 이미지는 맥락으로 남긴다.
+         */
+        showScene ? (
+          <SceneStage
+            progress={progress}
+            sceneLabel={`장면 ${progress?.current ?? 1}`}
+            backgroundImageUrl={scene.backgroundImageUrl}
+            subtitle={
+              state.status === PlayState.SCENE_NARRATION
+                ? currentSentence(state)
+                : undefined
+            }
+            dimmed={dimmed}
+            warm={warm}
+          />
+        ) : (
+          <CharacterStage
+            displayName={displayName}
+            characterImageUrl={scene.characterImageUrl}
+            backgroundImageUrl={scene.backgroundImageUrl}
+            text={state.characterText}
+            speaking={isCharacterTurn(state.status)}
+            progress={progress}
+            sceneLabel={`장면 ${progress?.current ?? 1}`}
+            turnCount={state.turnCount}
+            maxTurns={state.maxTurns}
+            highlightWords={state.highlightWords}
+            onWordClick={setOpenWord}
+            onReplay={isCharacterTurn(state.status) ? replay : undefined}
+            // 아이 차례가 되면 대사를 흐리게 해 시선을 우측 마이크로 보낸다
+            dimmed={dimmed}
+          />
+        )
       }
       right={
-        <>
-          {/* 높이를 묶어 둔다. shrink-0가 없으면 flex가 이 상자를 눌러버리고,
-              안쪽 카드는 고유 높이를 유지해 아래 패널로 넘친다.
-              50%는 실측으로 정했다. 4단계 체크리스트를 2×2로 다 보여주는 데
-              48%가 필요하고, 남은 절반으로 마이크가 120px 넘게 확보된다.
-              더 키우면 마이크가 §1-4의 72px 하한에 가까워진다. */}
-          {state.mission ? (
-            <div className="flex max-h-[50%] shrink-0 flex-col overflow-hidden pt-4">
+        /**
+         * 미션 브리프가 열려 있으면 우측은 **브리프 전용 화면**이다.
+         *
+         *   위 — 비어 있다 (셸의 "잠시 멈춤" 버튼이 숨 쉰다)
+         *   중 — 미션 카드. `flex-1` + `items-center`로 **세로 중앙**
+         *   아래 — [말해볼래요]. 카드 밖이다
+         *
+         * 마이크를 그리지 않는다. 보이면 "지금 말해도 되나?"를 아이가 판단해야 한다.
+         * 카드가 중앙에 있으므로 잠시 멈춤 버튼(y=76px에서 끝)과 겹치지 않아
+         * 예전의 회피용 `pr-28`이 필요 없다.
+         */
+        state.missionBriefOpen && state.mission ? (
+          <div className="flex size-full min-h-0 flex-col">
+            {/* `pt-20`(80px) — 셸의 "잠시 멈춤" 버튼이 y=24~68을 쓴다. 카드가 그
+                아래에서만 커지게 해야 제목이 버튼에 가리지 않는다. 미션 1 카드는
+                작아서 중앙 정렬만으로 피했지만, 미션 2는 친구 4장이 붙어 더 높다. */}
+            <div className="flex min-h-0 flex-1 items-center px-6 pt-20">
+              {isMission2 ? (
+                <Mission2Card
+                  title={state.mission.title}
+                  selectedIndex={state.mission2Choice}
+                  onSelect={(index) =>
+                    dispatch({ type: "MISSION2_SELECT", index })
+                  }
+                  /* 한 번 말해 봤는데 미션이 다시 열렸다 = 관점 요소가 확정되지
+                     않았다. 그때만 힌트를 붙인다 — 처음부터 보여주면 아이가
+                     정해진 답을 찾으려 한다 (PRD 7.6) */
+                  showHint={state.missionTurns >= 1}
+                />
+              ) : (
               <MissionCard
                 mission={state.mission}
-                onDismiss={() => dispatch({ type: "MISSION_DISMISS" })}
+                doneCount={missionDone}
+                /**
+                 * 한 번 말해봤는데도 아직 남은 항목이 있으면 힌트를 준다.
+                 * 프론트가 발화를 채점하는 것이 아니라 **서버가 준 턴 수**만 본다.
+                 */
+                showHint={state.turnCount >= 2}
               />
+              )}
             </div>
-          ) : null}
 
+            <div className="flex shrink-0 flex-col items-center gap-2 px-6 pb-5">
+              <p className="text-parent-body text-muted">
+                {isMission2 && state.mission2Choice === null
+                  ? "친구를 고르면 말할 수 있어"
+                  : "미션을 읽고 준비되면 눌러줘"}
+              </p>
+              {/* 채움 primary — 이 화면의 유일한 행동이고, 누르면 내 차례가
+                  시작된다. §1-5가 primary를 "주요 CTA · 내 차례"로 정했다.
+                  미션 2는 **고르기 전에는 누를 수 없다** — 문장 틀의 주어가 비어 있는
+                  상태로 말하게 하면 무엇을 말해야 하는지 알 수 없다. */}
+              <PillButton
+                size="kid"
+                disabled={isMission2 && state.mission2Choice === null}
+                onClick={() => dispatch({ type: "MISSION_DISMISS" })}
+              >
+                말해볼래요
+              </PillButton>
+            </div>
+          </div>
+        ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             {state.status === PlayState.SCENE_NARRATION ? (
               <WaitingPanel displayName={scene.characterDisplayName} />
             ) : null}
 
             {isCharacterTurn(state.status) ? (
-              <CharacterPanel
+              <ConversationPanel
                 displayName={displayName}
-                text={state.characterText}
-                turnCount={state.turnCount}
-                maxTurns={state.maxTurns}
-                messages={messages}
+                messages={npcMessages}
+                currentSceneId={scene.sceneId}
                 accumulatedElements={state.accumulatedElements}
                 guided={state.status === PlayState.GUIDED}
-                onReplay={replay}
-                highlightWords={state.highlightWords}
-                onWordClick={setOpenWord}
-                // 미션이 함께 떠 있으면 지난 기록과 비활성 마이크를 접는다.
-                compact={state.mission !== null}
               />
             ) : null}
 
             {state.status === PlayState.CHILD_TURN ||
             state.status === PlayState.TRANSCRIBING ? (
               <ChildTurnPanel
-                displayName={displayName}
-                previousText={state.characterText}
+                missionItem={missionNowItem}
                 recording={state.recording}
                 transcribing={state.status === PlayState.TRANSCRIBING}
                 interimText={state.interimText}
@@ -593,8 +777,6 @@ export function PlayScreen({
                   state.status === PlayState.TRANSCRIBING ||
                   (!state.recording && !state.interimText.trim())
                 }
-                // 미션이 함께 떠 있으면 지난 대사 줄을 접어 마이크 자리를 낸다.
-                compact={state.mission !== null}
               />
             ) : null}
 
@@ -609,7 +791,6 @@ export function PlayScreen({
 
             {state.status === PlayState.THINKING ? (
               <ThinkingPanel
-                displayName={displayName}
                 childText={messages.at(-1)?.text ?? ""}
                 elapsedMs={displayedThinkingElapsed}
               />
@@ -617,7 +798,6 @@ export function PlayScreen({
 
             {state.status === PlayState.MIC_ERROR ? (
               <MicErrorPanel
-                displayName={displayName}
                 onRetry={() => dispatch({ type: "RETRY_SPEAKING" })}
                 // "건너뛰기"로 빈 발화를 서버에 보내지 않는다. (PRD 8.9, Q-09)
                 // 메시지를 만들지 않고 아이 차례로 되돌린다.
@@ -625,7 +805,7 @@ export function PlayScreen({
               />
             ) : null}
           </div>
-        </>
+        )
       }
     />
   );

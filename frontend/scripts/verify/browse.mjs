@@ -1,7 +1,7 @@
 // 8단계 검증 — B-2 목록 · B-3 상세 · B-4 이어하기 모달 · C-9 단어 팝업 · E 단어장 · F-1 마이페이지
 import { chromium } from "playwright-core";
 
-import { SHOT, BASE, chromeExecutable } from "./_browser.mjs";
+import { SHOT, BASE, chromeExecutable, passMissionBrief } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -84,8 +84,25 @@ console.log("=== B-2 이야기 목록 ===");
 await page.goto(`${BASE}/stories`, { waitUntil: "networkidle" });
 await page.getByText("방귀 뀌는 며느리").first().waitFor({ timeout: 8000 }).catch(() => {});
 ok(await page.getByRole("heading", { name: "이야기" }).isVisible(), "제목");
-ok((await page.getByRole("tab").count()) === 4, "필터 칩 = 전체 + 주제 3개", `${await page.getByRole("tab").count()}개`);
-ok(await page.getByText("방귀 뀌는 며느리").first().isVisible(), "카드 1장");
+// 목 카탈로그가 3편이다(재생 가능 1 + 준비 중 2). 주제는 세 편의 합집합이라
+// 다름·자기이해·장점 발견·용기·지혜·가족 6개 + "전체" = 7개.
+// 카탈로그 편이 없으면 카드가 1장이라 **태블릿 3열을 확인할 방법이 없다.**
+ok((await page.getByRole("tab").count()) === 7, "필터 칩 = 전체 + 주제 6개", `${await page.getByRole("tab").count()}개`);
+{
+  const cards = await page.locator('a[href^="/stories/"]').count();
+  ok(cards === 3, "카드 3장 (재생 가능 1 + 준비 중 2)", `${cards}장`);
+}
+// 태블릿 1133px에서도 한 행에 3개다. 1열당 (813−48)÷3 = 255px.
+{
+  // ⚠️ <a>가 아니라 부모 <li>를 잰다. `hover:-translate-y-0.5` 때문에 포인터가
+  //    얹힌 카드만 2px 올라가 "행이 다르다"로 오판된다.
+  const tops = await page.evaluate(() =>
+    [...document.querySelectorAll('a[href^="/stories/"]')].map((a) =>
+      Math.round((a.parentElement ?? a).getBoundingClientRect().top)
+    )
+  );
+  ok(new Set(tops).size === 1, "카드 3장이 한 행 (태블릿 3열)", `y=${[...new Set(tops)].join(",")}`);
+}
 ok((await page.getByText("진행 중").count()) === 0, "세션 없으면 배지 없음");
 
 // 필터: 없는 주제 → 목록만 비고 페이지 이동은 없음
@@ -114,11 +131,88 @@ for (const [label, text] of [
     `"${label}" 내용 = PRD F-03 확정 문구`
   );
 }
+/**
+ * 뒤로가기가 표지 모서리에 딱 붙지 않는지 — 요구 5-2.
+ * 예전에는 바깥 여백 `p-6`(24px)과 버튼 위치 `top-6`(24px)이 같아서
+ * 버튼이 표지가 시작하는 좌표 정확히 그 지점에 앉았다.
+ */
+{
+  const gap = await page.evaluate(() => {
+    const back = document.querySelector('button[aria-label="돌아가기"], a[aria-label="돌아가기"]');
+    if (!back) return null;
+    // 표지 컨테이너 — 버튼의 offsetParent가 그것이다
+    const cover = back.offsetParent;
+    if (!cover) return null;
+    const b = back.getBoundingClientRect();
+    const c = cover.getBoundingClientRect();
+    return { left: Math.round(b.left - c.left), top: Math.round(b.top - c.top) };
+  });
+  ok(gap !== null, "뒤로가기 버튼을 찾았다");
+  ok(
+    gap !== null && gap.left >= 16 && gap.top >= 16,
+    "뒤로가기가 표지 모서리에서 16px 이상 떨어져 있다",
+    gap ? `left ${gap.left}px · top ${gap.top}px` : ""
+  );
+}
+
+/**
+ * 캐릭터 이름이 한 줄인지 — 요구 5-1.
+ * `w-20`(80px)이면 text-sm 한글 6.6자가 한계라 "방귀쟁이 며느리"(8자)가 두 줄로 깨졌다.
+ */
+{
+  const lines = await page.evaluate(() => {
+    const names = [...document.querySelectorAll("span")].filter((el) =>
+      ["방귀쟁이 며느리", "시아버지", "마을 이장"].includes(
+        (el.textContent ?? "").trim()
+      )
+    );
+    return names.map((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return {
+        text: (el.textContent ?? "").trim(),
+        lines: [...range.getClientRects()].filter((r) => r.width > 0).length,
+      };
+    });
+  });
+  const broken = lines.filter((n) => n.lines > 1);
+  ok(lines.length >= 3, "캐릭터 이름 3개를 찾았다", `${lines.length}개`);
+  ok(
+    broken.length === 0,
+    "캐릭터 이름이 전부 한 줄",
+    broken.map((n) => `${n.text}(${n.lines}줄)`).join(",")
+  );
+}
+
 ok(await page.getByText("방귀쟁이 며느리").isVisible(), "등장 캐릭터 (distinct)");
 ok(await page.getByText("시아버지", { exact: true }).isVisible(), "등장 캐릭터 2");
 ok(await page.getByText("마을 이장").isVisible(), "등장 캐릭터 3");
 ok(await page.getByText("약 20분").isVisible(), "예상 시간");
 ok(await page.getByText("난이도 보통").isVisible(), "난이도");
+
+/**
+ * 준비 중 이야기 — 상세까지는 보여주고 **재생만 막는다.**
+ * 장면 데이터가 없어 시작 버튼을 살려두면 /play에서 깨지는 막다른 길이 된다.
+ */
+await page.goto(`${BASE}/stories/story_horangi`, { waitUntil: "networkidle" });
+await page.getByRole("heading", { name: "호랑이와 하나" }).waitFor({ timeout: 8000 }).catch(() => {});
+ok(await page.getByRole("heading", { name: "호랑이와 하나" }).isVisible(), "준비 중 이야기도 상세는 보인다");
+ok(
+  (await page.getByRole("button", { name: "이야기 시작하기" }).count()) === 0,
+  "준비 중 이야기에 '이야기 시작하기'가 없다"
+);
+ok(
+  await page.getByRole("button", { name: "준비 중이에요" }).isDisabled(),
+  "준비 중 버튼이 비활성 (막다른 길 방지)"
+);
+ok(
+  await page.getByText("아직 준비 중이에요", { exact: false }).isVisible(),
+  "준비 중 이유를 안내한다"
+);
+
+// 다시 재생 가능한 편으로 돌아온다
+await page.goto(`${BASE}/stories/${STORY}`, { waitUntil: "networkidle" });
+await page.getByRole("heading", { name: "방귀 뀌는 며느리" }).waitFor({ timeout: 8000 }).catch(() => {});
 
 // 세션이 없으면 B-4 없이 바로 시작
 await page.getByRole("button", { name: "이야기 시작하기" }).click();
@@ -127,7 +221,8 @@ ok(path().startsWith("/play/"), "세션 없으면 곧바로 /play", path());
 
 // ── C-9 단어 뜻 팝업 → 단어장에 담기 ─────────────────────────────────
 console.log("\n=== C-9 단어 뜻 팝업 ===");
-// 밑줄 단어("구박")는 장면 2(sc_banggui_05)에 있다. 대화 1을 끝내야 도달한다.
+// 밑줄 단어는 **장면 첫 대사가 아니라 턴 응답**에 실려 온다 — 서버가 생성한 대사에
+// 후보 단어가 실제로 등장한 턴에만 채워진다 (백엔드 D-22). 그래서 몇 턴 진행해야 나온다.
 await page.getByText("탭하면 이야기가 시작돼요").click({ timeout: 8000 }).catch(() => {});
 
 const LONG = "며느리가 창피해서 계속 참았던 것 같아요. 가족들에게 솔직하게 말하면 좋겠어요. 그러면 마음이 편해질 거예요.";
@@ -136,6 +231,7 @@ for (let step = 0; step < 60 && !found; step++) {
   const body = await page.locator("body").innerText();
   if (await page.getByRole("button", { name: /창피한 뜻 보기/ }).count()) { found = true; break; }
   if (body.includes("계속하기")) await page.getByRole("button", { name: "계속하기" }).click().catch(() => {});
+  else if (body.includes("말해볼래요")) await passMissionBrief(page);
   else if (body.includes("이제 말해 볼까?")) await page.evaluate((t) => window.__say(t), LONG);
   else if (body.includes("이렇게 말한 게 맞아?")) await page.getByRole("button", { name: "보내기" }).click().catch(() => {});
   else if (body.includes("다음") || body.includes("이야기 시작하기")) {
@@ -144,7 +240,7 @@ for (let step = 0; step < 60 && !found; step++) {
   }
   await page.waitForTimeout(320);
 }
-ok(found, "장면 2 첫 대사에 밑줄 단어 '창피한'");
+ok(found, "턴 응답 대사에 밑줄 단어 '창피한' (D-22)");
 
 if (found) {
   await page.getByRole("button", { name: /창피한 뜻 보기/ }).first().click();
@@ -230,7 +326,8 @@ ok(await page.getByRole("heading", { name: "민준" }).isVisible(), "프로필 �
 for (const label of ["완료한 이야기", "모은 단어", "함께한 날"]) {
   ok(await page.getByText(label).isVisible(), `통계 "${label}"`);
 }
-ok((await page.getByText("별가루").count()) === 0, "별가루 칩 없음 (Q-12)");
+// F-1 프로필에 누적 별가루가 붙는다. 서버가 값을 줄 때만 보인다. (계획 D4)
+ok((await page.getByText(/별가루 \d+/).count()) >= 1, "마이페이지 별가루 칩");
 const mypageBody = await page.locator("body").innerText();
 ok(
   !mypageBody.includes("내 목소리로"),

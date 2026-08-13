@@ -13,7 +13,7 @@ type Props = {
   imageUrl?: string | null;
   /** screens.md의 설계 px. 내부에서 rem으로 바꿔 비례 스케일한다. */
   size?: number;
-  /** CHARACTER_SPEAKING — 파란 링 맥동 (§1-5) */
+  /** CHARACTER_SPEAKING — 테두리가 점등한다. 두께·번짐이 함께 커진다 (§1-5) */
   speaking?: boolean;
   /** C-2 대기 상태 — 그레이스케일 실루엣 */
   silhouette?: boolean;
@@ -31,14 +31,9 @@ export function CharacterPortrait({
 }: Props) {
   return (
     <span className="relative inline-flex shrink-0 items-center justify-center">
-      {speaking ? (
-        <span
-          aria-hidden
-          style={{ width: rem(size * 1.22), height: rem(size * 1.22) }}
-          className="absolute animate-ping rounded-full bg-info/35"
-        />
-      ) : null}
-
+      {/* ⚠️ `animate-ping` 후광을 쓰지 않는다. 160px 초상에서 bg-info/35는 거의
+          안 보이고, 정지된 `ring-4`는 "말하고 있다"를 알리지 못한다.
+          대신 테두리 자체를 맥동시킨다 — `.animate-speaking-ring` (globals.css) */}
       <span
         style={{ width: rem(size), height: rem(size), fontSize: rem(size * 0.36) }}
         className={[
@@ -46,7 +41,7 @@ export function CharacterPortrait({
           silhouette
             ? "bg-border text-muted grayscale"
             : "bg-secondary-soft text-text",
-          speaking ? "ring-4 ring-info" : "",
+          speaking ? "animate-speaking-ring" : "",
           thinking ? "animate-pulse" : "",
         ].join(" ")}
       >

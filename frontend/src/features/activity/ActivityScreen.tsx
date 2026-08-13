@@ -29,14 +29,14 @@ import {
   ReviewPanel,
 } from "@/features/activity/steps";
 
-import { mockActivityApi } from "@/lib/api/mock";
+import { activityApi } from "@/lib/api";
 import type { ActivityApi } from "@/lib/api/types";
 import { ActivityStep } from "@/lib/play-state";
 import { useCharacterVoice, useChildSpeech } from "@/lib/speech";
 
 export function ActivityScreen({
   sessionId,
-  api = mockActivityApi,
+  api = activityApi,
 }: {
   sessionId: string;
   api?: ActivityApi;
@@ -158,7 +158,8 @@ export function ActivityScreen({
             tray={state.tray}
             slots={orderedSlots}
             attemptCount={state.attemptCount}
-            hintCardId={state.hintCardId}
+            mismatched={state.orderMismatched}
+            slotResults={state.slotResults}
             submitting={submitting}
             canSubmit={isOrderComplete(state)}
             onPlace={(cardId, slotIndex) =>
@@ -172,8 +173,7 @@ export function ActivityScreen({
           <FeedbackModal
             open={state.step === ActivityStep.FEEDBACK}
             onRetry={() => dispatch({ type: "RETRY_ORDER" })}
-            onHint={() => dispatch({ type: "RETRY_ORDER" })}
-          />
+            />
         </>
       ) : null}
 

@@ -44,3 +44,13 @@ next-env.d.ts
 
 # 검증 스크립트가 남기는 스크린샷
 scripts/verify/.shots/
+
+# 에셋 원본. **웹에 쓰이는 것은 변환 결과뿐**이므로 원본은 커밋하지 않는다.
+#   public/characters/  아바타 원본 1024px (합 7.2MB) → public/avatars/*.webp
+#   public/logo.png     워드마크 원본 1280×458 → logo-symbol/wordmark.webp
+# 변환 방법은 docs/ui-overhaul-plan.md §1에 적어 뒀다.
+public/characters/
+public/logo.png
+
+# 분리 빌드 출력 (GQ_DIST_DIR)
+/.next-build/

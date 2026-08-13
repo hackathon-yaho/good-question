@@ -96,7 +96,8 @@ ok(
 ok(await page.getByRole("button", { name: /캐릭터 / }).count() === 6, "캐릭터 6종");
 ok(await page.getByRole("button", { name: "취소" }).count() === 0, "첫 등록엔 취소 없음");
 
-await page.getByRole("button", { name: "캐릭터 color3" }).click();
+// 라벨은 동물 이름이고 저장 값은 color1~6을 유지한다. (계획 D1)
+await page.getByRole("button", { name: "캐릭터 곰" }).click();
 await page.getByLabel("아이 이름").fill("민준");
 await page.getByLabel("출생 연도").selectOption({ index: 3 });
 ok(await done.isEnabled(), "입력 완료 후 활성");
@@ -122,10 +123,53 @@ await page.waitForTimeout(600);
 ok(await page.getByRole("navigation").count() === 1, "좌측 사이드바 (하단 탭바 아님)");
 const navLabels = await page.getByRole("navigation").getByRole("link").allInnerTexts();
 ok(navLabels.length === 5, "사이드바 로고 + 메뉴 4개", navLabels.join("/"));
-ok(await page.getByText("별가루").count() === 0, "별가루 칩 없음 (Q-12 MVP 제외)");
-ok(await page.getByText("오늘의 이야기").isVisible(), "진행 중 세션 없음 → 오늘의 이야기 카드");
+// 프로필은 우상단이 아니라 상단 1줄 전체다. 이름이 h1이다.
+ok(
+  await page.getByRole("heading", { level: 1, name: "민준" }).isVisible(),
+  "프로필 바에 아이 이름 (상단 1줄)"
+);
+// 별가루는 서버가 값을 줄 때만 보인다. 목은 완료 0편이라 0으로 온다.
+// 값이 없을 때 숨는지는 wiring 스위트(실서버 응답에 필드가 없다)가 확인한다.
+ok(
+  (await page.getByText(/별가루 \d+/).count()) >= 1,
+  "별가루 칩 표시 (값이 있을 때)"
+);
 ok(await page.getByText("이어서 하기").count() === 0, "이어하기 카드는 없음");
-ok(await page.getByText("이런 이야기도 있어요").isVisible(), "추천 영역");
+ok(
+  await page.getByRole("heading", { name: /오늘의 추천 이야기/ }).isVisible(),
+  "이어하기 없으면 추천만 (필터 없음)"
+);
+/**
+ * 이어하기가 없을 때는 **카드 3열**이다. 목록 형식은 이어하기가 있을 때
+ * 우측 42%에서만 쓴다 — 좁은 폭의 대안이고 카드를 대체하는 게 아니다.
+ */
+{
+  const cards = await page.locator('a[href^="/stories/"]').count();
+  ok(cards === 3, "추천 3개 (이어하기 없을 때)", `${cards}개`);
+  // ⚠️ <a>가 아니라 부모 <li>를 잰다. 카드에 `hover:-translate-y-0.5`가 걸려 있어
+  //    포인터가 얹힌 카드만 2px 올라가고, 그게 "행이 다르다"로 오판된다.
+  const tops = await page.evaluate(() =>
+    [...document.querySelectorAll('a[href^="/stories/"]')].map((a) =>
+      Math.round((a.parentElement ?? a).getBoundingClientRect().top)
+    )
+  );
+  ok(new Set(tops).size === 1, "추천이 한 행에 3개 (카드 3열)", `y=${[...new Set(tops)].join(",")}`);
+  // 카드 형식인지 — 표지 자리가 세로로 카드 안에 있다(가로형 목록 행이 아니다)
+  const shape = await page.evaluate(() => {
+    const a = document.querySelector('a[href^="/stories/"]');
+    const r = a?.getBoundingClientRect();
+    return r ? { w: Math.round(r.width), h: Math.round(r.height) } : null;
+  });
+  ok(shape !== null && shape.h > shape.w, "카드 형식 (세로형)", `${shape?.w}×${shape?.h}`);
+}
+ok(
+  await page.getByRole("button", { name: "이야기 시작하기" }).count() === 0,
+  "홈에서 바로 시작하지 않는다 — 카드 → B-3을 거친다"
+);
+ok(
+  await page.getByRole("link", { name: /더 많은 이야기 탐험하기/ }).count() === 1,
+  "이야기 목록으로 가는 길"
+);
 
 console.log("\n=== 새로고침 후 선택 유지 (A-5 체크리스트) ===");
 await page.reload({ waitUntil: "networkidle" });
@@ -147,7 +191,11 @@ console.log("\n=== 이야기 시작 → 이어하기 카드 등장 ===");
 await page.getByText("민준", { exact: true }).first().click();
 await page.waitForURL("**/home", { timeout: 8000 }).catch(() => {});
 await page.waitForTimeout(600);
-await page.getByRole("button", { name: "이야기 시작하기" }).click();
+// 홈에는 시작 CTA가 없다. 추천 카드 → B-3 → 시작하기 경로를 탄다.
+await page.getByRole("link", { name: /방귀 뀌는 며느리/ }).first().click();
+await page.waitForURL("**/stories/**", { timeout: 8000 }).catch(() => {});
+ok(path().startsWith("/stories/"), "추천 카드 → B-3", path());
+await page.getByRole("button", { name: "이야기 시작하기" }).click({ timeout: 8000 });
 await page.waitForURL("**/play/**", { timeout: 10000 }).catch(() => {});
 ok(path().startsWith("/play/"), "→ /play/{sessionId}", path());
 
@@ -159,7 +207,75 @@ ok(
   "진행 문구 표시"
 );
 ok(await page.getByRole("progressbar").count() === 1, "진행바 1개");
-ok(await page.getByText("오늘의 이야기").count() === 0, "이어하기가 있으면 오늘의 이야기 자리 대체");
+ok(
+  await page.getByRole("heading", { name: /오늘의 추천 이야기/ }).isVisible(),
+  "이어하기와 추천이 함께 보인다 (2단 배치)"
+);
+/**
+ * 이어하기가 있을 때는 **목록 행**이고 추천이 3개다. 그리고 두 섹션이
+ * **같은 행**에 있어야 한다 — 분기가 `xl:`(1280px)이면 태블릿에서 세로로 쌓인다.
+ */
+{
+  const rows = await page.locator('a[href^="/stories/"]').count();
+  ok(rows === 3, "추천 3개 (이어하기 있을 때)", `${rows}개`);
+  const shape = await page.evaluate(() => {
+    const a = document.querySelector('a[href^="/stories/"]');
+    const r = a?.getBoundingClientRect();
+    return r ? { w: Math.round(r.width), h: Math.round(r.height) } : null;
+  });
+  ok(shape !== null && shape.w > shape.h, "목록 형식 (가로형 행)", `${shape?.w}×${shape?.h}`);
+}
+// 1133px(지원 태블릿 최소 폭)에서도 2열인지 — 요구의 핵심이다
+await page.setViewportSize({ width: 1133, height: 744 });
+await page.waitForTimeout(400);
+{
+  const cols = await page.evaluate(() => {
+    const hero = [...document.querySelectorAll("h2")].find((h) =>
+      (h.textContent ?? "").includes("오늘의 추천")
+    );
+    const resume = [...document.querySelectorAll("span")].find(
+      (s) => (s.textContent ?? "").trim() === "이어서 하기"
+    );
+    if (!hero || !resume) return null;
+    const a = hero.getBoundingClientRect();
+    const b = resume.getBoundingClientRect();
+    // 같은 행이면 세로로 겹친다. 쌓였으면 겹치지 않는다.
+    return {
+      overlapY: Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0,
+      heroLeft: Math.round(a.left),
+      resumeLeft: Math.round(b.left),
+    };
+  });
+  ok(cols !== null && cols.overlapY, "1133px에서도 이어하기·추천이 같은 행", JSON.stringify(cols));
+  ok(cols !== null && cols.heroLeft > cols.resumeLeft, "추천이 이어하기 오른쪽");
+}
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.waitForTimeout(300);
+
+// 개발 전환 — 이어하기가 있는 상태에서 ?home=fresh로 빈 상태를 볼 수 있다
+await page.goto(`${BASE}/home?home=fresh`, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+ok(
+  (await page.getByText("이어서 하기").count()) === 0,
+  "?home=fresh — 이어하기가 숨는다 (세션은 살아 있다)"
+);
+// 빈 상태 레이아웃을 그대로 보기 위해 안내 칩을 띄우지 않는다 (2026-08-13 지시).
+// 칩이 끼면 확인하려는 배치가 밀린다.
+ok(
+  (await page.getByText("개발 전환", { exact: false }).count()) === 0,
+  "?home=fresh에 안내 칩을 띄우지 않는다"
+);
+// 빈 상태에서도 추천이 3개인지 — 칩이 없어졌어도 배치는 그대로여야 한다
+{
+  const cards = await page.locator('a[href^="/stories/"]').count();
+  ok(cards === 3, "?home=fresh에서도 추천 3개", `${cards}개`);
+}
+await page.goto(`${BASE}/home`, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+ok(
+  await page.getByText("이어서 하기").isVisible(),
+  "파라미터를 떼면 원래대로 (데이터를 조작하지 않았다)"
+);
 await page.getByRole("button", { name: "이어서 이야기하기" }).click();
 await page.waitForURL("**/play/**", { timeout: 8000 }).catch(() => {});
 ok(path().startsWith("/play/"), "이어하기 → /play", path());
@@ -167,7 +283,7 @@ ok(path().startsWith("/play/"), "이어하기 → /play", path());
 console.log("\n=== A-4 정원 초과 (3명) ===");
 await page.goto(`${BASE}/profiles`, { waitUntil: "networkidle" });
 await page.waitForTimeout(400);
-for (const [name, avatar] of [["서연", "color1"], ["하준", "color5"]]) {
+for (const [name, avatar] of [["서연", "병아리"], ["하준", "거북이"]]) {
   await page.getByRole("button", { name: "아이 추가" }).click();
   // child_consents는 아이 한 명당 한 건이므로 둘째·셋째도 동의를 먼저 받는다.
   await page.waitForURL("**/onboarding/consent", { timeout: 6000 });

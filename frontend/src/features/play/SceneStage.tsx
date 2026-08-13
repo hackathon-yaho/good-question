@@ -8,6 +8,8 @@
 
 import type { ReactNode } from "react";
 
+import { ListeningBadge } from "@/components/ui/ListeningBadge";
+
 type Props = {
   /** 좌측 상단 진행바 — 화면 단위 4구간 (Q-10) */
   progress?: { current: number; total: number };
@@ -91,9 +93,14 @@ export function SceneStage({
 
       {subtitle ? (
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-text/85 to-transparent px-10 pt-24 pb-12">
-          <p className="mx-auto max-w-[22ch] text-center text-narration leading-relaxed font-medium text-white">
-            {subtitle}
-          </p>
+          {/* 웨이브 → 라벨 → 자막 순서다. "듣는 차례"를 먼저 알려 아이가 마이크를 찾지 않게 한다.
+              ⚠️ `.kid-line`은 **<p>에** 걸어야 한다 — em이 그 요소의 font-size로 계산된다. */}
+          <div className="flex flex-col items-center gap-4">
+            <ListeningBadge layout="stacked" />
+            <p className="kid-line text-center text-narration leading-relaxed font-medium text-white">
+              {subtitle}
+            </p>
+          </div>
         </div>
       ) : null}
 

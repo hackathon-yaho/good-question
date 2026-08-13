@@ -12,8 +12,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
+import { BackButton } from "@/components/ui/BackButton";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { parentApi } from "@/lib/api";
 import type { ParentApi, ReportListResult } from "@/lib/api/types";
 import { setSelectedChildId, useSelectedChildId } from "@/lib/client-store";
 import type { SessionStatus } from "@/lib/play-state";
@@ -25,7 +26,7 @@ const STATUS_CHIP: Record<SessionStatus, { label: string; className: string }> =
   post_activity: { label: "진행 중", className: "bg-primary-soft text-text" },
 };
 
-export function ReportListScreen({ api = mockParentApi }: { api?: ParentApi }) {
+export function ReportListScreen({ api = parentApi }: { api?: ParentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const [data, setData] = useState<ReportListResult | null>(null);
@@ -62,9 +63,7 @@ export function ReportListScreen({ api = mockParentApi }: { api?: ParentApi }) {
 
   return (
     <CenteredShell width="wide">
-      <Link href="/parent" className="text-parent-body text-muted underline">
-        ← 보호자 홈
-      </Link>
+      <BackButton href="/parent" label="보호자 홈" />
       <h1 className="mt-4 text-parent-title font-bold text-text">리포트</h1>
 
       {data.children.length > 1 ? (
@@ -115,30 +114,57 @@ export function ReportListScreen({ api = mockParentApi }: { api?: ParentApi }) {
         <ul className="mt-6 flex flex-col gap-3">
           {data.reports.map((report) => {
             const chip = STATUS_CHIP[report.status];
+            /**
+             * 리포트는 **완료된 세션에만 존재한다.** 목록의 필터 기준은 "완료 여부"가
+             * 아니라 "아이 발화가 1건이라도 있는지"라서 진행 중·중단된 세션도 함께
+             * 온다. 그 행을 누르면 상세가 404다.
+             * (backend/docs/api-spec.md 10.2 · 10.3)
+             *
+             * 그래서 열 수 있는 행만 링크로 만든다. 링크로 두고 404 화면을 보여주는
+             * 것보다, 애초에 눌리지 않고 이유를 적어 두는 편이 낫다.
+             */
+            const openable = report.status === "completed";
+            const body = (
+              <>
+                <span
+                  aria-hidden
+                  className="flex size-16 shrink-0 items-center justify-center rounded-bubble bg-primary-soft text-sm font-bold text-muted"
+                >
+                  표지
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-parent-body font-bold text-text">
+                    {report.storyTitle}
+                  </span>
+                  <span className="block text-sm text-muted">
+                    {report.date}
+                    {openable ? null : " · 이야기를 마치면 리포트가 만들어져요"}
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 rounded-pill px-3 py-1 text-sm font-bold ${chip.className}`}
+                >
+                  {chip.label}
+                </span>
+              </>
+            );
+            const shared =
+              "flex min-h-touch items-center gap-4 rounded-card border border-border p-4";
+
             return (
               <li key={report.sessionId}>
-                <Link
-                  href={`/parent/reports/${report.sessionId}?tab=analysis`}
-                  className="flex min-h-touch items-center gap-4 rounded-card border border-border bg-surface p-4 shadow-soft transition-transform hover:-translate-y-0.5"
-                >
-                  <span
-                    aria-hidden
-                    className="flex size-16 shrink-0 items-center justify-center rounded-bubble bg-primary-soft text-sm font-bold text-muted"
+                {openable ? (
+                  <Link
+                    href={`/parent/reports/${report.sessionId}?tab=analysis`}
+                    className={`${shared} bg-surface shadow-soft transition-transform hover:-translate-y-0.5`}
                   >
-                    표지
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-parent-body font-bold text-text">
-                      {report.storyTitle}
-                    </span>
-                    <span className="block text-sm text-muted">{report.date}</span>
-                  </span>
-                  <span
-                    className={`shrink-0 rounded-pill px-3 py-1 text-sm font-bold ${chip.className}`}
-                  >
-                    {chip.label}
-                  </span>
-                </Link>
+                    {body}
+                  </Link>
+                ) : (
+                  <div className={`${shared} bg-bg`} aria-disabled="true">
+                    {body}
+                  </div>
+                )}
               </li>
             );
           })}

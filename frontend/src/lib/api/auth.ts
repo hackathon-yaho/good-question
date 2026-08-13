@@ -15,7 +15,7 @@
  */
 
 import { ApiError } from "@/lib/api/errors";
-import { API_BASE, AUTH_MODE, request } from "@/lib/api/http";
+import { API_BASE, API_MODE, request } from "@/lib/api/http";
 
 /** GET /api/auth/me */
 export type AuthMe = {
@@ -125,7 +125,7 @@ const mockAuthApi: AuthApi = {
 };
 
 export const authApi: AuthApi =
-  AUTH_MODE === "backend" ? backendAuthApi : mockAuthApi;
+  API_MODE === "backend" ? backendAuthApi : mockAuthApi;
 
 /**
  * 목 모드에서 로그인 버튼이 하는 일.

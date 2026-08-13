@@ -12,9 +12,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
+import { BackButton } from "@/components/ui/BackButton";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { parentApi } from "@/lib/api";
 import type { ParentAccount, ParentApi } from "@/lib/api/types";
 import { authApi } from "@/lib/api/auth";
 import { clearClientStore } from "@/lib/client-store";
@@ -34,7 +35,7 @@ const TERMS = [
 
 const WITHDRAW_PHRASE = "탈퇴합니다";
 
-export function SettingsScreen({ api = mockParentApi }: { api?: ParentApi }) {
+export function SettingsScreen({ api = parentApi }: { api?: ParentApi }) {
   const router = useRouter();
   const [parent, setParent] = useState<ParentAccount | null>(null);
   const [notify, setNotify] = useState(true);
@@ -87,9 +88,7 @@ export function SettingsScreen({ api = mockParentApi }: { api?: ParentApi }) {
 
   return (
     <CenteredShell width="column">
-      <Link href="/parent" className="text-parent-body text-muted underline">
-        ← 보호자 홈
-      </Link>
+      <BackButton href="/parent" label="보호자 홈" />
       <h1 className="mt-4 text-parent-title font-bold text-text">설정</h1>
 
       <Group title="계정">

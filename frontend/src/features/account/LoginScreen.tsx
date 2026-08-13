@@ -30,7 +30,7 @@ import {
   loginStartUrl,
   mockLoginRedirectPath,
 } from "@/lib/api/auth";
-import { AUTH_MODE } from "@/lib/api/http";
+import { API_MODE } from "@/lib/api/http";
 import { clearClientStore, setConsentDraft } from "@/lib/client-store";
 
 export function LoginScreen() {
@@ -43,7 +43,7 @@ export function LoginScreen() {
     setPending(true);
     setFailed(false);
 
-    if (AUTH_MODE === "backend") {
+    if (API_MODE === "backend") {
       // 여기서 페이지를 떠난다. 되돌아오는 곳은 /auth/callback이다.
       window.location.href = loginStartUrl();
       return;
@@ -85,15 +85,14 @@ export function LoginScreen() {
     <div className="flex min-h-dvh w-full bg-bg">
       {/* 좌 55% 일러스트 패널 — 일러스트 미수령이라 색면 + 로고타입으로 대체 */}
       <aside className="relative hidden w-[55%] shrink-0 flex-col justify-between bg-primary-soft p-12 lg:flex">
-        <span className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-12 items-center justify-center rounded-bubble bg-primary text-2xl font-bold text-white"
-          >
-            Q
-          </span>
-          <span className="text-2xl font-bold text-primary">굿퀘스천</span>
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
+        <img
+          src="/logo-wordmark.webp"
+          alt="굿퀘스천"
+          width={200}
+          height={72}
+          className="h-auto w-50"
+        />
 
         <p className="max-w-md text-parent-title leading-relaxed font-bold text-text">
           옛이야기 속 인물과 이야기를 나누며
@@ -152,9 +151,9 @@ export function LoginScreen() {
           {process.env.NODE_ENV === "development" ? (
             <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
               <p className="text-sm text-muted">
-                개발용 · 인증 모드 <b>{AUTH_MODE}</b>
+                개발용 · 연동 모드 <b>{API_MODE}</b>
               </p>
-              {AUTH_MODE === "backend" ? (
+              {API_MODE === "backend" ? (
                 <button
                   type="button"
                   onClick={() => void devLogin()}

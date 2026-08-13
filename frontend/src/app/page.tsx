@@ -65,13 +65,10 @@ export default function SplashPage() {
   return (
     <CenteredShell width="narrow" centerY>
       <div className="flex flex-col items-center gap-6 text-center">
-        {/* 로고 원본 미수령 — 텍스트 로고타입으로 대체 (assets.md §3-2) */}
-        <div
-          aria-hidden
-          className="flex size-24 items-center justify-center rounded-bubble bg-primary text-5xl font-bold text-white"
-        >
-          Q
-        </div>
+        {/* 받은 로고는 가로형 락업뿐이라 Q 심볼을 크롭해 따로 만들었다.
+            96px 자리에 락업을 넣으면 글자가 읽히지 않는다. (계획 D13) */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
+        <img src="/logo-symbol.webp" alt="" width={96} height={96} className="size-24" />
 
         <h1 className="text-hero leading-tight font-bold text-text">
           굿퀘스천

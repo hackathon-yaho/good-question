@@ -8,16 +8,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
-import { AVATAR_IDS, ChildAvatar } from "@/components/ui/ChildAvatar";
+import { BackButton } from "@/components/ui/BackButton";
+import { AVATAR_IDS, AVATAR_LABEL, ChildAvatar } from "@/components/ui/ChildAvatar";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
-import { mockAccountApi } from "@/lib/api/mock-account";
-import { mockParentApi } from "@/lib/api/mock-parent";
+import { accountApi as defaultAccountApi } from "@/lib/api";
+import { parentApi } from "@/lib/api";
 import type { AccountApi, Child, ParentApi } from "@/lib/api/types";
 import {
   getSelectedChildId,
@@ -36,8 +36,8 @@ function formatDate(iso: string): string {
 }
 
 export function ChildrenManageScreen({
-  api = mockParentApi,
-  accountApi = mockAccountApi,
+  api = parentApi,
+  accountApi = defaultAccountApi,
 }: {
   api?: ParentApi;
   accountApi?: AccountApi;
@@ -124,12 +124,7 @@ export function ChildrenManageScreen({
 
   return (
     <CenteredShell width="column">
-      <Link
-        href="/parent/settings"
-        className="text-parent-body text-muted underline"
-      >
-        ← 설정
-      </Link>
+      <BackButton href="/parent/settings" label="설정" />
       <h1 className="mt-4 text-parent-title font-bold text-text">
         아이 프로필 관리
       </h1>
@@ -230,7 +225,7 @@ export function ChildrenManageScreen({
                   <li key={id}>
                     <button
                       type="button"
-                      aria-label={`캐릭터 ${id}`}
+                      aria-label={`캐릭터 ${AVATAR_LABEL[id]}`}
                       aria-pressed={draftAvatar === id}
                       onClick={() => setDraftAvatar(id)}
                       className="flex min-h-touch w-full items-center justify-center rounded-bubble p-1"

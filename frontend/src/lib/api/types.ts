@@ -28,18 +28,27 @@ export type MissionTrigger = {
 /** C-3 자막 밑줄 + C-9 단어 팝업 */
 export type HighlightWord = { word: string; meaning: string };
 
-/** GET /api/sessions/{sessionId} — api.md 3.4 */
+/** GET /api/sessions/{sessionId} — backend/docs/api-spec.md 5.2 */
 export type SessionSnapshot = {
   sessionId: string;
   storyId: string;
+  /** `post_activity`면 /activity로 보낸다. 이게 후속 활동 진입 신호다. */
   status: SessionStatus;
   currentSceneId: string;
+  /** DB 단위 1~9. 화면 단위(1~4)는 `toScreenIndex()`로 직접 계산한다. (Q-10) */
   currentSceneOrder: number;
-  /** 화면 단위 진행바 분모. DB의 scene_order(1~9)와 다르다. (Q-10) */
-  sceneProgress: { current: number; total: number };
+  /**
+   * 화면 단위 전체 구간 수(고정 4).
+   *
+   * ⚠️ `/home`은 `sceneProgress: {current, total}`을 주는데 **이 엔드포인트는 안 준다.**
+   *    현재 위치는 `currentSceneOrder`로 계산해야 한다.
+   */
+  totalScenes: number;
   turnCount: number;
-  maxTurns: number;
+  /** dialogue 장면이 아니면 null */
+  maxTurns: number | null;
   accumulatedElements: string[];
+  /** `speakerType: "system"`(미션 노출 기록)은 이 목록에 오지 않는다. */
   messages: Message[];
   currentScene: SceneInfo;
 };
@@ -59,45 +68,59 @@ export type SceneInfo = {
   missionRevealed: boolean;
 };
 
-/** POST /api/sessions/{sessionId}/messages 응답 — api.md 3.5 (화면 명세 5-1 확정) */
+/** POST /api/sessions/{sessionId}/messages 응답 — backend/docs/api-spec.md 6.1 */
 export type UtteranceResponse = {
   responseMode: ResponseMode;
   characterMessage: string;
   /**
-   * 방금 만들어진 캐릭터 메시지의 id. `GET /api/tts?messageId=`로 음성을 받는다.
+   * 방금 저장된 캐릭터 메시지의 id. `GET /api/tts?messageId=`로 음성을 받는다.
    *
-   * 요청 문서: *"응답에 `messageId`가 포함되며, 이 값으로 ③을 호출합니다"*
-   * (docs/request/frontend/stt-tts-integration.md · api.md 3.5에는 없는 필드다)
-   *
-   * null이면 텍스트로 음성을 요청한다. 그래도 재생은 된다.
+   * 백엔드가 처음 `characterMessageId`로 만들었다가 프론트가 이미 검증한 이름에
+   * 맞춰 `messageId`로 고쳤다. (백엔드 D-26)
    */
-  messageId: string | null;
+  messageId: string;
   characterName: string;
   accumulatedElements: string[];
   turnCount: number;
-  maxTurns: number;
+  maxTurns: number | null;
+  /** true면 이 대사를 재생한 뒤 다음 장면 또는 후속 활동으로 넘어간다. */
   sceneEnded: boolean;
+  /**
+   * `sceneEnded`일 때 다음 장면 id. 없으면 null → 후속 활동으로 간다.
+   *
+   * ⚠️ 값이 있어도 **`.../complete`를 부르면 안 된다.** 서버가 이 응답을 만들면서
+   *    이미 세션을 그 장면으로 옮겼다(`session.advanceToScene`). 프론트는
+   *    `GET /sessions/{id}`로 다시 읽기만 한다.
+   */
   nextSceneId: string | null;
   missionTriggered: MissionTrigger | null;
   highlightWords: HighlightWord[];
 };
 
-/** POST /api/sessions/{sessionId}/scenes/{sceneId}/complete — api.md 3.4 */
+/**
+ * POST /api/sessions/{sessionId}/scenes/{sceneId}/complete
+ * — backend/docs/api-spec.md 5.3
+ *
+ * ⚠️ **intro·narrative 전용이다.** dialogue 장면에 부르면 400이 온다.
+ *    대화 장면의 종료는 `POST .../messages`가 알아서 판단하고 세션도 알아서 옮긴다.
+ *
+ * 응답의 `nextScene`은 `sceneDescription`·배경 이미지를 담지 않는다. 그래서 프론트는
+ * 이 응답을 쓰지 않고 **곧바로 `GET /sessions/{id}`를 다시 읽는다** — 자막을 그리려면
+ * `sceneDescription`이 필요하고, 후속 활동 진입 판단도 세션의 `status`로 해야 한다.
+ * 요청이 한 번 더 늘지만 두 경로(대화 종료 / 서술 종료)가 같은 코드로 합쳐진다.
+ */
 export type SceneCompleteResponse = {
-  nextScene:
-    | (SceneInfo & {
-        openingMessage: Message | null;
-        /**
-         * 첫 대사의 밑줄 단어. C-3에서 탭하면 C-9가 열린다.
-         *
-         * 🟡 api.md 3.4의 이 엔드포인트는 아직 초안(⚪)이다. 첫 대사에 밑줄이 없으면
-         *    단어장으로 갈 통로가 닫히므로 프론트에서 필요한 필드로 제안한다.
-         */
-        highlightWords: HighlightWord[];
-      })
-    | null;
-  /** 마지막 장면이 끝나 후속 활동으로 넘어가야 하면 true */
-  postActivityReady: boolean;
+  nextScene: {
+    sceneId: string;
+    sceneOrder: number;
+    sceneType: SceneType;
+    characterName: string | null;
+    characterDisplayName: string | null;
+    characterImageUrl: string | null;
+    maxTurns: number | null;
+    /** 다음 장면이 dialogue일 때만. 서버가 첫 대사를 미리 저장해 준다. */
+    openingMessage: Message | null;
+  };
 };
 
 /**
@@ -120,6 +143,14 @@ export type PlayApi = {
     sessionId: string,
     sceneId: string
   ): Promise<SceneCompleteResponse>;
+  /**
+   * C-13 "이야기 나가기" — `PATCH /api/sessions/{id}`로 세션을 `stopped`로 바꾼다.
+   * (backend/docs/api-spec.md 5.4)
+   *
+   * 이걸 부르지 않으면 세션이 `in_progress`로 남아 **홈의 이어하기 카드가 계속
+   * 떠 있고** 아이가 나갔다는 사실이 서버에 남지 않는다. 멱등이라 여러 번 불러도 된다.
+   */
+  stopSession(sessionId: string): Promise<void>;
 };
 
 /* ── 말하기 후 활동 — api.md 3.6 ─────────────────────────────────── */
@@ -141,16 +172,24 @@ export type ActivitySnapshot = {
   attemptCount: number;
 };
 
-/** POST /api/sessions/{sessionId}/activity/order */
+/**
+ * POST /api/sessions/{sessionId}/activity/order
+ * — backend/docs/api-spec.md 8.2
+ *
+ * ⚠️ 아래 두 필드는 **키 자체가 없을 수 있다.** 값이 null이 아니라 생략이다
+ *    (백엔드가 `@JsonInclude(NON_NULL)`을 걸었다). `?? []`·truthy 검사로 다뤄야 하고
+ *    `=== null` 비교는 통하지 않는다.
+ *
+ * `hintCardId`는 **없다.** D-3의 "힌트 보기"가 강조할 카드를 서버가 알려주지 않고,
+ * 프론트는 정답을 모르므로 만들 수 없다. 버튼을 빼는 쪽으로 정했다. (Q-15)
+ */
 export type OrderResult = {
   isCorrect: boolean;
   attemptCount: number;
-  /** 정답이거나 3회째일 때 채워진다. */
-  retellingKeywords: string[] | null;
-  /** 오답일 때 D-3 "힌트 보기"가 강조할 카드 1장 */
-  hintCardId: string | null;
+  /** 정답이거나 3회째일 때만 온다. */
+  retellingKeywords?: string[];
   /**
-   * 정답 순서. **3회째 오답에만 실려 온다.** (백엔드 D-10 · Q-15)
+   * 정답 순서. **3회째 오답에만 온다.** (백엔드 D-10 · Q-15)
    *
    * `attempt_count`는 재시도를 전제하지만 제한 규칙이 없어 무한 재시도가 된다.
    * 아이가 활동에 갇혀 세션이 완료되지 않고, D-3의 "실패를 지적하지 않는다"
@@ -158,9 +197,19 @@ export type OrderResult = {
    *
    * ⚠️ **프론트가 시도 횟수를 세서 판단하지 않는다.** 이 필드가 있으면 넘기고,
    *    없으면 D-3으로 돌린다. 제한 규칙은 서버 소관이다. (§0-2)
-   *    api.md 3.6의 "정답 순서를 내려주지 않는다"는 **처음에** 주지 말라는 뜻이다.
    */
-  correctOrder: string[] | null;
+  correctOrder?: string[];
+  /**
+   * 제출한 순서대로 **각 칸이 정답 위치인지.** `[true, false, false, true]`
+   *
+   * **선택 필드다.** 없으면 프론트는 배치 전체를 오답으로 표시한다 —
+   * 지금 백엔드가 주지 않으므로 실서버에서는 그쪽으로 동작한다.
+   *
+   * ⚠️ 정답 순서 자체가 아니다. "이 칸이 맞는지"만 알려주므로 프론트가 정답을
+   *    역산할 수 없다. 정답을 모른다는 원칙(§0-2)을 지키면서 틀린 칸만 표시할 수
+   *    있는 최소 필드다. (docs/request/backend/order-slot-results.md)
+   */
+  slotResults?: boolean[];
 };
 
 /** POST /api/sessions/{sessionId}/activity/retelling */
@@ -175,6 +224,8 @@ export type RetellingResult = {
   };
   /** 보호자 리포트(O-01) 구현 여부 */
   reportAvailable: boolean;
+  /** 이번 이야기로 얻은 별가루. 서버가 줄 때만 표시한다 (계획 D4·D16) */
+  earnedStarDust?: number;
 };
 
 export type ActivityApi = {
@@ -256,9 +307,19 @@ export type HomeInProgress = {
   lastActivityAt: string;
 };
 
+/**
+ * 별가루 — 팀이 추가한 보상 (백엔드 B-20 · [Q-12](../../../docs/open-questions.md))
+ *
+ * ⚠️ **선택 필드다.** 백엔드가 이야기 완료 시 `children.star_dust`를 올리지만
+ *    어떤 응답 DTO에도 노출하지 않는다(2026-08-13 확인). 값이 없으면 화면이
+ *    칩을 숨긴다 — "별가루 0"을 보여주는 것보다 낫다.
+ *    백엔드가 추가하면 코드 변경 없이 나타난다. (계획 D4)
+ */
+type WithStarDust = { starDust?: number };
+
 /** GET /api/home?childId={id} */
 export type HomeSnapshot = {
-  child: { id: string; name: string; avatarId: string };
+  child: { id: string; name: string; avatarId: string } & WithStarDust;
   /** 진행 중 세션이 없으면 null. 프론트는 그 자리를 빈 채로 두지 않는다. */
   inProgress: HomeInProgress | null;
   recommended: HomeStory[];
@@ -290,11 +351,15 @@ export type StoryCharacter = {
   imageUrl: string | null;
 };
 
-/** B-3 진행 중 세션. 있으면 프론트가 B-4 모달을 띄운다. */
+/**
+ * B-3 진행 중 세션. 있으면 프론트가 B-4 모달을 띄운다.
+ *
+ * ⚠️ `sceneProgress`가 없다. `/home`만 그걸 주고 여기는 `currentSceneOrder`(1~9)뿐이라
+ *    화면 단위 번호는 `toScreenIndex()`로 계산한다. (backend/docs/api-spec.md 4.2)
+ */
 export type ExistingSession = {
   sessionId: string;
-  currentSceneOrder: number;
-  sceneProgress: { current: number; total: number };
+  currentSceneOrder: number | null;
   status: SessionStatus;
 };
 
@@ -313,9 +378,24 @@ export type StoryDetail = {
   childRole: string;
   characters: StoryCharacter[];
   existingSession: ExistingSession | null;
-  /** false면 세션을 시작할 수 없다. 동의 화면으로 유도한다. */
-  consentGranted: boolean;
+  /**
+   * 아직 재생할 수 없는 이야기. **선택 필드**이므로 없으면 재생 가능이다.
+   *
+   * 목 카탈로그의 "준비 중" 편을 위해 있다(`mocks/story-catalog.ts`). 서버가
+   * 장면이 없는 이야기를 목록에 올린다면 같은 필드로 표현하면 된다 — 그러면
+   * B-3이 시작 버튼을 비활성으로 두고 안내를 띄운다.
+   */
+  comingSoon?: boolean;
 };
+
+/**
+ * ⚠️ `StoryDetail`에 `consentGranted`가 **없다.**
+ *
+ * 동의 여부는 `GET /children`의 `consentGranted`로 확인하라는 것이 백엔드 안내다
+ * (backend/docs/api-spec.md 5.1). 다만 B-3은 아이 목록을 부르지 않으므로,
+ * 프론트는 **`POST /sessions`의 403 `CONSENT_REQUIRED`를 받아 처리**한다.
+ * 서버가 어차피 다시 검증하므로 판단 주체를 서버로 두는 것이 어긋날 여지가 없다.
+ */
 
 /* ── 단어장 — 선택 요건 A-02 (Q-06) ──────────────────────────────── */
 
@@ -349,7 +429,7 @@ export type WordbookResult = {
 /* ── 마이페이지 (F-1) ────────────────────────────────────────────── */
 
 export type MypageSnapshot = {
-  child: { id: string; name: string; avatarId: string; age: number };
+  child: { id: string; name: string; avatarId: string; age: number } & WithStarDust;
   /** 점수·등급이 아니라 활동량이다. (PRD 10.1) */
   stats: {
     completedStories: number;
@@ -390,7 +470,16 @@ export type ContentApi = {
       contextSentence?: string | null;
     }
   ): Promise<WordEntry>;
-  toggleWordLiked(childId: string, wordId: string): Promise<WordEntry>;
+  /**
+   * E-1 좋아요. **바꿀 목표 값을 넘긴다.**
+   * `PATCH /wordbook/{id}`가 `{ liked }`를 요구하므로 서버가 뒤집어 주지 않는다.
+   * 현재 값은 목록을 들고 있는 화면이 안다. (api-spec 9.3)
+   */
+  toggleWordLiked(
+    childId: string,
+    wordId: string,
+    liked: boolean
+  ): Promise<WordEntry>;
   getMypage(childId: string): Promise<MypageSnapshot>;
 };
 
@@ -476,9 +565,16 @@ export type NoticeItem = {
   unread: boolean;
 };
 
+/**
+ * H-1 계정 정보.
+ *
+ * ⚠️ **전용 엔드포인트가 없다.** `GET /auth/me`로 id·name·email까지만 채운다.
+ *    `provider`는 카카오 단독이라 상수로 두고(PRD M-01), `createdAt`은 어디서도
+ *    오지 않아 옵셔널이다 — 없는 값을 만들어 넣지 않는다.
+ */
 export type ParentAccount = Parent & {
   provider: AuthProvider;
-  createdAt: string;
+  createdAt?: string;
 };
 
 export type ParentApi = {

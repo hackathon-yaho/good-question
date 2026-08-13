@@ -95,12 +95,12 @@ POST /api/auth/dev-login
 | `/auth/me` · `/auth/logout` · `/auth/dev-login` | `frontend/src/lib/api/auth.ts` |
 | `credentials: "include"` | `frontend/src/lib/api/http.ts` — 실 fetch가 여기 한 곳뿐 |
 
-`NEXT_PUBLIC_AUTH_MODE`로 목/백엔드를 전환합니다. 기본값 `mock`은 백엔드 없이
+`NEXT_PUBLIC_API_MODE`로 목/실서버를 전환합니다(인증·데이터 함께). 기본값 `mock`은 백엔드 없이
 같은 콜백 URL을 태워 분기 로직을 그대로 실행합니다. `npm run verify`의 `account`
 스위트가 콜백 4가지 경우(true·false·error·쿼리 없음)를 확인합니다.
 
 **마지막 항목은 백엔드 로컬 구동이 필요해 아직 못 했습니다.** 8080이 떠 있으면
-`NEXT_PUBLIC_AUTH_MODE=backend npm run dev` → `/login`의 "카카오 없이 로그인"으로
+`NEXT_PUBLIC_API_MODE=backend npm run dev` → `/login`의 "카카오 없이 로그인"으로
 쿠키 발급까지 확인하겠습니다. 이때 백엔드에서 확인이 필요한 것:
 
 - CORS `allowedOrigins`에 `http://localhost:3000`이 있고 `allowCredentials=true`인지

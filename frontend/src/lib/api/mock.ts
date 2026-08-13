@@ -15,6 +15,7 @@ import { withChildName } from "@/lib/korean";
 import type {
   ActivityApi,
   Message,
+  OrderResult,
   PlayApi,
   SceneCompleteResponse,
   SceneInfo,
@@ -68,40 +69,48 @@ function highlightWordsIn(text: string) {
   );
 }
 
-/** 캐릭터별 반응 문구. 실제로는 캐릭터 LLM이 생성한다. */
+/**
+ * 캐릭터별 반응 문구. 실제로는 캐릭터 LLM이 생성한다.
+ *
+ * ⚠️ **밑줄 단어(WORD_GLOSSARY)를 일부 대사에 심어 뒀다.** 실서버도 같은 구조다 —
+ *    `highlightWords`는 장면 첫 대사가 아니라 **생성된 턴 응답에 후보 단어가 실제로
+ *    등장할 때만** 채워진다 (백엔드 D-22 · `MessageServiceImpl.detectHighlightWords`).
+ *    여기 한 단어도 안 넣으면 목에서 C-9(단어 뜻 팝업)로 갈 통로가 아예 없어져
+ *    단어장까지 검증할 수 없다.
+ */
 const REACTIONS: Record<string, Record<ResponseMode, string[]>> = {
   ch_banggui_daughter_in_law: {
-    NORMAL: [
+    normal: [
       "정말? 내 마음을 알아주는 사람이 있었네…",
-      "그렇게 생각해 주니 조금 마음이 놓여.",
+      "그렇게 말해 주니 창피한 마음이 조금 가벼워지는 것 같아.",
     ],
-    GUIDED: [
+    guided: [
       "그런데 왜 꼭 말해야 하는지 나는 아직 잘 모르겠어.",
       "말을 꺼내고 싶어도 어떻게 시작해야 할지 모르겠어.",
     ],
-    CLOSING: [],
+    closing: [],
   },
   ch_banggui_father_in_law: {
-    NORMAL: [
+    normal: [
       "흠… 네 말도 아주 틀린 것은 아니구나.",
-      "그렇게 말하니 조금은 들어볼 만하구나.",
+      "그렇게 말하니 내가 구박만 한 것이 미안해지는구나.",
     ],
-    GUIDED: [
+    guided: [
       "일부러 그런 것이 아니라는 걸 내가 어찌 믿겠느냐.",
       "그래서 나더러 어찌하란 말이냐.",
     ],
-    CLOSING: [],
+    closing: [],
   },
   ch_banggui_village_chief: {
-    NORMAL: [
-      "허허, 그런 방법이 있었구려!",
+    normal: [
+      "허허, 그런 뾰족한 방법이 있었구려!",
       "듣고 보니 해볼 만한 이야기구려.",
     ],
-    GUIDED: [
+    guided: [
       "그 방법이 정말 통할지 나는 알 수가 없구려.",
       "사람들이 다치지나 않을까 그것이 걱정이구려.",
     ],
-    CLOSING: [],
+    closing: [],
   },
 };
 
@@ -194,16 +203,71 @@ function persist() {
   }
 }
 
+/**
+ * 개발 중에만 동작하는 시작 장면 지정 — `/play/xxx?scene=4`
+ *
+ * `?api=`·`?speech=`·`?home=`과 같은 장치다. 미션 2는 **마지막 대화 장면**에 있어서
+ * 확인하려면 앞 장면 3개를 다 지나야 하고, 발화를 열 번 넘게 해야 한다.
+ *
+ * 값은 **화면 단위 장면 번호(1~4)** 다. DB 장면 번호(1~9)가 아니다 — 화면에 뜨는
+ * "장면 3"과 같은 숫자여야 헷갈리지 않는다.
+ *
+ *   ?scene=1 → 장면 1 (며느리)      ?scene=3 → 장면 3 (마을 이장 · 미션 1)
+ *   ?scene=2 → 장면 2 (시아버지)    ?scene=4 → 장면 4 (며느리 재등장 · 미션 2)
+ *
+ * ⚠️ 해당 대화 장면의 **첫 턴부터** 시작한다. 미션은 서버(목)가 첫 발화 뒤에 띄우므로
+ *    한 번은 말해야 나온다. 미션 노출 판정을 건너뛰지 않는다 — 그러면 실제 흐름과 달라진다.
+ * ⚠️ 프로덕션 빌드에서는 `NODE_ENV` 비교가 상수로 접혀 이 분기가 사라진다.
+ */
+function devStartSceneId(): string | null {
+  if (process.env.NODE_ENV !== "development") return null;
+  if (typeof window === "undefined") return null;
+
+  const raw = new URLSearchParams(window.location.search).get("scene");
+  const screenIndex = Number(raw);
+  if (!Number.isInteger(screenIndex) || screenIndex < 1) return null;
+
+  // 화면 단위 n번째 대화 장면. DB에서는 3·5·7·9번이다.
+  const dialogues = MOCK_SCENES.filter((s) => s.sceneType === "dialogue");
+  return dialogues[screenIndex - 1]?.id ?? null;
+}
+
+/**
+ * `?scene=`을 **한 페이지 로드에 한 번만** 적용했는지.
+ *
+ * ⚠️ 매번 적용하면 안 된다. `getSession`은 장면이 넘어갈 때마다 다시 불리는데,
+ *    그때도 되돌리면 지정한 장면에 영원히 갇혀 이야기가 진행되지 않는다.
+ *    한 번만 적용하면 같은 주소를 다시 열어도 매번 그 장면에서 시작한다.
+ */
+let devSceneApplied = false;
+
 function ensureSession(sessionId: string): MockSession {
   hydrate();
   const existing = sessions.get(sessionId);
-  if (existing) return existing;
+  if (existing) {
+    // 이미 있는 세션도 첫 진입 때는 지정한 장면으로 보낸다. 안 그러면 주소를
+    // 다시 열 때마다 세션 id를 새로 지어내야 한다.
+    // ⚠️ 이미 그 장면에 있어도 **초기화한다.** 지난 실행의 대화와 미션 노출 기록이
+    //    남아 있으면 미션이 다시 뜨지 않아 "주소를 열면 그 장면부터"가 깨진다.
+    const target = devSceneApplied ? null : devStartSceneId();
+    if (target) {
+      devSceneApplied = true;
+      resetSceneState(existing, target);
+      existing.missionRevealedScenes.delete(target);
+      existing.messages = existing.messages.filter((m) => m.sceneId !== target);
+      // 첫 대사를 넣지 않으면 화면이 캐릭터 발화에 갇힌다 (헬퍼 주석 참조)
+      const scene = findScene(target);
+      if (scene) pushOpeningIfDialogue(existing, scene);
+      persist();
+    }
+    return existing;
+  }
 
   const created: MockSession = {
     sessionId,
     childId: null,
     lastActivityAt: Date.now(),
-    currentSceneId: MOCK_SCENES[0].id,
+    currentSceneId: devStartSceneId() ?? MOCK_SCENES[0].id,
     turnCount: 0,
     accumulatedElements: [],
     turnsWithoutNewElement: 0,
@@ -220,6 +284,19 @@ function ensureSession(sessionId: string): MockSession {
     detectedElements: [],
   };
   sessions.set(sessionId, created);
+
+  /**
+   * `?scene=`으로 대화 장면에서 시작했으면 첫 대사를 넣는다.
+   *
+   * 평소에는 이야기가 intro에서 시작하므로 이 자리가 필요 없다 — 대화 장면의 첫 대사는
+   * 장면 전환(`completeScene`)이 넣어 준다. 지름길은 그 단계를 건너뛰므로 직접 넣는다.
+   */
+  if (created.currentSceneId !== MOCK_SCENES[0].id) {
+    devSceneApplied = true;
+    const scene = findScene(created.currentSceneId);
+    if (scene) pushOpeningIfDialogue(created, scene);
+  }
+
   persist();
   return created;
 }
@@ -255,6 +332,29 @@ function resetSceneState(session: MockSession, sceneId: string) {
   session.turnsWithoutNewElement = 0;
   session.lowInformationTurns = 0;
   session.previousMode = null;
+}
+
+/**
+ * 대화 장면이면 캐릭터의 **첫 대사**를 messages에 넣는다.
+ *
+ * ⚠️ 이 단계를 빠뜨리면 화면이 캐릭터 발화 상태에 **갇힌다.** `applySnapshot`이
+ *    `characterText`를 "이 장면의 마지막 캐릭터 메시지"에서 가져오는데, 없으면
+ *    빈 문자열이 되고 → TTS가 호출되지 않고 → `CHARACTER_TTS_DONE`이 오지 않아
+ *    아이 차례로 넘어가지 못한다.
+ *
+ * 아이 이름 치환은 백엔드가 한다. 화면·TTS·AI 텍스트를 일치시키기 위함이다.
+ */
+function pushOpeningIfDialogue(
+  session: MockSession,
+  scene: MockScene
+): Message | null {
+  if (scene.sceneType !== "dialogue" || !scene.characterOpening) return null;
+  return pushMessage(
+    session,
+    scene.id,
+    "character",
+    withChildName(scene.characterOpening, CHILD_NAME)
+  );
 }
 
 function pushMessage(
@@ -357,12 +457,11 @@ export const mockPlayApi: PlayApi = {
       status: session.status,
       currentSceneId: scene.id,
       currentSceneOrder: scene.sceneOrder,
-      sceneProgress: {
-        current: toScreenIndex(scene.sceneOrder),
-        total: TOTAL_SCREEN_SCENES,
-      },
+      // 실서버는 화면 단위 현재 위치를 주지 않는다. 분모만 준다.
+      // (backend/docs/api-spec.md 5.2 — sceneProgress는 /home에만 있다)
+      totalScenes: TOTAL_SCREEN_SCENES,
       turnCount: session.turnCount,
-      maxTurns: scene.maxTurns ?? 0,
+      maxTurns: scene.maxTurns ?? null,
       accumulatedElements: [...session.accumulatedElements],
       messages: [...session.messages],
       currentScene: toSceneInfo(scene, session),
@@ -370,42 +469,63 @@ export const mockPlayApi: PlayApi = {
     return snapshot;
   },
 
+  /**
+   * intro·narrative 전용. **dialogue에 부르면 실서버가 400을 준다** — 목도 같이 막는다.
+   * 막지 않으면 목에서만 통하는 경로가 생겨서 실연동에서 처음 터진다.
+   * (backend/docs/api-spec.md 5.3)
+   */
   async completeScene(sessionId, sceneId) {
     await delay(120);
     assertOnline();
     const session = ensureSession(sessionId);
-    const next = nextSceneOf(sceneId);
+    const current = findScene(sceneId);
 
+    if (current?.sceneType === "dialogue") {
+      throw new ApiError(
+        "INVALID_REQUEST",
+        "대화 장면은 이 엔드포인트로 넘길 수 없습니다"
+      );
+    }
+    // 이미 지나간 장면을 다시 넘기려는 경우.
+    if (session.currentSceneId !== sceneId) {
+      throw new ApiError("SCENE_ALREADY_CLOSED");
+    }
+
+    const next = nextSceneOf(sceneId);
     if (!next) {
-      persist();
-      return { nextScene: null, postActivityReady: true };
+      // 서술 장면이 마지막인 이야기는 없다. 실서버는 이 경우 404다.
+      throw new ApiError("NOT_FOUND", "다음 장면이 없습니다");
     }
 
     resetSceneState(session, next.id);
 
-    let openingMessage: Message | null = null;
-    if (next.sceneType === "dialogue" && next.characterOpening) {
-      // 아이 이름 치환은 백엔드가 한다. 화면·TTS·AI 텍스트를 일치시키기 위함이다.
-      openingMessage = pushMessage(
-        session,
-        next.id,
-        "character",
-        withChildName(next.characterOpening, CHILD_NAME)
-      );
-    }
+    const openingMessage = pushOpeningIfDialogue(session, next);
 
     const response: SceneCompleteResponse = {
       nextScene: {
-        ...toSceneInfo(next, session),
+        sceneId: next.id,
+        sceneOrder: next.sceneOrder,
+        sceneType: next.sceneType,
+        characterName: next.characterName ?? null,
+        characterDisplayName: next.characterDisplayName ?? null,
+        characterImageUrl: null,
+        maxTurns: next.maxTurns ?? null,
         openingMessage,
-        // 첫 대사(C-3)가 어려운 낱말이 가장 많이 나오는 자리다. 여기에 밑줄이
-        // 없으면 C-9로 갈 통로가 사실상 닫힌다.
-        highlightWords: highlightWordsIn(openingMessage?.text ?? ""),
       },
-      postActivityReady: false,
     };
     persist();
     return response;
+  },
+
+  /** C-13 이야기 나가기. 멱등이다 — 이미 stopped여도 에러 없이 동작한다. */
+  async stopSession(sessionId) {
+    await delay(120);
+    assertOnline();
+    const session = ensureSession(sessionId);
+    // 완료된 세션은 되돌리지 않는다. 실서버도 상태를 덮어쓰지만 완료 기록이
+    // 사라지면 리포트가 없어지므로 목에서는 지킨다.
+    if (session.status !== "completed") session.status = "stopped";
+    persist();
   },
 
   async submitUtterance(sessionId, body) {
@@ -456,15 +576,15 @@ export const mockPlayApi: PlayApi = {
       (session.turnCount >= (scene.preferredTurns ?? 1) && missing.length === 0) ||
       session.turnCount >= scene.maxTurns
     ) {
-      mode = "CLOSING";
+      mode = "closing";
     }
     // 2. 강한 유도 제한 조건
     else if (
       session.turnCount === 1 ||
       detected.length > 0 ||
-      session.previousMode === "GUIDED"
+      session.previousMode === "guided"
     ) {
-      mode = "NORMAL";
+      mode = "normal";
     }
     // 3. 유도 필요성
     else if (
@@ -473,11 +593,11 @@ export const mockPlayApi: PlayApi = {
         session.turnsWithoutNewElement >= 2 ||
         turnsLeft <= 2)
     ) {
-      mode = "GUIDED";
+      mode = "guided";
     }
     // 4. 그 외
     else {
-      mode = "NORMAL";
+      mode = "normal";
     }
 
     session.previousMode = mode;
@@ -485,7 +605,7 @@ export const mockPlayApi: PlayApi = {
     // --- 캐릭터 응답 ----------------------------------------------------
     // CLOSING이면 AI를 호출하지 않고 고정 마지막 대사를 그대로 쓴다. (PRD I-01)
     const characterText =
-      mode === "CLOSING"
+      mode === "closing"
         ? (scene.characterClosing ?? "")
         : pick(
             REACTIONS[scene.characterName ?? ""]?.[mode] ?? [],
@@ -500,7 +620,7 @@ export const mockPlayApi: PlayApi = {
     if (
       scene.missionId &&
       !session.missionRevealedScenes.has(scene.id) &&
-      mode !== "CLOSING" &&
+      mode !== "closing" &&
       session.turnCount >= 1
     ) {
       session.missionRevealedScenes.add(scene.id);
@@ -514,7 +634,7 @@ export const mockPlayApi: PlayApi = {
       };
     }
 
-    const next = mode === "CLOSING" ? nextSceneOf(scene.id) : undefined;
+    const next = mode === "closing" ? nextSceneOf(scene.id) : undefined;
 
     const response: UtteranceResponse = {
       responseMode: mode,
@@ -523,12 +643,28 @@ export const mockPlayApi: PlayApi = {
       characterName: scene.characterDisplayName ?? "",
       accumulatedElements: [...session.accumulatedElements],
       turnCount: session.turnCount,
-      maxTurns: scene.maxTurns,
-      sceneEnded: mode === "CLOSING",
+      maxTurns: scene.maxTurns ?? null,
+      sceneEnded: mode === "closing",
       nextSceneId: next?.id ?? null,
       missionTriggered,
       highlightWords: highlightWordsIn(characterText),
     };
+
+    /**
+     * 장면이 닫혔으면 **여기서 세션을 옮긴다.** 응답을 만든 뒤에 옮기는 이유는
+     * 위 응답이 이번 턴의 turnCount·누적 요소를 담아야 하기 때문이다.
+     *
+     * 실서버가 이 자리에서 `session.advanceToScene()`을 부른다
+     * (`MessageServiceImpl`). 그래서 프론트는 `.../complete`를 부르지 않고
+     * `GET /sessions/{id}`만 다시 읽는다. 목이 이걸 흉내내지 않으면
+     * **장면 전환 코드가 목에서만 다른 길을 타게 된다.**
+     */
+    if (mode === "closing") {
+      if (next) resetSceneState(session, next.id);
+      // 마지막 대화 장면이 닫혔다. 후속 활동 진입 신호는 이 상태값이다.
+      else session.status = "post_activity";
+    }
+
     persist();
     return response;
   },
@@ -572,9 +708,6 @@ export const mockActivityApi: ActivityApi = {
       .map((c) => c.id);
     const isCorrect = submittedOrder.join() === correct.join();
 
-    // 오답이면 자리가 틀린 카드 하나를 힌트로 준다.
-    const wrongIndex = submittedOrder.findIndex((id, i) => id !== correct[i]);
-
     /**
      * 3회째 오답이면 정답 순서를 함께 내려보내 다음 단계로 넘긴다. (D-10)
      *
@@ -584,17 +717,38 @@ export const mockActivityApi: ActivityApi = {
      */
     const revealAnswer = !isCorrect && session.attemptCount >= ORDER_ATTEMPT_LIMIT;
 
-    return {
+    /**
+     * ⚠️ 없는 값은 **키 자체를 빼고** 보낸다. 실서버가 `@JsonInclude(NON_NULL)`이라
+     *    `null`이 아니라 키가 없다. 목이 null로 채워 보내면 `"correctOrder" in result`
+     *    같은 검사가 목에서만 통하고 실연동에서 어긋난다.
+     *    (backend/docs/api-spec.md 8.2)
+     */
+    const result: OrderResult = {
       isCorrect,
       attemptCount: session.attemptCount,
-      retellingKeywords:
-        isCorrect || revealAnswer
-          ? [...MOCK_POST_ACTIVITY.retellingKeywords]
-          : null,
-      // 정답을 보여주는 판에는 힌트가 필요 없다.
-      hintCardId: isCorrect || revealAnswer ? null : (correct[wrongIndex] ?? null),
-      correctOrder: revealAnswer ? correct : null,
     };
+    if (isCorrect || revealAnswer) {
+      result.retellingKeywords = [...MOCK_POST_ACTIVITY.retellingKeywords];
+    }
+    if (revealAnswer) result.correctOrder = correct;
+
+    /**
+     * 칸별 정오 — 1·2회째 오답에만 싣는다. 3회째는 정답을 보여주며 넘어가는 판이라
+     * 지적을 남기지 않는다.
+     *
+     * ⚠️ **실서버는 아직 이 필드를 주지 않는다.**
+     *    (docs/request/backend/order-slot-results.md로 요청해 뒀다) 목에만 있으므로
+     *    실연동에서는 프론트가 배치 전체를 표시하는 쪽으로 동작한다. 둘 다 검증한다.
+     *
+     * 정답 순서 자체는 여전히 내려보내지 않는다 — "이 칸이 맞는지"만 알려주므로
+     * 프론트가 정답을 역산할 수 없다.
+     */
+    if (!isCorrect && !revealAnswer) {
+      result.slotResults = submittedOrder.map(
+        (cardId, index) => cardId === correct[index]
+      );
+    }
+    return result;
   },
 
   async submitRetelling(sessionId, body) {
@@ -625,6 +779,8 @@ export const mockActivityApi: ActivityApi = {
       },
       // 보호자 리포트는 선택 요건(O-01). 미구현이므로 false.
       reportAvailable: false,
+      // 백엔드 B-20: 이야기 완료 시 +100. 시안의 +5가 아니다. (계획 D16)
+      earnedStarDust: 100,
     };
   },
 };

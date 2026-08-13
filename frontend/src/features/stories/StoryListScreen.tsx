@@ -13,14 +13,14 @@ import { useRouter } from "next/navigation";
 import { SidebarShell } from "@/components/shells/SidebarShell";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
 import { StoryCard } from "@/components/ui/StoryCard";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { contentApi } from "@/lib/api";
 import type { ContentApi, StoryListResult } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 
 /** FilterChipRow는 "전체"를 빈 문자열로 다룬다. */
 const ALL = "";
 
-export function StoryListScreen({ api = mockContentApi }: { api?: ContentApi }) {
+export function StoryListScreen({ api = contentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
 
@@ -72,7 +72,11 @@ export function StoryListScreen({ api = mockContentApi }: { api?: ContentApi }) 
         </p>
       ) : (
         // 카드가 1장이어도 3열 그리드에서 늘어나지 않게 한다. (체크리스트)
-        <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        //
+        // ⚠️ 3열 분기는 `lg:`(1024px)다. `xl:`(1280px)로 두면 지원 태블릿
+        //    1133·1180px이 미달해 2열로 떨어진다. 사이드바 240px과 여백 80px을 빼도
+        //    1133px에서 카드 1장이 255px이라 3열이 들어간다.
+        <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {data.stories.map((story) => (
             <li key={story.id}>
               <StoryCard

@@ -23,6 +23,7 @@ import {
   findScene,
   toScreenIndex,
 } from "@/mocks/story-banggui";
+import { CATALOG_STORIES, findCatalogStory } from "@/mocks/story-catalog";
 
 const WORDBOOK_KEY = "gq.mock.wordbook";
 /** 담은 뒤 이 시간 안이면 E-1에서 "새 단어" 칩을 붙인다. */
@@ -108,7 +109,11 @@ function toWordEntry(stored: StoredWord, now: number): WordEntry {
   };
 }
 
-/** MVP는 이야기 1편이다. 목록도 그 1편만 내려준다. (PRD 7.1) */
+/**
+ * 재생 가능한 이야기는 1편이다. 목록에는 **카탈로그 전용 2편**을 함께 올린다.
+ * 이야기가 여러 편일 때의 화면(추천 3개 · 태블릿 3열 · 주제 필터)을 볼 수 있어야 한다.
+ * (`mocks/story-catalog.ts`)
+ */
 function storyListItem(childId: string) {
   const sessions = mockSessionsOf(childId);
   // 여러 세션이 있으면 최신 것의 상태를 보여준다.
@@ -120,9 +125,25 @@ function storyListItem(childId: string) {
     coverImageUrl: STORY_META.coverImageUrl,
     estimatedMinutes: STORY_META.estimatedMinutes,
     difficulty: STORY_META.difficulty,
-    topics: [...STORY_META.topics],
+    // `as string[]`로 넓힌다. STORY_META.topics는 as const라 리터럴 유니온이 되고,
+    // 카탈로그 편과 합치면 `includes(topic)`에서 타입이 충돌한다.
+    topics: [...STORY_META.topics] as string[],
     sessionStatus: latest?.status ?? null,
   };
+}
+
+/** 카탈로그 전용 편. 세션이 있을 수 없으므로 `sessionStatus`는 늘 null이다. */
+function catalogListItems() {
+  return CATALOG_STORIES.map((story) => ({
+    id: story.id,
+    title: story.title,
+    summary: story.summary,
+    coverImageUrl: story.coverImageUrl,
+    estimatedMinutes: story.estimatedMinutes,
+    difficulty: story.difficulty,
+    topics: [...story.topics],
+    sessionStatus: null,
+  }));
 }
 
 export const mockContentApi: ContentApi = {
@@ -130,14 +151,17 @@ export const mockContentApi: ContentApi = {
     await delay(180);
     assertOnline();
 
-    const item = storyListItem(childId);
+    const all = [storyListItem(childId), ...catalogListItems()];
     // 필터는 목록만 갱신한다. 페이지 이동이 없다. (B-2 동작)
-    const matches =
-      !topic || topic === "all" || (item.topics as string[]).includes(topic);
-
     const result: StoryListResult = {
-      stories: matches ? [item] : [],
-      availableTopics: [...STORY_META.topics],
+      stories:
+        !topic || topic === "all"
+          ? all
+          : all.filter((item) => item.topics.includes(topic)),
+      // 세 편의 주제를 합집합으로 낸다. 1편 것만 내면 나머지 편이 걸러지지 않는다.
+      availableTopics: [
+        ...new Set(all.flatMap((item) => item.topics)),
+      ],
     };
     return result;
   },
@@ -145,6 +169,29 @@ export const mockContentApi: ContentApi = {
   async getStory(storyId, childId) {
     await delay(200);
     assertOnline();
+
+    // 카탈로그 전용 편 — 상세까지는 보여주고 재생만 막는다. (story-catalog.ts)
+    const catalog = findCatalogStory(storyId);
+    if (catalog) {
+      const detail: StoryDetail = {
+        id: catalog.id,
+        title: catalog.title,
+        summary: catalog.summary,
+        coverImageUrl: catalog.coverImageUrl,
+        estimatedMinutes: catalog.estimatedMinutes,
+        difficulty: catalog.difficulty,
+        topics: [...catalog.topics],
+        intro: catalog.intro,
+        situation: catalog.situation,
+        childRole: catalog.childRole,
+        characters: catalog.characters.map((c) => ({ ...c, imageUrl: null })),
+        // 재생이 안 되므로 세션이 있을 수 없다.
+        existingSession: null,
+        comingSoon: true,
+      };
+      return detail;
+    }
+
     if (storyId !== STORY_META.id) {
       throw new ApiError("UNKNOWN", "없는 이야기입니다");
     }
@@ -184,13 +231,11 @@ export const mockContentApi: ContentApi = {
         ? {
             sessionId: resumable.sessionId,
             currentSceneOrder: resumable.currentSceneOrder,
-            sceneProgress: resumable.sceneProgress,
             status: resumable.status,
           }
         : null,
       // 이 목에서는 등록 시 동의를 함께 받으므로 항상 true다.
       // 서버는 child_consents를 실제로 조회해야 한다.
-      consentGranted: true,
     };
     return detail;
   },
@@ -252,7 +297,7 @@ export const mockContentApi: ContentApi = {
     return toWordEntry(stored, Date.now());
   },
 
-  async toggleWordLiked(childId, wordId) {
+  async toggleWordLiked(childId, wordId, liked) {
     await delay(150);
     assertOnline();
 
@@ -260,9 +305,11 @@ export const mockContentApi: ContentApi = {
     const found = store.words.find(
       (w) => w.id === wordId && w.childId === childId
     );
-    if (!found) throw new ApiError("UNKNOWN", "없는 단어입니다");
+    if (!found) throw new ApiError("NOT_FOUND", "없는 단어입니다");
 
-    found.liked = !found.liked;
+    // 넘어온 값을 그대로 쓴다. 서버가 뒤집어 주지 않으므로 목도 뒤집지 않는다.
+    // 목만 뒤집으면 두 번 누를 때 실서버와 결과가 갈린다. (api-spec 9.3)
+    found.liked = liked;
     saveWords(store);
     return toWordEntry(found, Date.now());
   },
@@ -282,7 +329,11 @@ export const mockContentApi: ContentApi = {
 
     const snapshot: MypageSnapshot = {
       // 아이 정보는 계정 목이 가지고 있다. 화면이 두 번 부르지 않게 여기서 채운다.
-      child: readChild(childId),
+      child: {
+        ...readChild(childId),
+        // 백엔드 B-20: 이야기 완료 1편당 +100. 실서버는 이 필드를 아직 안 준다.
+        starDust: completed.length * 100,
+      },
       stats: {
         completedStories: completed.length,
         savedWords: words.length,

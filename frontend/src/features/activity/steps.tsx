@@ -9,6 +9,8 @@
 import { Modal } from "@/components/ui/Modal";
 import { MicButton } from "@/components/ui/MicButton";
 import { PillButton } from "@/components/ui/PillButton";
+import { StarDustIcon } from "@/components/ui/StarDust";
+import { StarDustRain } from "@/components/ui/StarDustRain";
 import type { ActivityCard, RetellingResult } from "@/lib/api/types";
 
 /** D-1 활동 인트로 */
@@ -46,15 +48,21 @@ export function ActivityIntro({ onStart }: { onStart: () => void }) {
  *
  * ⚠️ 절대 금지: 빨간색, X 마크, "틀렸어요", "실패".
  *    실패를 지적하면 아이가 위축된다.
+ *
+ * ── "힌트 보기"를 넣지 않았다 ────────────────────────────────────────
+ * 명세는 버튼 2개(힌트 보기 / 다시 해보기)를 그렸지만, **서버가 강조할 카드를
+ * 알려주지 않는다** — `POST .../activity/order` 응답에 그런 필드가 없다
+ * (backend/docs/api-spec.md 8.2). 프론트는 정답을 모르므로 힌트를 만들 수 없다.
+ * 누르면 아무 일도 없는 버튼보다 없는 것이 정직하다.
+ *
+ * 빠져나갈 길은 3회 제한이 대신한다 — 3회째에 서버가 정답 순서를 보여준다. (D-10)
  */
 export function FeedbackModal({
   open,
   onRetry,
-  onHint,
 }: {
   open: boolean;
   onRetry: () => void;
-  onHint: () => void;
 }) {
   return (
     <Modal open={open} width={560} dismissible={false} label="다시 해보기">
@@ -72,14 +80,9 @@ export function FeedbackModal({
           순서가 조금 바뀐 것 같아. 다시 한 번 놓아볼까?
         </p>
 
-        <div className="flex w-full gap-3">
-          <PillButton variant="outlined" className="basis-2/5" onClick={onHint}>
-            힌트 보기
-          </PillButton>
-          <PillButton className="basis-3/5" onClick={onRetry}>
-            다시 해보기
-          </PillButton>
-        </div>
+        <PillButton fullWidth onClick={onRetry}>
+          다시 해보기
+        </PillButton>
       </div>
     </Modal>
   );
@@ -394,20 +397,8 @@ export function ActivityComplete({
 
   return (
     <div className="relative flex size-full flex-col items-center justify-center gap-6 overflow-hidden px-10">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        {[
-          [10, 20], [26, 70], [42, 18], [58, 62], [74, 28], [88, 72],
-          [18, 48], [66, 10],
-        ].map(([left, top], i) => (
-          <span
-            key={i}
-            style={{ left: `${left}%`, top: `${top}%`, animationDelay: `${i * 0.2}s` }}
-            className="absolute animate-pulse text-3xl text-accent"
-          >
-            ✦
-          </span>
-        ))}
-      </div>
+      {/* 별가루가 떨어진다. 반짝이는 점 대신 실제로 모은 것이 쏟아지는 느낌을 준다. */}
+      <StarDustRain />
 
       <div
         aria-hidden
@@ -419,6 +410,14 @@ export function ActivityComplete({
       <h1 className="z-10 text-hero leading-tight font-bold text-text">
         이야기를 끝까지 해냈어!
       </h1>
+
+      {/* 획득 별가루 — 서버가 값을 줄 때만. 없으면 이 줄이 사라진다. (계획 D4) */}
+      {typeof result.earnedStarDust === "number" ? (
+        <p className="z-10 flex items-center gap-2 text-kid-button font-bold text-text">
+          <StarDustIcon size={28} className="text-accent" />
+          별가루 +{result.earnedStarDust.toLocaleString("ko-KR")}
+        </p>
+      ) : null}
 
       <ul className="z-10 flex gap-4">
         {stats.map((stat) => (

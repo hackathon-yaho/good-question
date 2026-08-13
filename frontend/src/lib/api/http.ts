@@ -19,26 +19,74 @@ export const BACKEND_URL =
 export const API_BASE = `${BACKEND_URL}/api`;
 
 /**
- * 인증을 백엔드로 붙일지, 목으로 둘지.
+ * 데이터·인증을 실서버로 붙일지, 목으로 둘지.
  *
- * 기본값이 `mock`인 이유: 백엔드가 아직 인증 외 엔드포인트를 만들지 않았고,
- * 검증 스위트(`npm run verify`)가 백엔드 없이 돌아야 한다.
- * 실제 백엔드를 띄운 뒤에는 `.env.local`에 `NEXT_PUBLIC_AUTH_MODE=backend`를 둔다.
+ * ── 왜 인증과 데이터를 한 스위치로 묶는가 ───────────────────────────
+ * 섞으면 반드시 깨진다. 목 데이터는 `c_mock_1` 같은 자체 childId를 쓰는데 실서버는
+ * 그런 아이를 모른다(403/404). 반대로 목 인증 + 실 데이터는 쿠키가 없어 전부 401이다.
+ * **둘은 함께 켜지고 함께 꺼져야 한다.**
+ *
+ * 음성(`NEXT_PUBLIC_SPEECH_MODE`)만 따로 둔다. 브라우저 TTS + 실 데이터는 실제로
+ * 동작하는 조합이라 섞을 이유가 있다.
+ *
+ * 기본값이 `mock`인 이유: 검증 스위트(`npm run verify`)가 백엔드 없이 돌아야 한다.
+ * 실서버를 띄운 뒤에는 `.env.local`에 `NEXT_PUBLIC_API_MODE=backend`를 둔다.
  */
-export const AUTH_MODE: "mock" | "backend" =
-  process.env.NEXT_PUBLIC_AUTH_MODE === "backend" ? "backend" : "mock";
+const BUILD_API_MODE: "mock" | "backend" =
+  process.env.NEXT_PUBLIC_API_MODE === "backend" ? "backend" : "mock";
 
-/** 백엔드가 준 에러 코드를 프론트 코드로 옮긴다. 모르는 값은 UNKNOWN. */
+/**
+ * 개발 중에만 동작하는 런타임 전환 — `/home?api=backend`
+ *
+ * `NEXT_PUBLIC_*`은 번들에 박히므로 모드를 바꾸려면 dev 서버를 재시작해야 한다.
+ * 실서버 경로를 손으로 확인할 때마다 재시작하는 것은 비싸고, 검증 스위트가 두 경로를
+ * 한 서버에서 확인할 방법도 필요하다. (`speech/mode.ts`와 같은 장치다)
+ *
+ * 프로덕션 빌드에서는 `process.env.NODE_ENV` 비교가 상수로 접혀 이 분기가 사라진다.
+ *
+ * ⚠️ 모듈 평가 시점에 한 번만 읽는다. 클라이언트 라우팅으로 주소가 바뀌어도
+ *    모드는 그대로다 — 데이터 계층이 이동 중에 갈리면 더 위험하다.
+ */
+function overrideFromUrl(): "mock" | "backend" | null {
+  if (process.env.NODE_ENV !== "development") return null;
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("api");
+  return value === "backend" || value === "mock" ? value : null;
+}
+
+export const API_MODE: "mock" | "backend" =
+  overrideFromUrl() ?? BUILD_API_MODE;
+
+/**
+ * 백엔드가 준 에러 코드를 프론트 코드로 옮긴다.
+ *
+ * 백엔드가 쓰는 코드 9종은 그대로 통과시킨다
+ * (backend/docs/api-spec.md 0.4 · `common/global/ErrorCode.java`).
+ * 문구가 아니라 코드로 분기하기 때문에 이름이 같으면 그대로 쓰는 게 맞다.
+ */
+const BACKEND_CODES = new Set<ApiErrorCode>([
+  "INVALID_REQUEST",
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "CONSENT_REQUIRED",
+  "NOT_FOUND",
+  "CHILD_LIMIT_EXCEEDED",
+  "SCENE_ALREADY_CLOSED",
+  "STT_EMPTY",
+  "INTERNAL_ERROR",
+]);
+
 function toErrorCode(status: number, code?: string): ApiErrorCode {
-  if (status === 401) return "UNAUTHORIZED";
-  switch (code) {
-    case "CHILD_LIMIT_EXCEEDED":
-    case "CONSENT_REQUIRED":
-    case "UNAUTHORIZED":
-      return code;
-    default:
-      return "UNKNOWN";
+  if (code && BACKEND_CODES.has(code as ApiErrorCode)) {
+    return code as ApiErrorCode;
   }
+  // 본문이 JSON이 아니거나 모르는 코드다. 상태 코드로만 판단한다.
+  if (status === 401) return "UNAUTHORIZED";
+  if (status === 403) return "FORBIDDEN";
+  if (status === 404) return "NOT_FOUND";
+  // 5xx는 재시도가 통할 수 있다. I-3으로 올린다.
+  if (status >= 500) return "NETWORK";
+  return "UNKNOWN";
 }
 
 type RequestOptions = {

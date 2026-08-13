@@ -68,10 +68,26 @@ const leaked = await page.evaluate(() =>
 );
 ok(!leaked, "correctOrder가 클라이언트에 노출되지 않음");
 
+/**
+ * 이야기의 정답 순서. 목의 `MOCK_POST_ACTIVITY.cards`와 같다.
+ * 프론트 코드는 이 값을 모른다 — **검증 스크립트만** 안다.
+ */
+const STORY_ORDER = [
+  "며느리는 방귀를 꾹 참고 또 참았어요.",
+  "며느리의 큰 방귀에 시아버지의 갓이 날아갔어요.",
+  "며느리의 방귀로 높은 배나무의 배가 우수수 떨어졌어요.",
+  "시아버지가 며느리에게 미안하다고 말했어요.",
+];
+
 // 탭으로 4장 배치 (드래그 대안 경로)
 console.log("\n=== 탭 배치 → 오답 제출 ===");
-for (let i = 0; i < 4; i++) {
-  await page.locator("button.touch-none").first().click();
+/**
+ * ⚠️ **일부만 틀린 배치**를 만든다. 트레이 순서대로 아무렇게나 넣으면 4칸이
+ *    전부 틀릴 수 있고, 그러면 "맞은 칸은 표시하지 않는다"(요구 10)를
+ *    확인할 수가 없다. 3·4번만 바꿔 넣어 1·2번은 정답 자리에 둔다.
+ */
+for (const text of [STORY_ORDER[0], STORY_ORDER[1], STORY_ORDER[3], STORY_ORDER[2]]) {
+  await page.locator("button.touch-none", { hasText: text }).first().click();
   await page.waitForTimeout(120);
 }
 ok(await submitBtn.isEnabled(), "4칸 채우면 확인하기 활성");
@@ -84,6 +100,46 @@ console.log(`  ${isFeedback ? "OK  " : "info"} D-3 오답 피드백 ${isFeedback
 if (isFeedback) {
   const banned = ["틀렸", "실패", "오답"].filter((w) => body1.includes(w));
   ok(banned.length === 0, `금지 표현 없음${banned.length ? " → " + banned : ""}`);
+
+  /**
+   * 칸별 오답 표시 — 요구 10.
+   *
+   * 목 서버는 1·2회째에 `slotResults`를 실어 보낸다. 그러면 **틀린 칸만** 빨간
+   * 테두리를 갖고, 맞은 칸은 지금 테두리를 유지한다.
+   *
+   * ⚠️ 실서버는 아직 이 필드를 주지 않는다. 그때는 배치 전체가 표시된다 —
+   *    프론트는 정답을 모르므로 어느 칸이 틀렸는지 알 방법이 없다 (§0-2).
+   *    (docs/request/backend/order-slot-results.md)
+   * ⚠️ 맞은 칸에 **초록 테두리를 넣지 않는다.** 정답 개수를 세는 화면이 된다.
+   */
+  // ⚠️ 클래스 문자열로 판단하지 않는다. `border-secondary`와 `border-danger`가
+  //    둘 다 class에 남아 있고 실제 색은 CSS 순서가 정한다. 계산된 색을 본다.
+  const marks = await page.evaluate(() => {
+    const slots = [...document.querySelectorAll("[data-slot-index]")];
+    return slots.map((el) => ({
+      wrong: el.dataset.mismatched === "1",
+      borderColor: getComputedStyle(el).borderTopColor,
+    }));
+  });
+  const DANGER = "rgb(217, 83, 79)"; // --color-danger
+  const wrongCount = marks.filter((m) => m.wrong).length;
+  ok(wrongCount > 0, "오답 칸에 표시가 붙는다", `${wrongCount}/4칸`);
+  ok(
+    wrongCount < marks.length,
+    "맞은 칸은 표시하지 않는다 (칸 단위 · slotResults)",
+    `${marks.length - wrongCount}칸 유지`
+  );
+  ok(
+    marks.every((m) => (m.borderColor === DANGER) === m.wrong),
+    "빨간 테두리가 틀린 칸에만 그려진다",
+    marks.map((m) => (m.wrong ? "✗" : "·")).join("")
+  );
+  // 맞은 칸에 초록을 새로 넣지 않는다 — 정답 개수를 세는 화면이 된다 (PRD 10.3)
+  ok(
+    !(await page.locator("[data-slot-index].border-secondary[data-mismatched]").count()),
+    "맞은 칸에 정답 표시를 추가하지 않는다"
+  );
+
   await page.getByRole("button", { name: "다시 해보기" }).click();
   await page.waitForTimeout(300);
 }
@@ -152,8 +208,12 @@ await page.getByRole("button", { name: "이야기 완성하기" }).click();
 await page.getByText("이야기를 끝까지 해냈어!").waitFor({ timeout: 6000 });
 ok(true, "완료 화면 도달");
 const finalBody = await page.locator("body").innerText();
-const bannedFinal = ["점수", "등급", "%", "별가루"].filter((w) => finalBody.includes(w));
-ok(bannedFinal.length === 0, `평가·미정의 표현 없음${bannedFinal.length ? " → " + bannedFinal : ""}`);
+// 별가루는 이제 구현된 보상 표시다(백엔드 B-20). 금칙어에서 뺀다 —
+// 금지 대상은 **평가 표현**이고 별가루는 평가가 아니다.
+const bannedFinal = ["점수", "등급", "%"].filter((w) => finalBody.includes(w));
+ok(bannedFinal.length === 0, `평가 표현 없음${bannedFinal.length ? " → " + bannedFinal : ""}`);
+// 획득 별가루는 서버가 값을 줄 때만 나온다. 목은 완료 시 +100을 준다. (계획 D16)
+ok(/별가루 \+\d+/.test(finalBody), "획득 별가루 표시");
 console.log("  통계: " + finalBody.split("\n").filter((l) => /번$|명$|개$/.test(l.trim())).join(" / "));
 
 await page.screenshot({ path: SHOT("activity-shot") });

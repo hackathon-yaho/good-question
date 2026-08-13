@@ -17,7 +17,7 @@
 
 import { chromium } from "playwright-core";
 
-import { SHOT, BASE, chromeExecutable } from "./_browser.mjs";
+import { SHOT, BASE, chromeExecutable, skipIntro } from "./_browser.mjs";
 
 const browser = await chromium.launch({
   executablePath: chromeExecutable(),
@@ -124,13 +124,7 @@ ok(
   calls.tts[0]?.slice(0, 40)
 );
 
-for (let i = 0; i < 5; i += 1) {
-  const next = page.getByRole("button", { name: /다음|이야기 시작하기/ });
-  if (await next.count()) {
-    await next.first().click().catch(() => {});
-    await page.waitForTimeout(300);
-  }
-}
+await skipIntro(page);
 
 /* ── C-4 녹음 → ① 변환 중 → C-5 ────────────────────────────────── */
 

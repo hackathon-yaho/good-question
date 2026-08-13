@@ -41,16 +41,40 @@ npm run verify  # 브라우저 검증 (dev 서버를 먼저 띄운 상태에서)
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `NEXT_PUBLIC_BACKEND_URL` | `http://localhost:8080` | 백엔드 오리진. 여기에 `/api`가 붙습니다 |
-| `NEXT_PUBLIC_AUTH_MODE` | `mock` | `mock` = 백엔드 없이 동작 · `backend` = 카카오 리다이렉트 + JWT 쿠키 |
+| `NEXT_PUBLIC_API_MODE` | `mock` | `mock` = 목 데이터 · `backend` = 실서버 호출(인증 포함) |
 | `NEXT_PUBLIC_SPEECH_MODE` | `mock` | `mock` = 브라우저 Web Speech · `backend` = `/api/stt`·`/api/tts` ([아래](#stt--tts)) |
 
 `npm run verify`는 **`mock` 모드로** 돕니다. 검증에 백엔드를 요구하지 않기 위한 것입니다.
 
-`backend` 모드로 로그인을 실제로 확인하려면 백엔드를 8080에 띄운 뒤:
+**인증과 데이터는 한 스위치로 묶여 있습니다.** 섞으면 반드시 깨집니다 — 목 데이터는
+자체 childId(`c_mock_1`)를 쓰는데 실서버는 그런 아이를 모르고, 반대 조합은 전부 401입니다.
+음성(`SPEECH_MODE`)만 따로 둡니다. 브라우저 TTS + 실 데이터는 동작하는 조합입니다.
+
+`backend` 모드로 확인하려면 백엔드를 8080에 띄운 뒤:
 
 ```bash
-NEXT_PUBLIC_AUTH_MODE=backend npm run dev
+NEXT_PUBLIC_API_MODE=backend npm run dev
 ```
+
+개발 중에는 재시작 없이 주소에 `?api=backend`를 붙여도 됩니다.
+
+### 개발 전용 주소 전환
+
+개발 모드에서만 동작합니다. 프로덕션 빌드에서는 `NODE_ENV` 비교가 상수로 접혀
+분기 자체가 사라집니다.
+
+| 주소 | 동작 |
+| --- | --- |
+| `?api=backend` · `?api=mock` | 데이터 계층 전환 |
+| `?speech=backend` · `?speech=browser` | STT/TTS 전환 |
+| `/home?home=fresh` | **이어하기를 숨긴다.** 빈 상태 화면을 로그인부터 다시 하지 않고 본다 |
+| `/home?recommend=3` | 추천 개수를 늘린다 (목록 레이아웃 확인용) |
+
+`?home=` · `?recommend=`는 **서버 데이터를 조작하지 않습니다.** 받아온 스냅샷을
+그리는 단계에서만 가리므로 세션은 살아 있고, 파라미터를 떼면 원래대로 돌아옵니다.
+`?recommend=`는 **없는 이야기를 늘려 보여주므로** 점선 칩으로 표시합니다.
+`?home=fresh`는 칩을 띄우지 않습니다 — 빈 상태 **레이아웃을 확인하려는** 화면에
+안내 칩이 끼면 그 배치를 그대로 볼 수 없습니다.
 
 카카오 앱 등록 전이라면 `/login` 하단의 **카카오 없이 로그인 (dev-login)** 으로
 쿠키 발급 → `/auth/callback` → 온보딩 분기까지 확인할 수 있습니다.
@@ -58,7 +82,7 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 
 ## 검증
 
-`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **270개**를 확인합니다.
+`npm run verify`가 헤드리스 Chromium으로 실제 화면을 조작해 **407개**를 확인합니다.
 `scripts/verify/`에 스위트별로 나뉘어 있습니다.
 
 | 스위트 | 범위 |
@@ -66,19 +90,40 @@ NEXT_PUBLIC_AUTH_MODE=backend npm run dev
 | `play` | C-1 도입 · 자동재생 게이트 · TTS |
 | `turn` | C-3~C-6 대화 1턴 · NORMAL/GUIDED/CLOSING |
 | `speech` | **2안 STT/TTS** — 실제 녹음·multipart 업로드·오디오 재생 (`?speech=backend`) |
+| `mission` | **C-10·C-11 미션 순차 진행** — 브리프 → 말해볼래요 → 발화 → 브리프 복귀 |
 | `handoff` | `/play` 완주 → `/activity` 인계 (장면 4개 전부 닫히는지) |
 | `activity` | D-1~D-7 · 키워드 점등 · 카드 재시도 3회 제한 |
 | `drag` | D-2 카드 드래그 (마우스 · 터치) |
 | `account` | A-1~A-5 · B-1 · 로그인 콜백 · 새로고침 유지 · 라우트 가드 · 정원 초과 |
 | `system` | I-1 · I-3 · I-4 (오프라인 → 재시도 → 발화 복구까지) |
 | `browse` | B-2·B-3·B-4 · C-9 → 단어장 · E · F-1 |
-| `parent` | A-6 · G-1~G-4 · H-1~H-7 |
-| `layout` | 태블릿 5종 — 버튼 줄바꿈·넘침, C-10 미션 겹침·잘림 |
+| `parent` | A-6 · G-1~G-4 · H-1~H-7 (완주 → 리포트 생성까지) |
+| `wiring` | **실서버 배선** — 경로·메서드·본문을 명세와 대조 (`?api=backend`) |
+| `layout` | 태블릿 5종 — 버튼 줄바꿈·넘침, 미션 브리프·발화 두 상태의 겹침·잘림 |
 
 단순 렌더 확인이 아니라 **요건 위반을 잡는 검사**가 섞여 있습니다. 예: 리포트에
 점수·등급·백분위 표현이 없는지, 내부 사고 요소 태그가 보호자 화면에 새지 않는지,
 F-1에 "내 목소리로" 문구가 없는지, 미션이 전체 화면 모달이 아닌지,
 카드 3회째에 실패를 지적하는 표현이 없는지.
+
+**픽셀을 재는 검사**도 있습니다. 아이 화면 자막이 줄당 한글 22자를 지키는지(§1-3),
+버튼 라벨이 두 줄로 접히지 않는지, 뒤로가기가 표지 모서리에 붙지 않는지처럼
+"동작은 하는데 보기 나쁜" 결함은 기능 검증으로 잡히지 않습니다.
+
+> 실제로 이 부류의 검사가 두 건을 잡았습니다 — **D-2 오답 빨간 테두리가 그려지지
+> 않던 문제**(`border-secondary`와 `border-danger`가 우선순위가 같아 클래스 순서로
+> 이기지 못했다. `data-mismatched`는 붙어서 기존 검증은 통과했다)와,
+> **미션 현재 항목이 1번이 아니라 3번부터 시작한 문제**입니다.
+
+### 완주 검사는 시간으로 제한한다
+
+`handoff`·`parent`는 이야기를 끝까지 몰고 갑니다. 그 루프의 제한이 **반복 횟수가
+아니라 시간(180초)** 입니다. 완주 소요 시간도 함께 출력합니다.
+
+반복 횟수로 세면 "화면이 실제로 멈춘 것"과 "반복이 부족한 것"을 구분할 수 없습니다.
+실제로 그 때문에 **아이가 영구히 멈추는 버그를 반복 부족으로 오진**했습니다 —
+미션이 끝나기 전에 장면이 닫히면 `missionBriefOpen`이 남아 아이 차례가 오지 않는데,
+화면은 정상처럼 보입니다. 횟수 상한을 올려도 통과하지 않으니 그때 원인을 찾았습니다.
 
 Chromium을 못 찾으면 `npx playwright install chromium`, 또는 `GQ_CHROME`으로
 크롬 실행 파일을 직접 지정하세요.
@@ -90,7 +135,8 @@ Chromium을 못 찾으면 `npx playwright install chromium`, 또는 `GQ_CHROME`�
 | 문서 | 내용 |
 | --- | --- |
 | [../docs/spec/screens.md](../docs/spec/screens.md) | 화면 48개 · 상태 전이 · 디자인 토큰 |
-| [../docs/spec/api.md](../docs/spec/api.md) | 서버 계약 (3절이 프론트↔백엔드) |
+| [../backend/docs/api-spec.md](../backend/docs/api-spec.md) | **서버 계약 정본.** 구현된 코드 기준이라 api.md보다 최신 |
+| [../docs/spec/api.md](../docs/spec/api.md) | 서버 계약 초안 (위 문서와 다르면 위가 맞다) |
 | [../docs/spec/assets.md](../docs/spec/assets.md) | 이미지 규격 · 미수령 에셋 폴백 |
 | [../docs/team/roles.md](../docs/team/roles.md) | 2장이 프론트 담당 범위 |
 | [../docs/open-questions.md](../docs/open-questions.md) | 미결 · 문서 간 충돌 |
@@ -98,6 +144,12 @@ Chromium을 못 찾으면 `npx playwright install chromium`, 또는 `GQ_CHROME`�
 ## 구조
 
 ```
+public/
+├── logo-symbol.webp             Q 기호만 크롭 256² — A-1 스플래시 · 사이드바
+├── logo-wordmark.webp           워드마크 640×229 — A-2 로그인
+├── avatars/*.webp               아이 아바타 6종 256² (색상 키 → 동물 매핑)
+└── (gitignore) logo.png · characters/   에셋 원본. 웹에 쓰이는 건 변환 결과뿐이다
+
 src/
 ├── app/
 │   ├── globals.css              디자인 토큰 (screens.md §1-2 ~ §1-4)
@@ -106,7 +158,7 @@ src/
 │   └── dev/gallery/             컴포넌트 갤러리 (개발용, 제출물 제외)
 ├── components/
 │   ├── shells/                  ImmersiveShell · SidebarShell · CenteredShell
-│   └── ui/                      공통 컴포넌트 10종 (screens.md §1-6)
+│   └── ui/                      공통 컴포넌트 14종 (screens.md §1-6)
 ├── features/
 │   ├── account/                 A-2 로그인 · A-3 동의 · A-4 등록 · A-5 선택
 │   ├── home/                    B-1 홈
@@ -120,13 +172,24 @@ src/
 └── lib/
     ├── thinking-elements.ts     사고 요소 8종 → 아이 화면 4그룹 매핑 (§1-7)
     ├── play-state.ts            PlayState · ActivityStep · 서버 모드 매핑
+    ├── api/index.ts             **API 입구** — 목/실서버를 여기서만 고른다
     ├── api/http.ts              fetch 래퍼 (credentials: include · 에러 코드 매핑)
+    ├── api/client*.ts           실서버 클라이언트 5종
     ├── api/auth.ts              로그인 · /auth/me · 로그아웃 (목 / 백엔드 전환)
     ├── api/speech.ts            POST /api/stt · GET /api/tts
     ├── speech/                  녹음·재생 (목 / 백엔드 전환) — mode.ts가 입구
     ├── client-store.ts          선택한 아이 · 동의 임시값 (localStorage)
     └── relative-date.ts         A-5 "최근 활동" 상대 표기 규칙
+
+src/mocks/
+├── story-banggui.ts             재생 가능한 이야기 1편 (장면·미션·활동 전부)
+└── story-catalog.ts             **카탈로그 전용 2편** — 재생 불가 (아래 참조)
 ```
+
+`story-catalog.ts`는 이야기가 여러 편일 때의 화면을 볼 수 있게 하는 목 데이터입니다.
+B-1 추천 3개 · B-2 태블릿 3열 · 주제 필터는 **이야기가 1편이면 확인할 방법이 없습니다.**
+B-3 상세까지 정상 동작하고 **재생만 막습니다** — 장면 데이터가 없어 시작 버튼을
+살려두면 `/play`에서 깨지므로, 비활성 버튼과 "준비 중이에요" 안내를 둡니다.
 
 `/dev/gallery`에서 토큰과 컴포넌트를 한 화면에 볼 수 있습니다. 디자인 시안(Stitch)을
 아직 못 받았으므로, 시안이 도착하면 이 화면과 나란히 놓고 대조합니다.
@@ -162,11 +225,25 @@ A-3의 동의 값을 함께 받는 계약이고(api.md 3.2) 동의 없는 아이
 | 항목 | 이유 |
 | --- | --- |
 | C-8 힌트 시트 | PRD 5.4가 MVP 범위 밖, 3단계 힌트 콘텐츠가 없음 ([Q-05](../docs/open-questions.md)) |
+| D-3 "힌트 보기" 버튼 | 서버가 강조할 카드를 주지 않고, 프론트는 정답을 모름 (api-spec 8.2). 3회 제한이 대신함 |
 | G-2 역량 4점 dot | 점 개수를 정하는 산출 기준이 어디에도 없음 ([Q-23](../docs/open-questions.md)) |
-| "별가루" 칩 (B-1·F-1) | 적립 규칙이 DB·요건 어디에도 없음 ([Q-12](../docs/open-questions.md)) |
 | A-2 구글·네이버 버튼 | PRD M-01은 카카오만 ([Q-02](../docs/open-questions.md)) |
 | H-4 "1:1 문의하기" 버튼 | 연결 대상 미정. 눌러도 아무 일 없는 버튼보다 안내가 정직함 |
 | G-3 "전체 대화 보기" | 연결 화면이 설계에 없음 |
+| C-10 미션 "성공" 판정 표시 | 서버가 미션 달성 여부를 주지 않음. 체크리스트가 채워지는 것으로 대신함 |
+
+같은 이유로 **값이 없으면 그리지 않습니다.** 0이나 빈 문자열로 채우면 화면이 거짓을
+말하게 됩니다.
+
+| 항목 | 값이 없을 때 |
+| --- | --- |
+| 별가루 칩 (B-1·F-1·D-7) | **칩과 낙하 애니메이션을 아예 그리지 않습니다.** 적립 규칙은 서버에 있는데([B-20](../backend/docs/decisions.md)) 잔액·적립량을 주는 응답이 없어, `backend` 모드에서는 지금 숨습니다 ([요청 문서](../docs/request/backend/star-dust-exposure.md)) |
+| 캐릭터 초상 · 장면 배경 · 이야기 표지 | 규격에 맞는 플레이스홀더. URL만 채우면 교체됩니다 ([assets.md](../docs/spec/assets.md)) |
+| B-3 추천 횟수 | 서버가 준 수를 그대로 씁니다. 없으면 문구를 빼고 그립니다 |
+
+> **별가루는 판단이 바뀐 항목입니다.** 처음에는 "적립 규칙이 없다"([Q-12](../docs/open-questions.md))는
+> 이유로 만들지 않았는데, B-20에서 **재구성 완료 시 +100**이 정해져 근거가 생겼습니다.
+> 그래서 UI는 만들고, **값이 실려 오는지로 표시 여부를 정하게** 했습니다.
 
 ## 지금 확인할 수 있는 것
 
@@ -250,6 +327,12 @@ prop으로 넘기면 `Functions cannot be passed directly to Client Components`�
 - **마이크는 캐릭터 발화가 끝난 뒤 활성화한다.** 발화 중 켜면 캐릭터 음성이 녹음된다
 - **`/play`, `/activity`는 페이지 이동이 없다.** 단일 페이지의 상태·단계 전환이다. 새로 그리면 TTS가 끊긴다
 - **미션을 전체 화면 모달로 만들지 않는다.** 주최측 요건이다 (open-questions Q-04)
+- **미션은 한 항목씩 진행한다.** 카드를 읽고 `말해볼래요`를 눌러야 발화가 시작된다.
+  TTS가 끝나도 자동으로 아이 차례가 되지 않는다 — 읽고 생각할 시간이 필요하다
+- **완료 표시의 뜻은 "맞았어요"가 아니라 "말했어요"다.** 어느 항목이 실제로 충족됐는지는
+  서버만 안다 ([요청 문서](../docs/request/backend/mission-progress.md))
+- **`ch` 단위를 쓰지 않는다.** 숫자 "0"의 폭이라 한글보다 1.4배 좁다.
+  줄 길이 상한은 `.kid-line`(19em = 한글 22자)이고 **글자 크기를 가진 요소에** 건다
 - **평가 표현을 쓰지 않는다.** 점수·등급·퍼센트·"틀렸어요" 금지
 - **토큰을 프론트가 보관하지 않는다.** JWT는 HttpOnly 쿠키다. 로그인 여부는 `GET /api/auth/me`가 답한다
 - 클릭 타겟은 C·D 화면 72px, 그 외 44px

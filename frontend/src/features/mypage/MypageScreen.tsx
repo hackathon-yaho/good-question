@@ -15,8 +15,9 @@ import { useRouter } from "next/navigation";
 
 import { SidebarShell } from "@/components/shells/SidebarShell";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
+import { StarDustChip } from "@/components/ui/StarDust";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { contentApi } from "@/lib/api";
 import type { ContentApi, MypageSnapshot } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { useCharacterVoice } from "@/lib/speech";
@@ -29,7 +30,7 @@ function formatDate(iso: string): string {
   ).padStart(2, "0")}`;
 }
 
-export function MypageScreen({ api = mockContentApi }: { api?: ContentApi }) {
+export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const { speak, cancel, speaking } = useCharacterVoice();
@@ -79,10 +80,12 @@ export function MypageScreen({ api = mockContentApi }: { api?: ContentApi }) {
     <SidebarShell>
       <section className="flex items-center gap-5 rounded-card border border-border bg-surface p-6 shadow-soft">
         <ChildAvatar name={child.name} avatarId={child.avatarId} size={120} />
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-parent-title font-bold text-text">{child.name}</h1>
           <p className="mt-1 text-parent-body text-muted">{child.age}세</p>
         </div>
+        {/* 별가루 — 서버가 값을 줄 때만 보인다 */}
+        <StarDustChip amount={child.starDust} size={24} />
       </section>
 
       <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">

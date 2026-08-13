@@ -15,12 +15,12 @@ import { SidebarShell } from "@/components/shells/SidebarShell";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
-import { mockContentApi } from "@/lib/api/mock-content";
+import { contentApi } from "@/lib/api";
 import type { ContentApi, WordEntry, WordbookFilter } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { useCharacterVoice } from "@/lib/speech";
 
-export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
+export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const { speak } = useCharacterVoice();
@@ -61,9 +61,10 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
   }, [api, childId, filter, version]);
 
   const toggleLiked = useCallback(
-    async (wordId: string) => {
+    async (wordId: string, liked: boolean) => {
       if (!childId) return;
-      await api.toggleWordLiked(childId, wordId).catch(() => null);
+      // 목표 값을 넘긴다. 서버가 뒤집어 주지 않는다. (api-spec 9.3)
+      await api.toggleWordLiked(childId, wordId, liked).catch(() => null);
       setVersion((prev) => prev + 1);
     },
     [api, childId]
@@ -103,7 +104,9 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
           </p>
         </div>
       ) : (
-        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        // 4열 분기는 `lg:`(1024px)다. `xl:`(1280px)이면 태블릿 1133·1180px이
+        // 2열로 떨어진다 — 이야기 목록과 같은 이유다.
+        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {words.map((word, index) => (
             <li
               key={word.id}
@@ -146,7 +149,7 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
                       : `${word.word} 좋아하는 단어로 담기`
                   }
                   aria-pressed={word.liked}
-                  onClick={() => void toggleLiked(word.id)}
+                  onClick={() => void toggleLiked(word.id, !word.liked)}
                   className="flex size-touch items-center justify-center rounded-full text-xl"
                 >
                   {word.liked ? "❤️" : "🤍"}
@@ -184,7 +187,7 @@ export function WordbookScreen({ api = mockContentApi }: { api?: ContentApi }) {
                   open.liked ? "좋아하는 단어 해제" : "좋아하는 단어로 담기"
                 }
                 aria-pressed={open.liked}
-                onClick={() => void toggleLiked(open.id)}
+                onClick={() => void toggleLiked(open.id, !open.liked)}
                 className="flex size-14 items-center justify-center rounded-full text-3xl"
               >
                 {open.liked ? "❤️" : "🤍"}

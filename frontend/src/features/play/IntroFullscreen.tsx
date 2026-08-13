@@ -7,6 +7,7 @@
 
 "use client";
 
+import { ListeningBadge } from "@/components/ui/ListeningBadge";
 import { PillButton } from "@/components/ui/PillButton";
 
 type Props = {
@@ -67,21 +68,28 @@ export function IntroFullscreen({
       </div>
 
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-text/85 to-transparent px-12 pt-32 pb-12">
-        <div className="mx-auto flex max-w-[28ch] flex-col items-center gap-6">
-          <button
-            onClick={onReplay}
-            className="flex min-h-touch items-center gap-2 rounded-pill px-4 text-parent-body font-bold text-white/80 hover:bg-white/10"
-          >
-            <span aria-hidden>🔊</span> 다시 듣기
-          </button>
+        {/* 웨이브 → 라벨 → 자막 → [다시 듣기][다음] 순서다. C-3(얼굴 → 이름 → 대사 →
+            다시 듣기)과 같은 순서로 맞췄다. 라벨과 자막 사이에 버튼을 끼우면
+            "듣고 있다 → 무슨 내용" 흐름이 끊긴다.
+            ⚠️ 폭 상한은 래퍼가 아니라 **자막 <p>** 가 갖는다. (`.kid-line` 주석 참조) */}
+        <div className="flex flex-col items-center gap-5">
+          <ListeningBadge layout="stacked" />
 
-          <p className="text-center text-intro leading-relaxed font-bold text-white">
+          <p className="kid-line text-center text-intro leading-relaxed font-bold text-white">
             {sentence}
           </p>
 
-          <PillButton size="kid" onClick={onNext}>
-            {index >= total - 1 ? "이야기 시작하기" : "다음"}
-          </PillButton>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onReplay}
+              className="flex min-h-touch items-center gap-2 rounded-pill border-2 border-white/50 px-5 text-parent-body font-bold text-white/90 hover:bg-white/10"
+            >
+              <span aria-hidden>🔊</span> 다시 듣기
+            </button>
+            <PillButton size="kid" onClick={onNext}>
+              {index >= total - 1 ? "이야기 시작하기" : "다음"}
+            </PillButton>
+          </div>
         </div>
       </div>
 

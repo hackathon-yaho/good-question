@@ -33,11 +33,15 @@ export function SidebarShell({ children, header }: Props) {
   return (
     <div className="flex min-h-dvh w-full bg-bg">
       <nav className="flex w-60 shrink-0 flex-col gap-2 border-r border-border bg-sidebar-bg px-4 py-8">
-        <Link
-          href="/home"
-          className="mb-6 px-3 text-2xl font-bold text-primary"
-        >
-          굿퀘스천
+        <Link href="/home" aria-label="굿퀘스천 홈" className="mb-6 block px-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
+          <img
+            src="/logo-wordmark.webp"
+            alt="굿퀘스천"
+            width={160}
+            height={57}
+            className="h-auto w-40"
+          />
         </Link>
 
         {NAV.map((item) => {

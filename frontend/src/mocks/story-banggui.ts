@@ -51,7 +51,7 @@ export const MOCK_SCENES: MockScene[] = [
     sceneOrder: 1,
     sceneType: "intro",
     sceneDescription:
-      "옛날 어느 마을에 방귀를 아주 크게 뀌는 며느리가 살았습니다. 며느리는 시집에 온 뒤로 늘 얌전하고 예의 바르게 보이고 싶었습니다. 시댁 식구들이 자신을 이상하게 볼까 봐 걱정했기 때문입니다.",
+      "옛날 어느 마을에 방귀를 아주 크게 뀌는 며느리가 살았습니다. 며느리는 시집에 온 뒤로 늘 얌전하고 예의 바르게 보이고 싶었습니다. 시댁 식구들이 자신을 이상하게 볼까 봐 걱정했기 때문입니다. 아침에 마당을 쓸 때도, 저녁에 밥상을 차릴 때도 며느리는 숨을 조심조심 쉬었습니다. 배 속에서 방귀가 부글부글 차오를 때마다 두 손을 꼭 모으고 참았습니다. 누군가 자기 소리를 듣고 놀라거나 흉을 볼까 봐, 며느리는 그 마음을 아무에게도 말하지 못했습니다.",
     characterName: null,
     characterDisplayName: null,
     characterOpening: null,
@@ -197,15 +197,20 @@ export const MOCK_MISSIONS = {
       { label: "그러면 어떤 일이 생길까?", element: "RESULT" },
     ],
   },
+  /**
+   * 미션 2는 **택 1** 방식이라 체크리스트가 없다.
+   *
+   * 실서버도 `mission_2`의 `checklist`를 **항상 빈 배열로** 보낸다
+   * (backend/docs/api-spec.md 6.1). 미션 정의는 별도 테이블에 두지 않고 코드 상수로
+   * 관리한다는 팀 결정이기 때문이다 (PRD 7.6). 친구 4종은 프론트 상수에 있다
+   * (`features/play/mission2.ts` · 라벨은 화면 명세 C-11, 예시는 PRD 7.6).
+   *
+   * ⚠️ 목이 항목을 채워 보내면 **실서버와 다르게** 동작한다. 계약을 그대로 흉내낸다.
+   */
   mission_2: {
     id: "mission_2",
-    title: "단점을 장점으로 바꿔 볼까?",
-    checklist: [
-      { label: "목소리가 큰 친구", element: "PERSPECTIVE" },
-      { label: "질문이 많은 친구", element: "PERSPECTIVE" },
-      { label: "힘이 센 친구", element: "SOLUTION" },
-      { label: "조용한 친구", element: "RESULT" },
-    ],
+    title: "친구의 다른 점을 좋은 점으로 바꿔볼까?",
+    checklist: [],
   },
 } as const;
 
