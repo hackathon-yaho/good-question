@@ -759,6 +759,32 @@ satisfiedIndexes:[]}` → 장면 종료 시 다시 `null`로 정확히 전환되
 
 ---
 
+### D-31 · 메시지 히스토리에 `characterDisplayName` 추가
+
+프론트 요청([request/backend/message-character.md](../../docs/request/backend/message-character.md))
+— C-3 우측 패널이 "그 캐릭터와 나눈 이야기 전체"를 보여주도록 바뀌었는데, 같은 캐릭터가
+여러 장면에 재등장한다(PRD I-13, 며느리가 장면3·9). `GET /sessions/{id}`의 `messages[]`엔
+`sceneId`만 있고 캐릭터 정보가 없어서, 지난 장면 대사가 누구 것인지 응답만으로 알 수 없었다.
+
+**해결**: `SessionMessageResponse`에 `characterDisplayName`을 추가하고,
+`DialogueContents.forSceneOrder(message.getScene().getSceneOrder()).characterDisplayName()`으로
+그 메시지가 속한 장면 기준 캐릭터를 채운다. `messages[]`에 담기는 메시지는 전부 대화
+장면(3·5·7·9) 소속이라(도입·전개 장면엔 메시지가 안 생김) `forSceneOrder`가 항상 성립한다.
+
+- **`child` 발화에도 채운다** — 프론트가 요청한 그대로. 아이 발화 자체엔 캐릭터가 없지만
+  "그 대화 상대"를 의미하므로, 같은 장면의 캐릭터 이름을 그대로 쓴다
+- `POST /messages`는 안 건드렸다 — 그 응답엔 애초에 `messages[]` 배열이 없고(단일 턴
+  응답), 이미 `characterName`으로 현재 턴의 캐릭터를 알려주고 있어 요청 문서가 말한
+  간극이 없다. 요청 문서 제목에 두 엔드포인트가 같이 적혀 있었지만 실제 간극은
+  `GET /sessions/{id}` 쪽뿐이라고 판단해 그쪽만 고쳤다
+
+**검증**: 세션을 장면3→9까지 진행(같은 캐릭터 며느리가 재등장) → `GET /sessions/{id}`로
+전체 `messages[]` 조회 → 장면3·장면9 메시지 전부 `"방귀쟁이 며느리"`로, 장면5는
+`"시아버지"`로, 장면7은 `"마을 이장"`으로 정확히 태그됨을 확인. `child` 발화도 같은 값이
+채워짐, `system` 메시지(미션 노출)는 기존대로 목록에서 빠짐.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

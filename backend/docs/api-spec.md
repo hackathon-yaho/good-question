@@ -746,6 +746,7 @@ GET /sessions/58291471-0cc9-4f21-b80d-b576901ab1ae
 | messages[].speakerType | `"child"` 또는 `"character"` | String | N | "character" |
 | messages[].turnOrder | 세션 전체 기준 연속 번호(장면별로 리셋되지 않음, 1부터 시작) | Integer | N | 1 |
 | messages[].text | 발화/대사 원문. 캐릭터 대사는 아이 이름이 이미 치환된 상태 | String | N | "\"민준아, 내 방귀가…\"" |
+| messages[].characterDisplayName | 이 메시지가 속한 **장면**의 캐릭터 표시명(D-31). `speakerType: "child"`에도 채워지며, 그때는 "이 발화의 대화 상대"를 뜻함. 같은 캐릭터가 여러 장면에 재등장해도(예: 며느리 — 장면3·9) 각 메시지가 실제 속한 장면 기준으로 채워짐 | String | N | "방귀쟁이 며느리" |
 | messages[].createdAt | 저장 시각 | Instant(string) | N | "2026-08-12T10:20:00Z" |
 | currentScene | 현재 장면 상세 (화면 복원용) | object | N | 아래 참조 |
 | currentScene.sceneId | 장면 id | UUID(string) | N | "39a666d8-..." |
@@ -773,8 +774,8 @@ GET /sessions/58291471-0cc9-4f21-b80d-b576901ab1ae
   "maxTurns": 5,
   "accumulatedElements": ["PERSPECTIVE"],
   "messages": [
-    { "id": "f579b987-...", "sceneId": "39a666d8-...", "speakerType": "character", "turnOrder": 21, "text": "\"이 배나무는...무슨 뾰족한 방법이 없겠는가?\"", "createdAt": "2026-08-12T10:20:00Z" },
-    { "id": "9524008f-...", "sceneId": "39a666d8-...", "speakerType": "child", "turnOrder": 22, "text": "장대를 쓰면 될 것 같아요", "createdAt": "2026-08-12T10:20:30Z" }
+    { "id": "f579b987-...", "sceneId": "39a666d8-...", "speakerType": "character", "turnOrder": 21, "text": "\"이 배나무는...무슨 뾰족한 방법이 없겠는가?\"", "characterDisplayName": "마을 이장", "createdAt": "2026-08-12T10:20:00Z" },
+    { "id": "9524008f-...", "sceneId": "39a666d8-...", "speakerType": "child", "turnOrder": 22, "text": "장대를 쓰면 될 것 같아요", "characterDisplayName": "마을 이장", "createdAt": "2026-08-12T10:20:30Z" }
   ],
   "currentScene": {
     "sceneId": "39a666d8-0a5f-49ee-bfc2-9d827077a8b9",

@@ -128,7 +128,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
 | — | ~~세션 생성 · 재시작~~ | 필수 | `POST /api/sessions` — **완료** |
-| — | ~~세션 조회 (이어하기 복원)~~ | 필수 | `GET /api/sessions/{sessionId}` — **완료** |
+| — | ~~세션 조회 (이어하기 복원)~~ | 필수 | `GET /api/sessions/{sessionId}` — **완료.** `messages[].characterDisplayName` 추가 (선택, 프론트 요청 — D-31) |
 | M-46 | ~~장면 전환 처리 (intro/narrative → 다음)~~ | 필수 | `POST /api/sessions/{id}/scenes/{sceneId}/complete` — **완료** |
 | — | ~~이야기 나가기~~ | 선택 | `PATCH /api/sessions/{sessionId}` — **완료** (C-13). `{"status":"stopped"}`만 허용, 그 외 값은 400 |
 | M-44 | ~~`story_sessions` 상태 갱신~~ | 필수 | [PRD 8.8](../../docs/product/prd.md) — `advanceToScene()` 초기화 필드 전부 반영. **완료** |

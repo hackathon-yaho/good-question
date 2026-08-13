@@ -8,6 +8,14 @@
 
 ## 수정 이력
 
+### 2026-08-13 — 메시지 히스토리에 characterDisplayName 추가
+
+근거: [request/backend/message-character.md](../request/backend/message-character.md), [backend/docs/decisions.md D-31](../../backend/docs/decisions.md)
+
+| 절 | 변경 |
+| --- | --- |
+| 3.4 | `GET /api/sessions/{sessionId}`의 `messages[]` 각 항목에 `characterDisplayName` 신규 — 그 메시지가 속한 장면의 캐릭터 표시명(`child` 발화에도 채움, 대화 상대 의미). 같은 캐릭터가 여러 장면에 재등장해도(며느리 — 장면3·9) 실제 장면 기준으로 채워짐 |
+
 ### 2026-08-13 — 미션 체크리스트 항목 단위 진행 필드 추가
 
 근거: [request/backend/mission-progress.md](../request/backend/mission-progress.md), [backend/docs/decisions.md D-30](../../backend/docs/decisions.md)
