@@ -67,10 +67,10 @@ STT 결과가 비면 ①에서 끝나고 ②를 호출하지 않으므로, `mess
 | 실패 지점 | 동작 |
 | --- | --- |
 | `/analyze` 실패 | 빈 분석(`detectedElements: []`, `utteranceValidity: UNCLEAR`)으로 **정상 진행.** `/respond`는 호출됨 |
-| `/respond` 실패 | `character_closing`을 조회해 **장면 종료**, 다음 장면으로 |
+| `/respond` 실패 | `character_midline`(검수된 고정 중간 대사)으로 대체, **장면은 끝내지 않고** 다음 아이 차례를 유지 (D-40. 최초엔 `character_closing`으로 장면 종료였다가 변경) |
 
 **원칙: AI가 죽어도 이야기가 멈추지 않습니다.** 실패를 에러 화면으로 올리지 않고
-검수된 고정 대사로 장면을 닫아 앞으로 보냅니다.
+아이의 다음 차례를 그대로 이어갑니다.
 
 **슬립 방지**: 외부 크론 10분 간격 핑 + 헬스체크에 `SELECT 1` 포함.
 Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다
@@ -630,7 +630,7 @@ CORS(GET 메서드·`allowCredentials`)는 이미 충족돼 있어 변경 없음
 
 ---
 
-### D-27 · O-12 캐릭터 마음 변화 — `characterState` 필드를 AI 응답에서 직접 받는다
+### D-27 · O-12 캐릭터 마음 변화 — `characterState` 필드를 AI 응답에서 직접 받는다 (D-41로 뒤집힘)
 
 PRD 11.3 O-12(주최측 추가 요건 A-03, "아이의 발화 내용에 따라 캐릭터 표정 또는 태도
 변화")는 원래 담당이 "프론트·AI"로만 적혀 있어 백엔드 문서 어디에도 추적되지 않고
@@ -714,10 +714,9 @@ PERSPECTIVE 단독을 선택했다.
 5 vs 3, 장면9는 4 vs 2로 둘 다 여유 2턴이라 안전하다. 앞으로 미션이 딸린 장면을 새로 추가할
 때 `maxTurns == preferredTurns`로 두면 이 보장이 깨진다 — 코드에 짧은 주석으로 남겨뒀다.
 
-**미반영 잔여 위험**: `/respond` AI 실패 폴백(B-12)은 `hasUnrevealedMission`과 무관하게
-여전히 `character_closing`으로 장면을 즉시 강제 종료한다 — AI 서버 장애 상황이라 이번
-수정 범위 밖으로 남겨뒀다. 흔치 않은 경로이고, 다루려면 실패 시 대체용 "중간 대사"를 장면마다
-따로 준비해야 해서 별도 논의가 필요하다.
+**해소됨(D-40)**: `/respond` AI 실패 폴백(B-12)이 `character_closing`으로 장면을 즉시 강제
+종료하던 문제 — 장면마다 대체용 "중간 대사"(`character_midline`)를 준비해 D-40에서 고쳤다.
+더 이상 `hasUnrevealedMission`과 무관하게 장면을 강제로 닫지 않는다.
 
 **검증**:
 - 단위 테스트: `ProgressJudgeTest`에 GOAL_MET 유예/`MAX_TURNS` 하드 한도 유지 2건,
@@ -969,6 +968,168 @@ GitHub Actions 워크플로우(`​.github/workflows/keep-alive.yml`)는 지워�
 그냥 남겨뒀다 — 가끔 더 도는 건 손해가 아니다.
 
 **검증**: work-items.md B-23 참조.
+
+---
+
+### D-39 · U-01 해소 — `/analyze`·`/respond`에 `X-Internal-Token` 헤더 추가
+
+AI 파트가 `docs/request/backend/ai-service-integration-v1.md`로 실 AI 서버 연동 스펙을 넘겼다.
+헤더명(`X-Internal-Token`)·값 출처(`AI_SERVER_INTERNAL_TOKEN`)·엔드포인트 경로가 이걸로
+확정돼 U-01 중 인증 부분을 닫는다. 배포 주소 자체는 여전히 미결이라 U-01은 남겨두되
+범위를 좁힌다.
+
+- `AiAnalyzeClientImpl`·`AiRespondClientImpl` 생성자에서 `RestClient.Builder.defaultHeader`로
+  헤더를 얹는다 — 요청마다 헤더를 붙이는 코드를 반복하지 않으려고 클라이언트 초기화 시점에
+  고정했다.
+- `ai.server.internal-token` 프로퍼티 기본값은 빈 문자열이다. 로컬 mock 서버(`AiMockController`)는
+  인증을 보지 않으므로 토큰 값이 없어도 그대로 동작한다. 실 토큰 값은 AI 서버 쪽에서 받는 대로
+  `.env`에만 넣는다.
+
+**검증**: `AiAnalyzeClientImplTest`·`AiRespondClientImplTest` — JDK 내장 `HttpServer`로 로컬
+엔드포인트를 띄우고 실제 요청에 `X-Internal-Token` 헤더가 주입한 값 그대로 실리는지 확인.
+
+---
+
+### D-40 · `/respond` 실패 폴백 — 장면 강제 종료 대신 고정 중간 대사 유지
+
+AI 파트가 `docs/request/backend/free-speech-provider-and-ai-fallback.md`에서 지적한 문제.
+기존 B-12는 `/respond`가 실패하면 무조건 `character_closing`으로 장면을 즉시 닫았다 —
+AI 서버 장애 한 번으로 아이의 생각과 무관하게 이야기가 넘어가 버린다. D-28~D-29 미션 강제
+노출 작업 때도 "미반영 잔여 위험"으로 남겨뒀던 항목이다.
+
+**바꾼 것**: `story_scenes`에 `character_midline`(nullable text) 컬럼을 추가했다.
+`/respond` 실패 시 이 값으로 대체하고 `sceneEnded=false`로 응답한다 — `effectiveMode`는
+실패 전에 이미 `ProgressJudge`가 정한 `decision.mode()`(NORMAL/GUIDED)를 그대로 쓴다.
+새 모드를 만들지 않은 이유는 `story_sessions.last_response_mode`로 이어지는 다음 턴 진행
+판단(연속 GUIDED 제한 등)이 기존 두 값만 안다고 가정하고 있어서다.
+
+- `character_midline` 문구는 장면마다 캐릭터 말투에 맞춰 팀(AI 파트 요청을 받아 백엔드가
+  임시 작성)이 채웠다 — 원본 데이터가 없어 자문위원 검수 전 임시 문구다. 실제로는 무엇을
+  말했는지 모르는 상태에서 재생하는 문구라 장면 내용을 언급하지 않고 "계속 말해봐" 취지로만
+  썼다.
+- 작성 후 `docs/reference/characters.md`(캐릭터 성격 정본)와 대조해 검증했다. 시아버지(대화2)
+  1차 문구가 "익살스러운 어른"이라는 원문 특징을 못 살리고 명령조로만 읽혀서 호기심 어조를
+  더한 문구로 교체했다(`"허, 그래서? 어디 계속 말해 보아라, 궁금하구나."`). 나머지 3건은
+  원문 성격과 부합해 그대로 뒀다.
+- `guidanceTarget`은 `null`로 보낸다 — 고정 문구가 실제로 그 방향을 유도하지 않는데
+  값을 채우면 프론트·분석 로그가 오해한다.
+- `characterState`는 기존과 동일하게 `null`(D-35의 5종 밖 폴백과 같은 취급).
+
+**검증**: `AiMockController.respond()`가 빈 텍스트를 반환하도록 임시로 바꿔 `/respond` 실패를
+재현 → `POST .../messages` 응답이 `sceneEnded: false`, `characterMessage`가 해당 장면의
+`character_midline` 값, 다음 턴도 정상 진행되는 것을 확인 후 원복.
+
+---
+
+### D-41 · O-12 `characterState` — D-27을 뒤집는다. AI 판단 대신 `reactionKey` 고정 매핑
+
+AI 파트가 `docs/request/backend/ai-service-integration-v1.md`에서 캐릭터 LLM 응답을
+`{ "text": "..." }` 하나로 못박았다 — "AI 응답에 이미지 URL·이미지 프롬프트·표정 판정을
+추가하지 않는다"고 명시했고, 실제 `ai-server`의 `RespondResponse`(`schemas.py`)도
+`text` 필드 하나뿐인 `StrictModel`(`extra="forbid"`)이라 다른 값을 얹을 수 없다.
+`docs/request/frontend/static-visual-assets.md`도 "표정 상태의 파일 매핑은 프론트/백엔드가
+고정 목록으로 관리한다"고 같은 방향으로 요청했다.
+
+D-27은 "AI가 실제로 쓴 대사에 맞는 표정을 AI 스스로 고르는 게 더 정확하다"는 이유로
+`reactionKey` 기반 매핑을 **일부러 피했었다.** 지금은 AI 쪽이 그 값 자체를 안 주기로
+계약을 못박아서 선택지가 없다 — 대사 뉘앙스와 완벽히 일치하지 않을 수 있다는 D-27의
+우려는 감수한다.
+
+**바꾼 것**: `session/engine/CharacterStateMapper.java` 신설. `/respond` 호출 *전에* 이미
+계산해 둔 `reactionKey`(+ 신규 사고요소 감지 여부)로 5종 상태를 고정 매핑한다.
+
+| `reactionKey` | `characterState` |
+| --- | --- |
+| `playfulUtterance`, `empathyFromChild` | `HAPPY` |
+| `proposalFromChild` (신규 요소 채움) | `MOVED` |
+| `proposalFromChild` (신규 요소 못 채움) | `SURPRISED` |
+| `unclearUtterance`, `disagreement` | `WORRIED` |
+| 그 외(`questionFromChild`, `directResponse`) | `NEUTRAL` |
+
+- `RespondAiResult`·`AiRespondClientImpl`·`AiMockController`에서 `characterState` 파싱을
+  전부 걷어냈다 — AI가 그 필드를 절대 안 보내므로 계속 두면 항상 `null`만 나오는 죽은
+  분기였다.
+- `CLOSING`과 `/respond` 실패 폴백(D-40)은 여전히 `characterState: null`이다 — 이 매핑은
+  AI를 실제로 호출해 대사를 받은 턴에만 적용된다.
+- `MessageCreateResponse.characterState`(프론트 응답 필드)는 이름·타입 그대로 유지 —
+  프론트는 값의 출처(AI 직접 판단 → 백엔드 매핑)가 바뀐 걸 몰라도 된다.
+
+**검증**: `CharacterStateMapperTest` 8건(7개 `reactionKey` × `proposalFromChild`의 신규
+요소 여부 분기 포함) + 전체 빌드 106/106 통과.
+
+---
+
+### D-42 · STT 환각 문제 — `language=ko` 고정 + `no_speech_prob` 구간 필터링 (D-43으로 대체)
+
+프론트에서 신고: 아이가 아무 말도 안 했는데 STT 결과로 일본어(`チャンネル登録をお願いいたします`)나
+한국어 유튜브 자막체 상투구(`시청해주셔서 감사합니다`)가 나온다. Whisper가 무음·저품질
+구간에서 학습 데이터(유튜브 자막)의 상투구를 지어내는 것으로 널리 알려진 문제(hallucination)다.
+
+**재현**: `ffmpeg`로 무음 1·3초, 옅은 핑크노이즈 2초를 만들어 `response_format=verbose_json`으로
+직접 Whisper API를 호출해 재현했다.
+
+| 입력 | 결과 텍스트 | `no_speech_prob` | `avg_logprob` |
+| --- | --- | --- | --- |
+| 무음 3초 | "고맙습니다." | 0.94 | -0.79 |
+| 무음 1초 | "고맙습니다." | 0.94 | -0.79 |
+| 옅은 잡음 2초 | "시청해 주셔서 감사합니다." | 0.93 | -0.53 |
+| TTS 라운드트립("배가 아파요") | "배가 아파요." | **0.0075** | -0.41 |
+
+`no_speech_prob`는 환각 3건 모두 0.93 이상, 실제 발화는 0.0075로 확실히 갈린다.
+반면 `avg_logprob`는 -0.79~-0.41로 겹쳐서 **신뢰할 수 없는 신호였다** — Whisper는 지어낸
+문장의 토큰도 확신 있게 고른다. 처음엔 `no_speech_prob > 0.6` **그리고** `avg_logprob < -1.0`을
+동시에 요구했는데, 무음 3초 케이스(`avg_logprob -0.79`)가 그 AND 조건을 통과하지 못해
+필터를 빠져나가는 걸 실측으로 확인하고 `no_speech_prob` 단독 조건으로 정정했다.
+
+**바꾼 것**:
+- `OpenAiSttClientImpl`이 `/audio/transcriptions` 요청에 `language=ko`, `response_format=verbose_json`을
+  추가한다. `language`를 안 주면 짧고 모호한 오디오에서 Whisper가 언어 자체를 잘못 추측할 수
+  있다(신고된 일본어 케이스).
+- `voice/support/WhisperHallucinationFilter.java` 신설 — `no_speech_prob > 0.6`(OpenAI 기본
+  디코딩 임계값과 동일)인 구간을 버리고 나머지만 이어 붙인다. 전 구간이 걸러지면 빈 문자열 —
+  기존 "빈 결과면 /messages를 호출하지 않는다"(B-13) 계약 그대로 이어진다.
+- `verbose_json`이 `segments`를 안 주는 경우(빈 응답 등)를 대비해 최상위 `text`로 폴백한다.
+
+**검증**: `WhisperHallucinationFilterTest` 5건(위 실측값 그대로 케이스화) + 재빌드한
+서버에 같은 무음·잡음·실발화 4개 파일을 다시 `POST /api/stt`로 올려 **무음·잡음 3건 모두
+빈 문자열, 실제 발화만 정확히 복원**되는 것을 실제 OpenAI API로 확인. 전체 빌드 111/111 통과.
+
+**D-43으로 대체됨** — 근본 원인(모델 자체의 환각 성향)을 사후 필터링으로 완화하는
+방식이었는데, 모델을 바꾸는 게 더 근본적인 해결이라 판단해 하루 만에 뒤집었다.
+
+---
+
+### D-43 · STT 모델을 `whisper-1` → `gpt-4o-mini-transcribe`로 교체
+
+D-42가 사후 필터링(구간별 `no_speech_prob`)으로 환각을 걸러내는 방식이었다면, 이번엔
+**환각을 덜 일으키는 모델로 원인 자체를 바꾼다.** `whisper-1`은 GPT 계열이 아니라 OpenAI의
+구형 전용 음성인식 모델이고, 무음·저품질 구간에서 유튜브 자막 학습 데이터의 상투구를
+지어내는 게 문서로 잘 알려진 특성이다. `gpt-4o-mini-transcribe`는 GPT-4o 오디오 기반 신형
+모델로, 같은 `/v1/audio/transcriptions` 엔드포인트를 쓰되 단어 오류율·언어 인식이
+Whisper 대비 개선됐다고 OpenAI가 공식 문서에서 밝히고 있다.
+
+**제약**: 이 모델은 `response_format=verbose_json`을 지원하지 않는다 — 시도하면
+`response_format 'verbose_json' is not compatible with model 'gpt-4o-mini-transcribe-api-ev3'`
+400 에러가 난다(실측 확인). D-42의 구간별 필터링(`WhisperHallucinationFilter`)이 애초에
+호출될 수 없어져 통째로 삭제했다 — 죽은 코드를 남겨두지 않았다.
+
+**검증**: 실제 OpenAI API로 D-42와 동일한 3개 파일(무음 3초·옅은 잡음 2초·TTS 발화
+"배가 아파요")을 `gpt-4o-mini-transcribe`로 재실행.
+
+| 입력 | `whisper-1` (D-42) | `gpt-4o-mini-transcribe` (이번) |
+| --- | --- | --- |
+| 무음 3초 | "고맙습니다." (환각) | `""` — 5회 반복 전부 동일 |
+| 옅은 잡음 2초 | "시청해 주셔서 감사합니다." (환각, 신고된 것과 동일) | `""` — 5회 반복 전부 동일 |
+| 실제 발화 | "배가 아파요." (정상) | "배가 아파요." (정상) |
+
+직접 API 호출 10회(무음 5·잡음 5) 전부 빈 문자열로 일관됐고, 재빌드한 서버의 실제
+`POST /api/stt`로도 무음×3·잡음×3·실발화×2 총 8회를 다시 확인 — 전부 같은 결과.
+전체 빌드 106/106 통과(D-42 전용 테스트 5건 삭제로 111 → 106).
+
+**남은 트레이드오프**: 응답 속도가 `whisper-1`(~0.86초) 대비 다소 느려질 수 있음(참고:
+`gpt-4o-transcribe` 기준 ~1.6초, mini는 더 빠를 것으로 추정) — STT 타임아웃 8초·전체
+15초 예산 안에는 들어오지만, 배포 후 실측이 필요하면 U-02와 함께 재확인한다. 가격은
+`whisper-1`과 동일(2026-04 기준 $0.006/분 보고 사례 기준).
 
 ---
 

@@ -42,6 +42,6 @@ public class AiMockController {
 
     @PostMapping("/respond")
     public Map<String, Object> respond(@RequestBody(required = false) Map<String, Object> request) {
-        return Map.of("text", "그랬구나, 네 말을 들으니 마음이 좀 놓이는구나.", "characterState", "MOVED");
+        return Map.of("text", "그랬구나, 네 말을 들으니 마음이 좀 놓이는구나.");
     }
 }

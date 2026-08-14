@@ -83,6 +83,7 @@ public class ContentSeeder implements ApplicationRunner {
                         "ch_banggui_daughter_in_law",
                         "\"ㅇㅇ아, 내 방귀가 너무 크다는 걸 알면 가족들이 나를 이상하게 생각하지 않을까?\"",
                         "\"그래도 아직은 못 말하겠어. 조금만 더 참아 볼게.\"",
+                        "\"음… 그랬구나. 조금만 더 얘기해 줄 수 있을까?\"",
                         "방귀를 숨기고 싶어하는 며느리의 입장을 이해하고, 공감해주며 문제를 숨기지 않고 솔직하게 말할 수 있는 용기를 준다",
                         List.of("PERSPECTIVE", "EMOTION", "REASON", "SOLUTION"),
                         Map.of(
@@ -102,6 +103,7 @@ public class ContentSeeder implements ApplicationRunner {
                         "ch_banggui_father_in_law",
                         "\"아이고 이게 무슨 일이냐! 우리 집안이 다 흔들리는구나! 이렇게 창피한 며느리와 함께 못살겠다! 그렇지 않니?\"",
                         "\"흥, 그래도 도저히 이런 며느리와는 함께 살 수 없으니 친정으로 데려다줘야겠다.\"",
+                        "\"허, 그래서? 어디 계속 말해 보아라, 궁금하구나.\"",
                         "시아버지가 놀란 마음을 이해하면서도, 며느리가 일부러 그런 것이 아니라 오래 참아서 힘들었던 것임을 말하고, 며느리를 따뜻하게 이해해 달라고 설득한다",
                         List.of("PERSPECTIVE", "EMOTION", "REASON", "SOLUTION"),
                         Map.of(
@@ -121,6 +123,7 @@ public class ContentSeeder implements ApplicationRunner {
                         "ch_banggui_village_chief",
                         "\"이 배나무는 해마다 탐스러운 배가 열리지만, 너무 높아서 아무도 딸 수가 없었소. 무슨 뾰족한 방법이 없겠는가?\"",
                         "\"아이고, 방귀 뀌는 며느리 덕분에 온 마을이 배 잔치를 할 수 있겠구려, 고맙소!\"",
+                        "\"허허, 그렇구려. 계속 말해 보시게.\"",
                         "높은 배나무의 배를 떨어뜨릴 방법을 생각하고, 며느리의 큰 방귀를 안전하게 사용할 수 있는 해결책을 제안한다",
                         List.of("SOLUTION", "REASON", "REQUEST", "RESULT"),
                         Map.of(
@@ -140,6 +143,7 @@ public class ContentSeeder implements ApplicationRunner {
                         "ch_banggui_daughter_in_law",
                         "\"ㅇㅇ이 덕분에 내 방귀가 누군가에게 도움이 될 수 있다는 걸 처음 알았어. 이제는 방귀 소리가 큰 걸 부끄러워하지 않아도 될까?\"",
                         "\"이제는 부끄러워하며 숨기지 않고, 조심해서 좋은 일에 써 볼게.\"",
+                        "\"그렇구나. 조금 더 얘기해 줄래?\"",
                         "다름을 인정하고, 자신의 특징을 긍정적으로 받아들이는 태도를 말한다",
                         List.of("EMOTION", "PERSPECTIVE", "RESULT", "SOLUTION"),
                         Map.of(
