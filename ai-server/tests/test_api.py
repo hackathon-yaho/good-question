@@ -88,7 +88,7 @@ async def test_health_is_public_and_exposes_prompt_versions() -> None:
     assert response.json() == {
         "status": "ok",
         "model": "gpt-5-mini",
-        "promptVersions": {"analyze": "analyze_v3", "respond": "respond_v4"},
+        "promptVersions": {"analyze": "analyze_v3", "respond": "respond_v5"},
     }
 
 
