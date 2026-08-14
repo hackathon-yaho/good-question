@@ -43,7 +43,7 @@ export function StoryListRow({
       href={`/stories/${storyId}`}
       className={[
         /* items-center 유지: 세로 중앙 정렬 */
-        "flex h-full w-full items-center gap-3.5 rounded-card border border-border bg-surface p-3.5 shadow-soft transition-transform hover:-translate-y-0.5",
+        "flex h-[33%] w-full items-center gap-3.5 rounded-card border border-border bg-surface p-3.5 shadow-soft transition-transform hover:-translate-y-0.5",
         className,
       ].join(" ")}
     >

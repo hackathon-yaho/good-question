@@ -364,15 +364,21 @@ export function playReducer(
     case "TRANSCRIBED": {
       const text = action.text.trim();
       if (!text) {
-        return { ...state, errorCode: "no-speech" };
+        return {
+          ...state,
+          status: PlayState.MIC_ERROR,
+          recording: false,
+          errorCode: "no-speech",
+        };
       }
       return {
         ...state,
-        // status를 CONFIRM이나 다른 상태로 강제 전환하지 않고,
-        // draftText만 업데이트하며 CHILD_TURN 상태를 유지합니다.
+        // PlayState.CONFIRM 상태가 play-state.ts에 정의되어 있다면 그 상태로 변경!
+        status: PlayState.CONFIRM ?? PlayState.CHILD_TURN, 
         draftText: text,
         sttRawText: state.sttRawText || text,
         interimText: "",
+        recording: false,
       };
     }
 

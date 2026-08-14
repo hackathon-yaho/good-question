@@ -161,10 +161,10 @@ export function PlayScreen({
   // 그 시작을 알린다. (docs/request/frontend/stt-tts-integration.md)
   const stt = useChildSpeech({
     // 필요 시 maxDurationMs를 제거하거나 충분히 크게 설정
-    onTranscribeStart: () => dispatch({ type: "RECORDING_START" }),
+    onTranscribeStart: () => dispatch({ type: "TRANSCRIBING" }),
     onInterim: (text) => dispatch({ type: "INTERIM", text }),
     // 실시간 final 결과가 나올 때마다 draftText를 자동 업데이트 (턴 종료는 하지 않음)
-    onFinal: (text) => dispatch({ type: "DRAFT_CHANGE", text }),
+    onFinal: (text) => dispatch({ type: "TRANSCRIBED", text }),
     onError: (code) => {
       // 사용자가 직접 취소/종료하기 전 발생한 에러만 처리
       if (code !== "aborted") {
@@ -745,11 +745,11 @@ export function PlayScreen({
               />
             ) : null}
 
-            {state.status === PlayState.CHILD_TURN ? (
+            {state.status === PlayState.CHILD_TURN || state.status === PlayState.TRANSCRIBING ? (
               <ChildTurnPanel
                 missionItem={missionNowItem}
                 recording={state.recording}
-                transcribing={!state.recording && Boolean(state.interimText)}
+                transcribing={state.status === PlayState.TRANSCRIBING}
                 interimText={state.interimText}
                 micLevel={displayedMicLevel}
                 onMicClick={() => {

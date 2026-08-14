@@ -11,13 +11,9 @@
  * 미션은 처음부터 노출하지 않는다. 서버가 노출 시점을 판단해 내려준다.
  * 프론트는 신호를 받아 표시만 한다. (작업 분장 3.7)
  *
- * ── 한 항목씩 순차로 진행한다 ────────────────────────────────────────
- * 4항목을 한 번에 다 말하게 하지 않는다. 1번을 말하면 2번, 그렇게 4번까지 간다.
- * 카드는 [브리프 → 발화 → 브리프 → …]로 **네 번 돌아온다.**
- *
- * 그래서 체크리스트가 **1열 4행**이다. 예전엔 2×2였고 근거는 "세로 1열은 4개 중
- * 2개만 보인다"였는데, 브리프에서는 마이크를 그리지 않아 우측 패널 전체가 카드
- * 자리가 됐다 — 그 근거가 사라졌다. 한 줄에 하나면 **읽는 순서가 곧 말하는 순서**다.
+ * ── 미션 1 진행 방식 ──────────────────────────────────────────────
+ * 4가지 항목은 아이가 보고 생각할 수 있도록 방향을 유도하는 가이드입니다.
+ * 별도의 체크 표시 없이 4개 항목을 리스트로 노출합니다.
  *
  * ── 구성 ────────────────────────────────────────────────────────────
  *   [미션] 칩 + 미션 이름
@@ -37,65 +33,20 @@
  * **4그룹 한글 이름**(마음·이유·생각·방법)을 키워드로 쓴다. (계획 D14)
  */
 
-/**
- * 미션 카드 — docs/spec/screens.md C-10, C-11
- */
-
 "use client";
 
 import type { MissionTrigger } from "@/lib/api/types";
-import { toKidGroup, type ThinkingElement } from "@/lib/thinking-elements";
 
 type Props = {
   mission: MissionTrigger;
-  /** 완료로 표시할 항목 수. `machine.ts`의 `missionDoneCount()` 결과 */
-  doneCount: number;
-  /** 미션 2처럼 한 번 해보고 어려울 때 힌트를 붙인다 */
+  /** 한 번 해보고 어려울 때 힌트를 붙인다 */
   showHint?: boolean;
 };
 
-/** 항목 상태별 표시 — 색·링·굵기로만 구분한다. `[완료]` 텍스트는 쓰지 않는다 */
-const ROW = {
-  done: {
-    row: "bg-secondary-soft",
-    badge: "bg-secondary text-white",
-    label: "text-muted",
-    sr: "말했어요",
-  },
-  current: {
-    row: "bg-surface ring-2 ring-primary",
-    badge: "bg-primary text-white",
-    label: "font-bold text-text",
-    sr: "지금 말할 차례예요",
-  },
-  waiting: {
-    row: "bg-surface/60",
-    badge: "bg-primary-soft text-muted",
-    label: "text-muted",
-    sr: "아직이에요",
-  },
-} as const;
-
-export function MissionCard({ mission, doneCount, showHint = false }: Props) {
-  /** 지금 말할 항목. 다 채웠으면 없다 */
-  const current = mission.checklist[doneCount] ?? null;
-
-  /** 
-   * 지금 말해볼 것 — 현재 항목을 기반으로 3개의 주요 키워드를 구성합니다.
-   * (실제 키워드 모음/fallback 데이터를 통해 3개 그룹을 제공)
-   */
-  const currentGroup = current
-    ? toKidGroup(current.element as ThinkingElement)
-    : null;
-
-  // 💡 3개의 키워드 목록을 만듭니다. (현재 그룹을 포함하여 총 3줄)
-  const defaultKeywords = ["마음", "생각", "방법"];
-  const keywords = currentGroup
-    ? Array.from(new Set([currentGroup, ...defaultKeywords])).slice(0, 3)
-    : defaultKeywords;
-
+export function MissionCard({ mission, showHint = false }: Props) {
   return (
     <section className="flex max-h-full min-h-0 w-full flex-col overflow-y-auto rounded-card border-2 border-accent bg-accent-soft p-4">
+      {/* 미션 헤더 */}
       <div className="shrink-0">
         <p className="mb-1 w-fit rounded-pill bg-primary px-3 py-0.5 text-sm font-bold text-white">
           미션
@@ -105,57 +56,28 @@ export function MissionCard({ mission, doneCount, showHint = false }: Props) {
         </h3>
       </div>
 
+      {/* 4가지 관찰/생각 항목 가이드 리스트 */}
       <ul className="flex shrink-0 flex-col gap-2">
-        {mission.checklist.map((item, index) => {
-          const state =
-            index < doneCount
-              ? ROW.done
-              : index === doneCount
-                ? ROW.current
-                : ROW.waiting;
-          return (
-            <li
-              key={item.label}
-              className={`flex min-w-0 items-center gap-2.5 rounded-bubble px-3.5 py-2.5 transition-colors ${state.row}`}
-            >
-              <span
-                className={`flex size-6.5 shrink-0 items-center justify-center rounded-full text-sm font-bold ${state.badge}`}
-              >
-                {index < doneCount ? "✓" : index + 1}
-              </span>
-              <span className={`min-w-0 text-kid-body ${state.label}`}>
-                {item.label}
-              </span>
-              <span className="sr-only">{state.sr}</span>
-            </li>
-          );
-        })}
+        {mission.checklist.map((item, index) => (
+          <li
+            key={item.label || index}
+            className="flex min-w-0 items-center gap-2.5 rounded-bubble bg-surface px-3.5 py-2.5 ring-1 ring-accent/50"
+          >
+            <span className="flex size-6.5 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary">
+              {index + 1}
+            </span>
+            <span className="min-w-0 text-kid-body font-bold text-text">
+              {item.label}
+            </span>
+          </li>
+        ))}
       </ul>
 
-      {/* 🟢 지금 말해볼 것 — 3개의 키워드가 각각 fullWidth를 차지하여 3줄로 표시됩니다 */}
-      {current ? (
-        <div className="mt-4 shrink-0">
-          <p className="mb-2 text-parent-body font-bold text-muted">
-            지금 말해볼 것
-          </p>
-          <div className="flex flex-col gap-2">
-            {keywords.map((kw, idx) => (
-              <div
-                key={idx}
-                className="flex w-full items-center justify-center rounded-bubble border-2 border-accent bg-surface py-2.5 px-4 text-center text-parent-body font-bold text-text shadow-sm"
-              >
-                {kw}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* 힌트 */}
-      {showHint && current ? (
+      {/* 힌트 영역 */}
+      {showHint ? (
         <p className="mt-3 shrink-0 rounded-bubble bg-surface px-3.5 py-2.5 text-parent-body leading-snug text-text">
           <span className="font-bold text-primary">힌트 </span>
-          이런 걸 말해보면 어때? “{current.label}”
+          위의 내용을 생각해보면서 마이크를 누르고 자유롭게 말해보자!
         </p>
       ) : null}
     </section>
