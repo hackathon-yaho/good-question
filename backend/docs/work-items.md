@@ -239,7 +239,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
 | B-13 | ~~`POST /api/stt` — 오디오 업로드 → 텍스트~~ | 필수 | **완료.** `voice/controller/SttController.java`. `multipart/form-data`. 타임아웃 8초 |
-| B-14 | ~~STT 연동~~ | 필수 | **완료.** `voice/client/OpenAiSttClientImpl.java`. `whisper-1`(D-21) → 무음 환각 문제로 `gpt-4o-mini-transcribe`로 교체(D-43, D-42는 대체됨) |
+| B-14 | ~~STT 연동~~ | 필수 | **완료.** `voice/client/OpenAiSttClientImpl.java`. `whisper-1`(D-21) → 무음 환각 문제로 `gpt-4o-mini-transcribe`(D-43, D-42는 대체됨) → 다른 언어 오인식 문제로 `gpt-4o-transcribe`로 교체(D-46) |
 | B-15 | ~~**오디오 즉시 폐기**~~ | 필수 | **완료.** 오디오는 바이트 배열로 메모리에서만 다루고 디스크에 별도로 쓰지 않음 ([PRD 10.3](../../docs/product/prd.md)) |
 | B-16 | ~~`GET /api/tts?messageId=` — 오디오 반환~~ | 필수 | **완료.** `voice/controller/TtsController.java`. 캐시 히트 시 즉시, 미스 시 생성 후 저장. `?text=`도 지원(D-26, `messageId` 없는 내레이션/단어 발음용). 둘 다 없으면 400. 캐릭터별 목소리·연기 지시(D-35, 문구 분리·확정 D-36) |
 | B-17 | ~~`tts_cache` 저장·조회~~ | 필수 | **완료.** DB(`bytea`). **파일시스템 금지** — Render 재배포 시 초기화됨 |
