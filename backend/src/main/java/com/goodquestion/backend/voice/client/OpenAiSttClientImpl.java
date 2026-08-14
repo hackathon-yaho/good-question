@@ -24,11 +24,12 @@ import java.time.Duration;
  * {@code MultipartBodyBuilder}는 이 프로젝트에 없는 reactive-streams를 요구해
  * {@code NoClassDefFoundError}가 나므로 쓰지 않는다 — 서블릿(비-WebFlux) 프로젝트라 겪은 문제다.
  *
- * 모델은 `whisper-1`이 아니라 `gpt-4o-transcribe`다(D-46, 이전 D-43은 `gpt-4o-mini-transcribe`) —
- * `whisper-1`은 무음·저품질 구간에서 유튜브 자막체 상투구를 지어내는 환각이 있었다(D-42).
- * `language=ko`는 짧고 모호한 오디오에서 언어 자체를 잘못 추측하는 문제(예: 중국어·일본어
- * 오인식) 방지용으로 보내는데, OpenAI 문서상 `language`/`prompt`가 공식 지원되는 모델은
- * `gpt-4o-transcribe`뿐이라(mini는 비공식) D-46에서 이 모델로 올렸다. `prompt`(LANGUAGE_HINT_PROMPT)로
+ * 모델은 `whisper-1`이 아니라 `gpt-transcribe`다(D-47, 이전 D-43은 `gpt-4o-mini-transcribe`,
+ * D-46은 `gpt-4o-transcribe`) — `whisper-1`은 무음·저품질 구간에서 유튜브 자막체 상투구를
+ * 지어내는 환각이 있었다(D-42). `gpt-transcribe`는 OpenAI가 2026-07-28에 새로 낸 신형
+ * 추천 모델로, AA-WER 벤치마크 기준 `gpt-4o-transcribe`(4.01%)보다 낮은 3.31%를 기록했고
+ * 분당 단가도 더 싸다(D-47). `language=ko`는 짧고 모호한 오디오에서 언어 자체를 잘못
+ * 추측하는 문제(예: 중국어·일본어 오인식) 방지용으로 보내고, `prompt`(LANGUAGE_HINT_PROMPT)로
  * 한국어 아동 발화라는 문맥도 같이 보내 언어 추정을 추가로 편향시킨다 — 다만 이 두
  * 파라미터도 100% 강제는 아니라서 여전히 다른 언어가 나올 수 있다(완전 차단은 별도 필터가 필요).
  *

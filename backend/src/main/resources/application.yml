@@ -59,7 +59,7 @@ ai:
 openai:
   api-key: ${OPENAI_API_KEY:}
   stt:
-    model: gpt-4o-transcribe   # D-46 — language 파라미터가 공식 지원되는 모델로 교체 (D-43은 mini)
+    model: gpt-transcribe   # D-47 — OpenAI 신형 추천 모델, WER 3.31%로 gpt-4o-transcribe(4.01%)보다 낮고 더 저렴
     timeout-seconds: 8        # D-03
   tts:
     model: gpt-4o-mini-tts     # D-35 — 캐릭터별 voice+instructions 연기를 쓰려고 tts-1에서 교체
