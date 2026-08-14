@@ -151,3 +151,13 @@ async def test_response_rejects_unsafe_character_lines(line: str) -> None:
 
     with pytest.raises(ModelUpstreamError):
         await service.respond(respond_request(), "request-unsafe")
+
+
+async def test_response_rejects_incomplete_character_lines() -> None:
+    client = FakeOpenAI(
+        json.dumps({"text": "문장 중간에서 끝난 응답", "characterState": "NEUTRAL"})
+    )
+    service = OpenAIService(settings(), client=client)
+
+    with pytest.raises(ModelUpstreamError):
+        await service.respond(respond_request(), "request-incomplete")

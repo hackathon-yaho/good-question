@@ -13,7 +13,7 @@
 | DB | PostgreSQL | [PRD 9.1](../../docs/product/prd.md) 확정 |
 | 인증 | Spring Security + JWT | [PRD 9.1](../../docs/product/prd.md) 확정 |
 | 소셜 로그인 | 카카오 (단독) | D-06 |
-| STT / TTS | OpenAI Whisper · OpenAI TTS | D-01 |
+| STT / TTS | OpenAI `gpt-4o-mini-transcribe`(D-43, 이전 Whisper) · OpenAI TTS | D-01 |
 | 스키마 관리 | JPA `ddl-auto` (Flyway 미도입) | D-14 |
 | 배포 | Render (무료) | [PRD 9.1](../../docs/product/prd.md) 확정 |
 | 배포 DB | Supabase Postgres | D-13 |
@@ -80,7 +80,7 @@ volumes:
 | `KAKAO_CLIENT_SECRET` | 〃 | Client Secret 미발급 시 비워도 컴파일·부팅은 되나 실제 로그인은 `invalid_client`로 실패할 수 있음 |
 | `FRONTEND_URL` | 로그인 성공/실패 후 리다이렉트 대상 | 뒤에 `/auth/callback`이 자동으로 붙음 |
 | `COOKIE_SECURE` | JWT 쿠키 `Secure`·`SameSite` 전환 | 로컬(http) `false` / 배포(https) `true`. Vercel↔Render 크로스 도메인이라 배포는 `SameSite=None`이 필요 |
-| `OPENAI_API_KEY` | **Whisper · TTS 전용** | 백엔드 담당 키 (D-16). AI 서버 키와 별개 |
+| `OPENAI_API_KEY` | **STT(`gpt-4o-mini-transcribe`) · TTS 전용** | 백엔드 담당 키 (D-16). AI 서버 키와 별개 |
 | `AI_SERVER_BASE_URL` | AI 서버 주소 | **미결 U-01.** 기본값 `http://localhost:8080/api/mock-ai`(B-11 자체 mock) — 값을 안 넣어도 동작함 |
 | `AI_SERVER_TIMEOUT_SECONDS` | `/analyze`·`/respond` 타임아웃 | 기본 5초 (D-03) |
 | `AI_SERVER_INTERNAL_TOKEN` | 내부 호출 인증 | 미결 U-01. 아직 코드에서 쓰지 않음(mock은 인증 없음) |

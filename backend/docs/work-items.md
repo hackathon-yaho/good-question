@@ -178,7 +178,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | M-44 | ~~`story_sessions` 상태 갱신 (턴 단위)~~ | 필수 | [PRD 8.8](../../docs/product/prd.md) — **완료.** `StorySession.recordTurnResult()`·`closeScene()` |
 | M-45 | ~~`utterance_analyses` 저장~~ | 필수 | [PRD 8.10](../../docs/product/prd.md) — **완료** |
 | M-47~M-49 | ~~미션 노출 판정 + system 메시지~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — **완료.** `session/engine/MissionTrigger.java` (D-20, 조작화 근거 참조). 주최측이 "항상 노출"로 확정한 뒤 GOAL_MET 유예 + 강제 노출 턴 추가 (D-29) |
-| B-12 | ~~AI 실패 폴백~~ | 필수 | `/analyze` 실패→빈 분석 진행, `/respond` 실패→`character_closing`으로 강제 종료. **완료** |
+| B-12 | ~~AI 실패 폴백~~ | 필수 | `/analyze` 실패→빈 분석 진행, `/respond` 실패→`character_closing`으로 강제 종료. **완료** (D-40에서 한때 장면 유지 방식으로 바꿨다가, AI 파트 요청 변경으로 D-44에서 원복) |
 
 엔드포인트: `POST /api/sessions/{sessionId}/messages` — 스키마 [api.md 3.5](../../docs/spec/api.md). **완료**,
 mock 스텁 상대로 curl 검증 (evidence 삭제, GUIDED 트리거, max_turns 종료, 장면전환 초기화,
@@ -215,7 +215,7 @@ analyze/respond 각각 실패 폴백, 미션 트리거+중복방지, STT_EMPTY, 
 | 실패 지점 | 동작 |
 | --- | --- |
 | `/analyze` | 빈 분석(`detectedElements: []`, `utteranceValidity: UNCLEAR`)으로 **정상 진행.** `/respond`는 호출됨. 아이는 아무것도 못 느낌 |
-| `/respond` | `character_closing`을 조회해 **장면 종료.** 다음 장면으로 넘김 |
+| `/respond` | `character_closing`을 조회해 **장면 종료.** 다음 장면으로 넘김 (D-44, D-40에서 잠시 바뀌었다가 원복) |
 
 **어느 쪽도 에러 화면을 띄우지 않습니다.** AI가 죽어도 이야기가 멈추지 않는 것이 목표입니다.
 
@@ -239,7 +239,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
 | B-13 | ~~`POST /api/stt` — 오디오 업로드 → 텍스트~~ | 필수 | **완료.** `voice/controller/SttController.java`. `multipart/form-data`. 타임아웃 8초 |
-| B-14 | ~~Whisper 연동~~ | 필수 | **완료.** `voice/client/OpenAiSttClientImpl.java` (`whisper-1`, D-21) |
+| B-14 | ~~STT 연동~~ | 필수 | **완료.** `voice/client/OpenAiSttClientImpl.java`. `whisper-1`(D-21) → 무음 환각 문제로 `gpt-4o-mini-transcribe`로 교체(D-43, D-42는 대체됨) |
 | B-15 | ~~**오디오 즉시 폐기**~~ | 필수 | **완료.** 오디오는 바이트 배열로 메모리에서만 다루고 디스크에 별도로 쓰지 않음 ([PRD 10.3](../../docs/product/prd.md)) |
 | B-16 | ~~`GET /api/tts?messageId=` — 오디오 반환~~ | 필수 | **완료.** `voice/controller/TtsController.java`. 캐시 히트 시 즉시, 미스 시 생성 후 저장. `?text=`도 지원(D-26, `messageId` 없는 내레이션/단어 발음용). 둘 다 없으면 400. 캐릭터별 목소리·연기 지시(D-35, 문구 분리·확정 D-36) |
 | B-17 | ~~`tts_cache` 저장·조회~~ | 필수 | **완료.** DB(`bytea`). **파일시스템 금지** — Render 재배포 시 초기화됨 |
@@ -432,23 +432,23 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 엔드포인트 전부 curl로 응답 형태 확인. 완료 전 세션의 리포트 조회 → 404, 다른 보호자
 접근 → 403, 존재하지 않는 `childId` → 404.
 | O-13 | ~~NORMAL soft-cue~~ | [PRD 6.14](../../docs/product/prd.md) | **완료.** `session/engine/GuidanceSelector.selectForTurn()` (D-23) |
-| O-12 | ~~캐릭터 마음 변화 — `characterState` 필드~~ | 주최측 추가 요건 A-03 | **필드 배관 완료 (D-27).** 이미지 자체는 미도착 — [request/ai/story-image-assets.md](../../docs/request/ai/story-image-assets.md) 대기 |
+| O-12 | ~~캐릭터 마음 변화 — `characterState` 필드~~ | 주최측 추가 요건 A-03 | **필드 배관 완료 (D-27, D-41에서 잠시 백엔드 매핑으로 바꿨다가 D-44에서 원복).** 이미지 자체는 미도착 — [request/backend/ai-service-integration-v1.md](../../docs/request/backend/ai-service-integration-v1.md) 대기 |
 | O-14 | `analysis_versions` | 확장 테이블 | 문자열 `mvp_v1` 저장으로 대체 가능 |
 
-### O-12 캐릭터 마음 변화 — `characterState` 필드 (2026-08-13)
+### O-12 캐릭터 마음 변화 — `characterState` 필드 (2026-08-13, D-44에서 D-27 방식으로 원복)
 
 PRD 담당이 원래 "프론트·AI"로만 적혀 있어 백엔드 문서에 추적된 적이 없었다(D-25
-마이페이지와 같은 종류의 누락). 이미지 에셋 재작업을 AI 파트에 요청하면서 함께
-설계했다(D-27).
+마이페이지와 같은 종류의 누락). AI가 대사에 맞춰 직접 판단해 주는 방식(D-27)으로 배관했다.
+중간에 AI 파트 문서가 한 번 `{ "text": "..." }` 단독으로 바뀌어 D-41(백엔드 `reactionKey`
+매핑)로 대응했으나, 13분 뒤 같은 문서가 다시 `characterState` 필수 포함으로 바뀐 걸 뒤늦게
+발견해(D-44) D-27 방식으로 되돌렸다 — 지금 정본은 AI가 직접 판단해 준다.
 
 - `message/enums/CharacterState.java` — `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 5종 고정
-- `AiRespondClientImpl`이 `/respond` 응답의 `characterState`를 파싱해 `RespondAiResult`로 전달.
-  못 알아듣는 값이면 예외 없이 `null` 폴백
+- `AiRespondClientImpl`이 `/respond` 응답의 `characterState` 문자열을 파싱한다. 없거나
+  5종 밖의 값이면 예외 없이 `null` 폴백
 - `MessageCreateResponse.characterState` — `CLOSING`(고정 문구 사용, AI 미호출)에서는 항상 `null`
-- 로컬 `AiMockController`도 `characterState: "MOVED"` 고정값을 함께 반환하도록 갱신
 
-**검증**: 대화 중 턴 응답에 `characterState: "MOVED"`(목 서버 값) 확인 → 마지막 턴(`closing`)
-응답에 `characterState: null` 확인.
+**검증**: 전체 빌드 98/98 통과.
 
 **남은 일**: 캐릭터 상태별 이미지(3명×5상태=15장) 도착 후 프론트가 이 값으로 이미지를
 바꾸는 작업. 이 문서 범위 밖.

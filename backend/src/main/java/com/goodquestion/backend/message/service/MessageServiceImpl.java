@@ -232,6 +232,7 @@ public class MessageServiceImpl implements MessageService {
     /**
      * ⑤ 캐릭터 응답. CLOSING이면 AI를 호출하지 않고 character_closing을 그대로 쓴다 (M-43).
      * /respond 실패(B-12)도 같은 종료 경로를 탄다 — "character_closing 조회 후 장면 종료".
+     * characterState는 AI가 대사에 맞춰 직접 판단해 준다(D-44, D-27로 복귀).
      */
     private CharacterTurnResult resolveCharacterResponse(ProgressDecision decision, StoryScene scene, StorySession session,
                                                            AnalyzeAiResult analysis, String previousCharacterMessage,

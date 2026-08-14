@@ -20,7 +20,8 @@ public class AiRespondClientImpl implements AiRespondClient {
     private final RestClient restClient;
 
     public AiRespondClientImpl(@Value("${ai.server.base-url}") String baseUrl,
-                                @Value("${ai.server.timeout-seconds}") long timeoutSeconds) {
+                                @Value("${ai.server.timeout-seconds}") long timeoutSeconds,
+                                @Value("${ai.server.internal-token}") String internalToken) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
         requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
@@ -28,6 +29,7 @@ public class AiRespondClientImpl implements AiRespondClient {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
+                .defaultHeader("X-Internal-Token", internalToken)
                 .build();
     }
 
