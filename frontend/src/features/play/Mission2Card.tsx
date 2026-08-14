@@ -27,7 +27,9 @@ import {
   MISSION_2_OPTIONS,
   MISSION_2_SENTENCE_TAIL,
 } from "@/features/play/mission2";
+import { getMission2OptionImage } from "@/lib/story-images";
 import { topicParticle } from "@/lib/korean";
+import Image from "next/image";
 
 type Props = {
   title: string;
@@ -59,15 +61,12 @@ export function Mission2Card({
         </p>
       </div>
 
-      {/* 친구 카드 4장을 **가로 1행**에 놓는다 (화면 명세 C-11 · 시안과 같다).
-          ⚠️ 2×2로 놓으면 카드가 두 배로 높아져 아래 문장 틀과 힌트가 잘린다.
-             우측 패널(1133px에서 453px)에서 1행이면 1장당 98px, 1280px에서 112px이다.
-             그림이 작아지는 대신 **문장 틀·힌트까지 스크롤 없이** 보인다 —
-             아이 화면에서 스크롤은 마지막 수단이다. */}
+      {/* 친구 카드 4장을 2×2 4분할로 놓는다. 그림이 크게 보여 친구 표정·특징이
+          잘 읽힌다. 카드가 높아져도 섹션이 overflow-y-auto라 스크롤된다. */}
       <ul
         role="radiogroup"
         aria-label="친구 고르기"
-        className="mt-3 grid shrink-0 grid-cols-4 gap-2"
+        className="mt-3 grid shrink-0 grid-cols-2 gap-2"
       >
         {MISSION_2_OPTIONS.map((option, index) => {
           const on = index === selectedIndex;
@@ -87,12 +86,16 @@ export function Mission2Card({
                     : "border-transparent bg-surface/60 hover:bg-surface",
                 ].join(" ")}
               >
-                {/* 3. shrink-0을 추가해 텍스트 길이에 따라 그림 영역 크기가 왜곡되는 것을 방지합니다 */}
-                <span className="flex aspect-square w-full shrink-0 items-center justify-center rounded-bubble bg-primary-soft text-[0.6rem] leading-tight font-bold text-muted">
-                  그림
-                  <br />
-                  준비 중
-                </span>
+                {/* 3. 실제 이미지 표시 */}
+                <div className="relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-bubble bg-primary-soft">
+                  <Image
+                    src={getMission2OptionImage(option.label)}
+                    alt={option.label}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                </div>
               
                 {/* 4. flex-1, flex, items-center를 추가해 1줄/2줄 상관없이 텍스트 영역 높이를 통일하고 세로 중앙 정렬합니다 */}
                 <span
@@ -140,7 +143,7 @@ export function Mission2Card({
 
       {/* 힌트 — 고른 친구의 예시 문장을 그대로 보여준다 (PRD 7.6) */}
       {showHint && selected ? (
-        <p className="mt-2.5 shrink-0 rounded-bubble bg-surface px-3.5 py-2 text-parent-body leading-snug text-text">
+        <p className="mt-2.5 shrink-0 rounded-bubble bg-surface/40 px-3.5 py-2 text-parent-body leading-snug text-text backdrop-blur-sm">
           <span className="font-bold text-primary">힌트 </span>
           이렇게 말해도 좋아. “{selected.label}
           {topicParticle(selected.label)} {selected.example}”

@@ -70,14 +70,8 @@ export function CharacterStage({
           className="size-full scale-110 object-cover blur-sm brightness-85"
         />
       ) : (
-        /* 에셋 미수령 표시는 **가운데를 비켜** 좌하단에 둔다. 가운데는 얼굴·대사가
-           쓰는 자리이고, 거기에 겹치면 대사를 읽는 데 방해가 된다. */
-        <div className="size-full bg-primary-soft">
-          {/* 좌하단이 아니라 우하단이다 — 개발 모드 Next.js 인디케이터가 좌하단에 뜬다 */}
-          <p className="absolute right-6 bottom-5 text-sm font-bold text-muted/70">
-            장면 이미지 준비 중
-          </p>
-        </div>
+        /* 배경이 없으면 그냥 색면만 표시. "준비 중" 텍스트는 빼지 않는다 — 대화에 집중을 방해한다 */
+        <div className="size-full bg-primary-soft" />
       )}
 
       {/* 어둡게 덮는 것은 **이미지가 있을 때만**이다. 색면 폴백 위에 검정을 얹으면

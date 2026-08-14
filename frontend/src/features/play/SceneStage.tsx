@@ -43,7 +43,7 @@ export function SceneStage({
         <img
           src={backgroundImageUrl}
           alt=""
-          className="size-full object-cover"
+          className="size-full object-contain"
         />
       ) : (
         <div className="flex size-full items-center justify-center">

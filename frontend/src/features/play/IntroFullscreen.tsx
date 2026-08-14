@@ -38,7 +38,7 @@ export function IntroFullscreen({
     <div className="relative size-full overflow-hidden bg-primary-soft">
       {backgroundImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
-        <img src={backgroundImageUrl} alt="" className="size-full object-cover" />
+        <img src={backgroundImageUrl} alt="" className="size-full object-contain" />
       ) : (
         <div className="flex size-full items-center justify-center">
           <p className="text-kid-body font-bold text-muted">

@@ -41,8 +41,7 @@ export const STORY_META = {
   difficulty: "보통",
   topics: ["다름", "자기이해", "장점 발견"],
   estimatedMinutes: 20,
-  // 표지 이미지 미수령. 규격은 assets.md §2, 폴백은 §3-1.
-  coverImageUrl: null,
+  coverImageUrl: "/story-assets/banggui/cover_banggui.webp",
 } as const;
 
 export const MOCK_SCENES: MockScene[] = [

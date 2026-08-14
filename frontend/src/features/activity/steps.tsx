@@ -277,7 +277,7 @@ export function Retelling({
               ? "네 이야기를 글로 옮기고 있어…"
               : recording
                 ? "듣고 있어요…"
-                : "마이크를 누르고 이야기해줘"}
+                : null}
           </p>
         )}
 
@@ -288,18 +288,13 @@ export function Retelling({
         ) : null}
       </div>
 
-      {/* 🟢 수동 클릭으로만 다음 단계(onDone)로 진입 */}
+      {/* 말하기 / 말 다 했어요 버튼 — 처음엔 "말하기"(STT 시작), STT 완료 후 "말 다 했어요"(제출) */}
       <PillButton
         size="kid"
-        onClick={onDone}
-        /* 
-          변환 중(transcribing)일 때는 클릭 방지.
-          녹음이 중지되었거나, 한번이라도 이야기를 변환한 텍스트가 생겼다면 
-          아이/부모가 직접 눌러서 제출할 수 있도록 활성화합니다.
-        */
-        disabled={transcribing}
+        onClick={interimText ? onDone : onMicClick}
+        disabled={recording || transcribing}
       >
-        말 다 했어요
+        {interimText ? "말 다 했어요" : "말하기"}
       </PillButton>
     </div>
   );

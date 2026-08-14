@@ -16,6 +16,7 @@ import { StoryCard } from "@/components/ui/StoryCard";
 import { contentApi } from "@/lib/api";
 import type { ContentApi, StoryListResult } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
+import { getStoryCoverImage } from "@/lib/story-images";
 
 /** FilterChipRow는 "전체"를 빈 문자열로 다룬다. */
 const ALL = "";
@@ -82,7 +83,7 @@ export function StoryListScreen({ api = contentApi }: { api?: ContentApi }) {
               <StoryCard
                 storyId={story.id}
                 title={story.title}
-                imageUrl={story.coverImageUrl}
+                imageUrl={getStoryCoverImage(story.id, story.title, story.coverImageUrl)}
                 estimatedMinutes={story.estimatedMinutes}
                 topics={story.topics}
                 sessionStatus={story.sessionStatus}

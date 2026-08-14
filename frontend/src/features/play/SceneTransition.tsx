@@ -18,6 +18,7 @@ import { numberRo } from "@/lib/korean";
 
 type Props = {
   displayName: string;
+  characterImageUrl?: string | null;
   closingText: string;
   accumulatedElements: readonly string[];
   /** 다음 장면 번호(화면 단위). 마지막이면 null */
@@ -28,6 +29,7 @@ type Props = {
 
 export function SceneTransition({
   displayName,
+  characterImageUrl,
   closingText,
   accumulatedElements,
   nextScreenIndex,
@@ -56,7 +58,7 @@ export function SceneTransition({
         ))}
       </div>
 
-      <CharacterPortrait displayName={displayName} size={120} />
+      <CharacterPortrait displayName={displayName} imageUrl={characterImageUrl} size={180} />
 
       {/* 마무리 대사가 이 화면의 주인공이다. 폭을 넓히고 가운데 정렬해
           "장면이 닫혔다"는 느낌을 준다. 평가 문구가 아니라 연결이다.

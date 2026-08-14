@@ -29,6 +29,7 @@ import type { ContentApi, PlayApi, StoryDetail } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { queryMicPermission } from "@/lib/mic-permission";
 import { toScreenIndex } from "@/mocks/story-banggui";
+import { getStoryCoverImage, getCharacterImage } from "@/lib/story-images";
 
 /** 정보 블록 3개 — 이 화면의 핵심 (명세 B-3) */
 const BLOCKS = [
@@ -141,7 +142,8 @@ export function StoryDetailScreen({
     if (!story) return;
     // 동의 여부는 미리 보지 않는다. 상세 응답에 그 필드가 없고, 세션 생성 시
     // 서버가 403으로 막아 준다. 판단 주체를 한 곳에 둔다.
-    if (story.existingSession) {
+    // completed는 이미 완료된 이야기 — 이어하기가 아니라 새로 시작한다.
+    if (story.existingSession && story.existingSession.status !== "completed") {
       setResumeOpen(true);
       return;
     }
@@ -208,9 +210,9 @@ export function StoryDetailScreen({
             (28,28)에서 11.3px이고 반지름 28px보다 작다. */}
         <div className="relative flex size-full items-center justify-center overflow-hidden rounded-card bg-primary-soft">
           <BackButton className="absolute top-5 left-5 z-10" />
-          {story.coverImageUrl ? (
+          {getStoryCoverImage(story.id, story.title, story.coverImageUrl) ? (
             // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
-            <img src={story.coverImageUrl} alt="" className="size-full object-cover" />
+            <img src={getStoryCoverImage(story.id, story.title, story.coverImageUrl) ?? undefined} alt="" className="size-full object-cover" />
           ) : (
             /* 표지 미수령 (assets.md §3-1). 규격 자리를 지켜 레이아웃이 흔들리지 않게 한다. */
             <span className="text-parent-body font-bold text-muted">표지 준비 중</span>
@@ -282,7 +284,7 @@ export function StoryDetailScreen({
                 >
                   <CharacterPortrait
                     displayName={character.displayName}
-                    imageUrl={character.imageUrl}
+                    imageUrl={character.imageUrl ?? getCharacterImage(character.name)}
                     size={72}
                   />
                   <span className="text-sm font-bold whitespace-nowrap text-text">
