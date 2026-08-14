@@ -25,6 +25,7 @@ import com.goodquestion.backend.message.service.ai.RespondAiResult;
 import com.goodquestion.backend.message.service.ai.RespondAnalysisPayload;
 import com.goodquestion.backend.session.engine.AccumulatedElementsCalculator;
 import com.goodquestion.backend.session.engine.AnalysisPostProcessor;
+import com.goodquestion.backend.session.engine.CharacterStateMapper;
 import com.goodquestion.backend.session.engine.GuidanceSelector;
 import com.goodquestion.backend.session.engine.MissionProgressCalculator;
 import com.goodquestion.backend.session.engine.MissionTrigger;
@@ -231,7 +232,8 @@ public class MessageServiceImpl implements MessageService {
 
     /**
      * ⑤ 캐릭터 응답. CLOSING이면 AI를 호출하지 않고 character_closing을 그대로 쓴다 (M-43).
-     * /respond 실패(B-12)도 같은 종료 경로를 탄다 — "character_closing 조회 후 장면 종료".
+     * /respond 실패(D-40)는 장면을 끝내지 않는다 — character_midline으로 다음 아이 차례를 유지한다.
+     * characterState는 AI가 주지 않으므로(D-41) reactionKey로 백엔드가 직접 매핑한다.
      */
     private CharacterTurnResult resolveCharacterResponse(ProgressDecision decision, StoryScene scene, StorySession session,
                                                            AnalyzeAiResult analysis, String previousCharacterMessage,
@@ -260,12 +262,13 @@ public class MessageServiceImpl implements MessageService {
 
         RespondAiResult respondResult = aiRespondClient.respond(respondRequest);
         if (!respondResult.success()) {
-            // B-12: /respond 실패 → character_closing으로 장면을 종료한다. 사유 코드는 규칙엔진이 낸 것이 아니라 없음(null).
-            String fallbackText = NameSubstitutor.substitute(scene.getCharacterClosing(), session.getChild().getName());
-            return new CharacterTurnResult(ResponseMode.CLOSING, fallbackText, true, null, null, null);
+            // D-40: /respond 실패해도 장면을 강제 종료하지 않는다 — 검수된 고정 중간 대사로 다음 아이 차례를 유지한다.
+            String fallbackText = NameSubstitutor.substitute(scene.getCharacterMidline(), session.getChild().getName());
+            return new CharacterTurnResult(decision.mode(), fallbackText, false, null, null, null);
         }
 
-        return new CharacterTurnResult(decision.mode(), respondResult.text(), false, null, guidanceTarget, respondResult.characterState());
+        CharacterState characterState = CharacterStateMapper.map(reactionKey, hasNewlyAccumulatedElement);
+        return new CharacterTurnResult(decision.mode(), respondResult.text(), false, null, guidanceTarget, characterState);
     }
 
     /** 대화3(미션1)·대화4(미션2)에서만 판정한다. 이미 노출됐으면 다시 노출하지 않는다 (PRD I-07). */
