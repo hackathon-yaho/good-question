@@ -160,23 +160,51 @@ export function PlayScreen({
   // 2안에서는 녹음 종료(stop) → 업로드 → 텍스트가 별개 구간이다. onTranscribeStart가
   // 그 시작을 알린다. (docs/request/frontend/stt-tts-integration.md)
   const stt = useChildSpeech({
-    maxDurationMs: 30_000,
-    onTranscribeStart: () => dispatch({ type: "TRANSCRIBING" }),
-    // 백엔드 모드에서는 오지 않는다. 여기에 기능을 의존하면 안 된다.
+    // 필요 시 maxDurationMs를 제거하거나 충분히 크게 설정
+    onTranscribeStart: () => dispatch({ type: "RECORDING_START" }),
     onInterim: (text) => dispatch({ type: "INTERIM", text }),
-    onFinal: (text) => dispatch({ type: "TRANSCRIBED", text }),
+    // 실시간 final 결과가 나올 때마다 draftText를 자동 업데이트 (턴 종료는 하지 않음)
+    onFinal: (text) => dispatch({ type: "DRAFT_CHANGE", text }),
     onError: (code) => {
-      // 변환 자체가 실패·타임아웃한 경우는 아이 잘못이 아니다. I-2("잘 안 들렸어")로
-      // 보내면 원인을 아이에게 떠넘기는 문구가 된다. I-3을 띄우고 같은 발화를
-      // 다시 녹음할 수 있게 되돌린다. (요청 문서 "상태별 처리" — 에러는 I-3)
-      if (code === "stt-timeout" || code === "stt-failed") {
-        network.show({ retry: () => dispatch({ type: "RETRY_SPEAKING" }) });
-        return;
+      // 사용자가 직접 취소/종료하기 전 발생한 에러만 처리
+      if (code !== "aborted") {
+        dispatch({ type: "STT_FAILED", code });
       }
-      dispatch({ type: "STT_FAILED", code });
     },
   });
-
+  
+  // PlayScreen.tsx 내부 submit 함수
+  const submit = useCallback(async () => {
+    if (submittingRef.current) return;
+  
+    // draftText가 비어있다면 interimText를 대신 사용
+    const text = (state.draftText || state.interimText).trim();
+    if (!text) return;
+  
+    submittingRef.current = true;
+  
+    // 1. 마이크/STT 강제 정지
+    stt.stop(); 
+    
+    // 2. 제출 상태(THINKING)로 전환
+    dispatch({ type: "SUBMIT" });
+  
+    try {
+      const result = await withTimeout(
+        api.submitUtterance(sessionId, {
+          text,
+          sttRawText: state.sttRawText || text,
+        }),
+        10_000
+      );
+      dispatch({ type: "SERVER_RESULT", result });
+    } catch (error) {
+      // 에러 처리...
+    } finally {
+      submittingRef.current = false;
+    }
+  }, [api, sessionId, state.draftText, state.interimText, state.sttRawText, stt]);
+  
   const startRecording = useCallback(() => {
     dispatch({ type: "RECORDING_START" });
     stt.start();
@@ -305,6 +333,9 @@ export function PlayScreen({
 
     // 캐릭터 발화(C-3 / C-7). TTS가 끝나면 아이 차례로 넘긴다.
     if (isCharacterTurn(state.status) && state.characterText) {
+      // 브라우저 오디오 해제가 안 되어있다면 해제 유도
+      if (!audioUnlocked) return;
+
       const key = `char:${scene.sceneId}:${state.turnCount}:${state.characterText}`;
       if (spokenKeyRef.current === key) return;
       spokenKeyRef.current = key;
@@ -359,53 +390,6 @@ export function PlayScreen({
   }, [state.status]);
   const displayedThinkingElapsed =
     state.status === PlayState.THINKING ? thinkingElapsed : 0;
-
-  // --- 발화 제출 --------------------------------------------------------
-  const submit = useCallback(async () => {
-    // 중복 제출을 막는다. 이게 없으면 같은 발화가 두 번 올라가고,
-    // 늦게 온 두 번째 응답이 이미 넘어간 장면을 덮어 아이가 갇힌다.
-    if (submittingRef.current) return;
-
-    const text = state.draftText.trim();
-    if (!text) return;
-
-    // 제출 당시의 장면. 응답이 돌아왔을 때 아직 이 장면인지 확인하는 기준이다.
-    const submittedSceneId = scene?.sceneId ?? null;
-    submittingRef.current = true;
-
-    stt.stop();
-    dispatch({ type: "SUBMIT" });
-
-    try {
-      const result = await withTimeout(
-        api.submitUtterance(sessionId, {
-          text,
-          sttRawText: state.sttRawText || undefined,
-        }),
-        // ②의 예산은 10초다. 요청이 셋으로 갈리면서 구간별 예산이 나뉘었다.
-        // (docs/request/frontend/stt-tts-integration.md · Q-14)
-        RESPOND_TIMEOUT_MS
-      );
-      // 기다리는 동안 장면이 바뀌었으면 이 응답은 지난 장면의 것이다. 버린다.
-      if (currentSceneIdRef.current !== submittedSceneId) return;
-      dispatch({ type: "SERVER_RESULT", result });
-    } catch (error) {
-      // 조용히 삼키면 원인을 못 찾는다. 아이 화면에는 부드러운 문구만 보여주고
-      // 개발자용 정보는 콘솔에 남긴다.
-      console.error("[play] 발화 제출 실패", error);
-      // 지난 장면의 실패로 지금 장면의 상태를 되돌리지 않는다.
-      if (currentSceneIdRef.current !== submittedSceneId) return;
-      // 아이가 한 말이 사라지지 않게, 같은 발화를 그대로 다시 보내는 재시도를 준다.
-      network.show({
-        retry: async () => {
-          dispatch({ type: "TRANSCRIBED", text });
-          submittingRef.current = false;
-        },
-      });
-    } finally {
-      submittingRef.current = false;
-    }
-  }, [api, network, scene?.sceneId, sessionId, state.draftText, state.sttRawText, stt]);
 
   /**
    * C-9 "단어장에 담기". 단어장은 선택 요건이라 실패해도 대화는 계속되어야 한다.
@@ -727,7 +711,7 @@ export function PlayScreen({
             </div>
 
             <div className="flex shrink-0 flex-col items-center gap-2 px-6 pb-5">
-              <p className="text-parent-body text-muted">
+              <p className="text-kid-body font-semibold text-muted">
                 {isMission2 && state.mission2Choice === null
                   ? "친구를 고르면 말할 수 있어"
                   : "미션을 읽고 준비되면 눌러줘"}
@@ -757,26 +741,24 @@ export function PlayScreen({
                 messages={npcMessages}
                 currentSceneId={scene.sceneId}
                 accumulatedElements={state.accumulatedElements}
-                guided={state.status === PlayState.GUIDED}
+                guided={false}
               />
             ) : null}
 
-            {state.status === PlayState.CHILD_TURN ||
-            state.status === PlayState.TRANSCRIBING ? (
+            {state.status === PlayState.CHILD_TURN ? (
               <ChildTurnPanel
                 missionItem={missionNowItem}
                 recording={state.recording}
-                transcribing={state.status === PlayState.TRANSCRIBING}
+                transcribing={!state.recording && Boolean(state.interimText)}
                 interimText={state.interimText}
                 micLevel={displayedMicLevel}
-                onMicClick={startRecording}
-                onSubmit={() => stt.stop()}
-                // 변환 중에는 누를 수 없다. 백엔드 모드에는 interimText가 없어
-                // 녹음 여부만으로 판단해야 한다.
-                submitDisabled={
-                  state.status === PlayState.TRANSCRIBING ||
-                  (!state.recording && !state.interimText.trim())
-                }
+                onMicClick={() => {
+                  if (state.recording) stt.stop();
+                  else startRecording();
+                }}
+                onSubmit={submit} // 👈 submit 함수 연결
+                // 💡 핵심: draftText 또는 interimText에 글자가 하나라도 있으면 버튼 활성화!
+                submitDisabled={!state.draftText.trim() && !state.interimText.trim()}
               />
             ) : null}
 

@@ -37,6 +37,10 @@
  * **4그룹 한글 이름**(마음·이유·생각·방법)을 키워드로 쓴다. (계획 D14)
  */
 
+/**
+ * 미션 카드 — docs/spec/screens.md C-10, C-11
+ */
+
 "use client";
 
 import type { MissionTrigger } from "@/lib/api/types";
@@ -50,7 +54,7 @@ type Props = {
   showHint?: boolean;
 };
 
-/** 항목 상태별 표시 — 색·링·굵기로만 구분한다. `[완료]` 텍스트는 쓰지 않는다 (계획 D18) */
+/** 항목 상태별 표시 — 색·링·굵기로만 구분한다. `[완료]` 텍스트는 쓰지 않는다 */
 const ROW = {
   done: {
     row: "bg-secondary-soft",
@@ -59,7 +63,6 @@ const ROW = {
     sr: "말했어요",
   },
   current: {
-    // 현재 항목만 링과 bold를 가진다. 시선이 한 곳으로 간다
     row: "bg-surface ring-2 ring-primary",
     badge: "bg-primary text-white",
     label: "font-bold text-text",
@@ -77,17 +80,22 @@ export function MissionCard({ mission, doneCount, showHint = false }: Props) {
   /** 지금 말할 항목. 다 채웠으면 없다 */
   const current = mission.checklist[doneCount] ?? null;
 
-  /** 지금 말해볼 것 — 현재 항목의 그룹 이름 하나. 남은 항목 전부를 뿌리지 않는다 */
-  const keyword = current
+  /** 
+   * 지금 말해볼 것 — 현재 항목을 기반으로 3개의 주요 키워드를 구성합니다.
+   * (실제 키워드 모음/fallback 데이터를 통해 3개 그룹을 제공)
+   */
+  const currentGroup = current
     ? toKidGroup(current.element as ThinkingElement)
     : null;
 
+  // 💡 3개의 키워드 목록을 만듭니다. (현재 그룹을 포함하여 총 3줄)
+  const defaultKeywords = ["마음", "생각", "방법"];
+  const keywords = currentGroup
+    ? Array.from(new Set([currentGroup, ...defaultKeywords])).slice(0, 3)
+    : defaultKeywords;
+
   return (
-    /* ⚠️ `w-full`이 필요하다. 감싸는 상자가 세로 중앙 정렬을 위해 가로 flex라서,
-       `items-center`는 교차축(세로)에만 작용한다. 폭을 지정하지 않으면 카드가
-       내용 폭만 차지해 패널 왼쪽으로 치우치고, 아래 버튼과 축이 어긋난다. */
     <section className="flex max-h-full min-h-0 w-full flex-col overflow-y-auto rounded-card border-2 border-accent bg-accent-soft p-4">
-      {/* "잠시 멈춤" 회피용 pr-28이 없다. 카드가 세로 중앙에 있어 그 버튼과 겹치지 않는다 */}
       <div className="shrink-0">
         <p className="mb-1 w-fit rounded-pill bg-primary px-3 py-0.5 text-sm font-bold text-white">
           미션
@@ -115,8 +123,6 @@ export function MissionCard({ mission, doneCount, showHint = false }: Props) {
               >
                 {index < doneCount ? "✓" : index + 1}
               </span>
-              {/* 영문 사고 요소 코드를 여기 넣지 않는다. 같은 정보는 아래 키워드와
-                  C-7·C-12의 뱃지가 한글로 보여준다. */}
               <span className={`min-w-0 text-kid-body ${state.label}`}>
                 {item.label}
               </span>
@@ -126,19 +132,28 @@ export function MissionCard({ mission, doneCount, showHint = false }: Props) {
         })}
       </ul>
 
-      {/* 지금 말해볼 것 — 라벨과 칩을 **다른 행에** 둔다 */}
-      {keyword ? (
-        <div className="mt-3.5 shrink-0">
-          <p className="text-sm font-bold text-muted">지금 말해볼 것</p>
-          <p className="mt-1.5 w-fit rounded-pill border-2 border-accent bg-surface px-3.5 py-0.5 text-parent-body font-bold text-text">
-            {keyword}
+      {/* 🟢 지금 말해볼 것 — 3개의 키워드가 각각 fullWidth를 차지하여 3줄로 표시됩니다 */}
+      {current ? (
+        <div className="mt-4 shrink-0">
+          <p className="mb-2 text-parent-body font-bold text-muted">
+            지금 말해볼 것
           </p>
+          <div className="flex flex-col gap-2">
+            {keywords.map((kw, idx) => (
+              <div
+                key={idx}
+                className="flex w-full items-center justify-center rounded-bubble border-2 border-accent bg-surface py-2.5 px-4 text-center text-parent-body font-bold text-text shadow-sm"
+              >
+                {kw}
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
-      {/* 힌트 — 문장을 새로 만들지 않고 현재 항목을 그대로 인용한다. (계획 D15) */}
+      {/* 힌트 */}
       {showHint && current ? (
-        <p className="mt-2.5 shrink-0 rounded-bubble bg-surface px-3.5 py-2 text-parent-body leading-snug text-text">
+        <p className="mt-3 shrink-0 rounded-bubble bg-surface px-3.5 py-2.5 text-parent-body leading-snug text-text">
           <span className="font-bold text-primary">힌트 </span>
           이런 걸 말해보면 어때? “{current.label}”
         </p>

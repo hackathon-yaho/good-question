@@ -35,6 +35,11 @@ export function StoryCard({
 }: Props) {
   const badge = sessionStatus ? BADGE[sessionStatus] : undefined;
 
+  // 1. 최대 표시할 개수 설정 및 태그 분할
+  const MAX_TAGS = 2;
+  const visibleTopics = topics.slice(0, MAX_TAGS);
+  const extraCount = topics.length - MAX_TAGS;
+
   return (
     <Link
       href={`/stories/${storyId}`}
@@ -70,9 +75,10 @@ export function StoryCard({
           <p className="text-parent-body text-muted">약 {estimatedMinutes}분</p>
         ) : null}
 
+        {/* 2. 태그 렌더링 영역 수정 */}
         {topics.length > 0 ? (
-          <ul className="mt-auto flex flex-wrap gap-2 pt-2">
-            {topics.map((topic) => (
+          <ul className="mt-auto flex flex-wrap items-center gap-2 pt-2">
+            {visibleTopics.map((topic) => (
               <li
                 key={topic}
                 className="rounded-pill bg-accent-soft px-3 py-1 text-sm font-bold text-text"
@@ -80,6 +86,13 @@ export function StoryCard({
                 {topic}
               </li>
             ))}
+
+            {/* 3. 남은 태그가 있을 때 +n 배지 표시 */}
+            {extraCount > 0 ? (
+              <li className="rounded-pill bg-border/50 px-2.5 py-1 text-sm font-bold text-muted">
+                +{extraCount}
+              </li>
+            ) : null}
           </ul>
         ) : null}
       </div>

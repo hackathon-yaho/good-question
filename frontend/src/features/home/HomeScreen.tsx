@@ -249,17 +249,16 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
             </article>
           </section>
 
-          {/* 우 42% — 추천. 좁은 폭이라 카드가 아니라 **목록 행**이다 (계획 D3).
-              1133px에서 331px밖에 없어 카드로는 표지만 248px을 먹는다. */}
-          <section className="flex min-w-0 flex-col gap-2.5">
-            <h2 className="flex items-center gap-2 text-parent-body font-bold text-text">
+          {/* 우 42% — 추천 이야기 (전체 높이를 남김없이 균등 배분) */}
+          <section className="flex h-full min-w-0 flex-col gap-2.5">
+            <h2 className="shrink-0 flex items-center gap-2 text-parent-body font-bold text-text">
               <span aria-hidden>✨</span> {RECOMMEND_TITLE}
             </h2>
-            <ul className="flex flex-col gap-2.5">
-              {/* key에 index를 섞는다 — 개발 전환(`?recommend=n`)이 같은 편을
-                  순환시켜 id가 겹칠 수 있다. */}
+
+            {/* 🟢 flex-1과 flex-col을 줘서 li들이 세로 공간을 균등하게 커지도록 설정 */}
+            <ul className="flex flex-1 flex-col gap-2.5">
               {recommended.map((story, index) => (
-                <li key={`${story.id}-${index}`}>
+                <li key={`${story.id}-${index}`} className="flex flex-1">
                   <StoryListRow
                     storyId={story.id}
                     title={story.title}
@@ -270,7 +269,10 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
                 </li>
               ))}
             </ul>
-            <MoreLink />
+            
+            <div className="shrink-0 pt-1">
+              <MoreLink />
+            </div>
           </section>
         </div>
       ) : (

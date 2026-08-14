@@ -38,18 +38,16 @@ export function ConversationHistory({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
       {messages.map((message, index) => {
-        /**
-         * 이 메시지에서 장면이 바뀌는가. 첫 메시지가 지난 장면이면 그 앞에도 넣는다.
-         * "지금 장면"에는 라벨을 붙이지 않는다 — 현재는 설명이 필요 없다.
-         */
         const prev = messages[index - 1];
+        // 이전 메시지와 sceneId가 다를 때만 구분선 표시
         const sceneChanged = prev ? prev.sceneId !== message.sceneId : true;
         const isPast = currentSceneId
           ? message.sceneId !== currentSceneId
           : false;
 
         return (
-          <div key={message.id} className="flex flex-col gap-3">
+          /* key 값에 index와 sceneId를 조합하여 렌더링 유실 방지 */
+          <div key={`${message.id ?? "msg"}-${message.sceneId}-${index}`} className="flex flex-col gap-3">
             {sceneChanged && isPast ? (
               <p className="flex items-center gap-2 text-sm font-bold text-muted">
                 <span aria-hidden className="h-px flex-1 bg-border" />

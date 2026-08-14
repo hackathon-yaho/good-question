@@ -187,6 +187,9 @@ export function KeywordReveal({
  * 그래서 "아직 안 켜진 키워드"가 아이 잘못으로 읽히지 않아야 한다 — 회색이지
  * 빨간색이 아니고, "아직 안 말했어요"까지만 말한다.
  */
+/**
+ * D-5 이야기 재구성 말하기 (수동 제출 처리)
+ */
 export function Retelling({
   cards,
   keywords,
@@ -211,6 +214,9 @@ export function Retelling({
   onMicClick: () => void;
   onDone: () => void;
 }) {
+  // 💡 기존에 녹음 완료나 transcribing 완료 시 자동으로 onDone()을 실행하던 
+  // useEffect나 콜백 함수가 상위/내부에 있다면 반드시 삭제해주세요!
+
   return (
     <div className="flex size-full flex-col items-center gap-5 px-10 py-8">
       <h1 className="text-narration font-bold text-text">
@@ -282,10 +288,16 @@ export function Retelling({
         ) : null}
       </div>
 
+      {/* 🟢 수동 클릭으로만 다음 단계(onDone)로 진입 */}
       <PillButton
         size="kid"
         onClick={onDone}
-        disabled={!recording || transcribing}
+        /* 
+          변환 중(transcribing)일 때는 클릭 방지.
+          녹음이 중지되었거나, 한번이라도 이야기를 변환한 텍스트가 생겼다면 
+          아이/부모가 직접 눌러서 제출할 수 있도록 활성화합니다.
+        */
+        disabled={transcribing}
       >
         말 다 했어요
       </PillButton>

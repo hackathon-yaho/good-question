@@ -363,21 +363,27 @@ export function playReducer(
 
     case "TRANSCRIBED": {
       const text = action.text.trim();
-      // 빈 발화는 메시지를 만들지 않는다. (PRD 8.9) I-2로 보낸다.
       if (!text) {
-        return { ...state, status: PlayState.MIC_ERROR, errorCode: "no-speech" };
+        return { ...state, errorCode: "no-speech" };
       }
       return {
         ...state,
-        status: PlayState.CONFIRM,
+        // status를 CONFIRM이나 다른 상태로 강제 전환하지 않고,
+        // draftText만 업데이트하며 CHILD_TURN 상태를 유지합니다.
         draftText: text,
-        sttRawText: text,
+        sttRawText: state.sttRawText || text,
         interimText: "",
       };
     }
 
-    case "DRAFT_CHANGE":
-      return { ...state, draftText: action.text };
+    // DRAFT_CHANGE 액션 처리 (텍스트 입력/수정 시)
+  case "DRAFT_CHANGE":
+    return {
+      ...state,
+      draftText: action.text,
+      // 만약 STT 원본이 비어있다면 최초 수신 텍스트로 보존
+      sttRawText: state.sttRawText || action.text,
+    };
 
     case "RETRY_SPEAKING":
       return {
@@ -396,17 +402,9 @@ export function playReducer(
       const { result } = action;
       const mission = result.missionTriggered ?? state.mission;
 
-      /**
-       * 미션이 처음 떴는지, 아니면 이미 진행 중이었는지.
-       * 진행 중이었다면 이번 응답은 아이 발화에 대한 답이므로 포인터를 한 칸 옮긴다.
-       */
       const wasRunning = state.mission !== null;
       const missionTurns = wasRunning ? state.missionTurns + 1 : 0;
 
-      /**
-       * 남은 게 있으면 브리프를 다시 연다. 미션 1은 4항목을 다 말했을 때,
-       * 미션 2는 관점 요소가 확정됐거나 재시도 한도에 닿았을 때 닫힌다.
-       */
       const satisfied =
         wasRunning &&
         mission2Satisfied(state.accumulatedElements, result.accumulatedElements);
@@ -414,14 +412,41 @@ export function playReducer(
         mission !== null &&
         shouldOpenMissionBrief(mission, missionTurns, satisfied);
 
+      const currentSceneId = state.scene?.sceneId ?? "";
+      const currentTurn = result.turnCount ?? state.turnCount;
+
+      // 1. 아이의 발화 메시지 객체 (turnOrder 추가)
+      const childMessage: Message = {
+        id: `child-${Date.now()}`,
+        speakerType: "child",
+        text: state.draftText,
+        sceneId: currentSceneId,
+        turnOrder: currentTurn, // 👈 turnOrder 추가
+        createdAt: new Date().toISOString(),
+      };
+    
+      // 2. 캐릭터의 응답 메시지 객체 (turnOrder 추가)
+      const characterMessage: Message = {
+        id: result.messageId ?? `char-${Date.now()}`,
+        speakerType: "character",
+        text: result.characterMessage,
+        sceneId: currentSceneId,
+        turnOrder: currentTurn, // 👈 turnOrder 추가
+        createdAt: new Date().toISOString(),
+      };
+    
       return {
         ...state,
-        // 서버가 확정한 모드를 화면 상태로 옮기는 것이 전부다.
         status: toPlayState(result.responseMode),
+        // draftText가 있을 때만 아이 메시지 추가
+        messages: [
+          ...state.messages,
+          ...(state.draftText.trim() ? [childMessage] : []),
+          characterMessage,
+        ],
         characterText: result.characterMessage,
         characterMessageId: result.messageId,
         turnCount: result.turnCount,
-        // dialogue 장면이면 값이 있다. 없으면 턴 표시(n/m)를 그리지 않는다.
         maxTurns: result.maxTurns ?? state.maxTurns,
         accumulatedElements: result.accumulatedElements,
         mission,

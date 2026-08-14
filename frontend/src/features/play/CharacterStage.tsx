@@ -129,7 +129,9 @@ export function CharacterStage({
       ) : null}
 
       {/* 가운데 — 얼굴 → 이름 → 대사 */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-10">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 px-10">
+        {speaking ? <ListeningBadge label="말하고 있어요" /> : null}
+
         <CharacterPortrait
           displayName={displayName}
           imageUrl={characterImageUrl}
@@ -147,7 +149,6 @@ export function CharacterStage({
           >
             {displayName}
           </p>
-          {speaking ? <ListeningBadge label="말하고 있어요" /> : null}
         </div>
 
         {/* ⚠️ 폭 상한을 이 래퍼가 아니라 **안쪽 <p>** 가 정한다. `em`·`ch`는 그 요소

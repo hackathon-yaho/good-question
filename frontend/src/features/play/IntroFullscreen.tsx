@@ -82,7 +82,7 @@ export function IntroFullscreen({
           <div className="flex items-center gap-3">
             <button
               onClick={onReplay}
-              className="flex min-h-touch items-center gap-2 rounded-pill border-2 border-white/50 px-5 text-parent-body font-bold text-white/90 hover:bg-white/10"
+              className="flex min-h-touch-kid items-center justify-center gap-2 rounded-pill border-2 border-white/50 px-8 py-3.5 text-kid-body font-bold text-white/90 hover:bg-white/10"
             >
               <span aria-hidden>🔊</span> 다시 듣기
             </button>
