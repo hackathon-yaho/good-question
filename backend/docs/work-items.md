@@ -178,7 +178,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | M-44 | ~~`story_sessions` 상태 갱신 (턴 단위)~~ | 필수 | [PRD 8.8](../../docs/product/prd.md) — **완료.** `StorySession.recordTurnResult()`·`closeScene()` |
 | M-45 | ~~`utterance_analyses` 저장~~ | 필수 | [PRD 8.10](../../docs/product/prd.md) — **완료** |
 | M-47~M-49 | ~~미션 노출 판정 + system 메시지~~ | 필수 | [PRD 7.6](../../docs/product/prd.md) — **완료.** `session/engine/MissionTrigger.java` (D-20, 조작화 근거 참조). 주최측이 "항상 노출"로 확정한 뒤 GOAL_MET 유예 + 강제 노출 턴 추가 (D-29) |
-| B-12 | ~~AI 실패 폴백~~ | 필수 | `/analyze` 실패→빈 분석 진행, `/respond` 실패→`character_midline`으로 대체하고 장면 유지(D-40, 최초엔 `character_closing` 강제 종료였음). **완료** |
+| B-12 | ~~AI 실패 폴백~~ | 필수 | `/analyze` 실패→빈 분석 진행, `/respond` 실패→`character_closing`으로 강제 종료. **완료** (D-40에서 한때 장면 유지 방식으로 바꿨다가, AI 파트 요청 변경으로 D-44에서 원복) |
 
 엔드포인트: `POST /api/sessions/{sessionId}/messages` — 스키마 [api.md 3.5](../../docs/spec/api.md). **완료**,
 mock 스텁 상대로 curl 검증 (evidence 삭제, GUIDED 트리거, max_turns 종료, 장면전환 초기화,
@@ -215,7 +215,7 @@ analyze/respond 각각 실패 폴백, 미션 트리거+중복방지, STT_EMPTY, 
 | 실패 지점 | 동작 |
 | --- | --- |
 | `/analyze` | 빈 분석(`detectedElements: []`, `utteranceValidity: UNCLEAR`)으로 **정상 진행.** `/respond`는 호출됨. 아이는 아무것도 못 느낌 |
-| `/respond` | `character_midline`(검수된 고정 중간 대사)으로 대체. **장면은 끝내지 않고** 다음 아이 차례를 유지 (D-40) |
+| `/respond` | `character_closing`을 조회해 **장면 종료.** 다음 장면으로 넘김 (D-44, D-40에서 잠시 바뀌었다가 원복) |
 
 **어느 쪽도 에러 화면을 띄우지 않습니다.** AI가 죽어도 이야기가 멈추지 않는 것이 목표입니다.
 
@@ -432,24 +432,23 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 엔드포인트 전부 curl로 응답 형태 확인. 완료 전 세션의 리포트 조회 → 404, 다른 보호자
 접근 → 403, 존재하지 않는 `childId` → 404.
 | O-13 | ~~NORMAL soft-cue~~ | [PRD 6.14](../../docs/product/prd.md) | **완료.** `session/engine/GuidanceSelector.selectForTurn()` (D-23) |
-| O-12 | ~~캐릭터 마음 변화 — `characterState` 필드~~ | 주최측 추가 요건 A-03 | **완료 (D-41).** AI가 판단해 주기로 했던 D-27을 뒤집어, `reactionKey` 기반 백엔드 고정 매핑으로 전환. 이미지 자체는 미도착 — [request/ai/story-image-assets.md](../../docs/request/ai/story-image-assets.md) 대기 |
+| O-12 | ~~캐릭터 마음 변화 — `characterState` 필드~~ | 주최측 추가 요건 A-03 | **필드 배관 완료 (D-27, D-41에서 잠시 백엔드 매핑으로 바꿨다가 D-44에서 원복).** 이미지 자체는 미도착 — [request/backend/ai-service-integration-v1.md](../../docs/request/backend/ai-service-integration-v1.md) 대기 |
 | O-14 | `analysis_versions` | 확장 테이블 | 문자열 `mvp_v1` 저장으로 대체 가능 |
 
-### O-12 캐릭터 마음 변화 — `characterState` 필드 (2026-08-13, D-41로 방식 변경)
+### O-12 캐릭터 마음 변화 — `characterState` 필드 (2026-08-13, D-44에서 D-27 방식으로 원복)
 
 PRD 담당이 원래 "프론트·AI"로만 적혀 있어 백엔드 문서에 추적된 적이 없었다(D-25
-마이페이지와 같은 종류의 누락). 처음엔 AI가 대사에 맞춰 직접 판단해 주는 방식(D-27)으로
-배관했으나, AI 파트가 `/respond` 계약을 `{ "text": "..." }` 하나로 확정하면서 그 값을
-절대 안 주기로 했다 — `reactionKey` 기반 백엔드 고정 매핑으로 전환했다(D-41).
+마이페이지와 같은 종류의 누락). AI가 대사에 맞춰 직접 판단해 주는 방식(D-27)으로 배관했다.
+중간에 AI 파트 문서가 한 번 `{ "text": "..." }` 단독으로 바뀌어 D-41(백엔드 `reactionKey`
+매핑)로 대응했으나, 13분 뒤 같은 문서가 다시 `characterState` 필수 포함으로 바뀐 걸 뒤늦게
+발견해(D-44) D-27 방식으로 되돌렸다 — 지금 정본은 AI가 직접 판단해 준다.
 
 - `message/enums/CharacterState.java` — `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 5종 고정
-- `session/engine/CharacterStateMapper.java` — `/respond` 호출 전 이미 계산해 둔 `reactionKey`
-  (+ 신규 사고요소 감지 여부)로 매핑. AI 응답은 더 이상 이 값에 관여하지 않는다
-- `MessageCreateResponse.characterState` — `CLOSING`·`/respond` 실패 폴백(D-40)에서는 여전히 `null`
-- `RespondAiResult`·`AiRespondClientImpl`·`AiMockController`의 `characterState` 파싱 코드는
-  삭제 — AI가 그 필드를 절대 안 보내므로 항상 `null`만 나오던 죽은 코드였다
+- `AiRespondClientImpl`이 `/respond` 응답의 `characterState` 문자열을 파싱한다. 없거나
+  5종 밖의 값이면 예외 없이 `null` 폴백
+- `MessageCreateResponse.characterState` — `CLOSING`(고정 문구 사용, AI 미호출)에서는 항상 `null`
 
-**검증**: `CharacterStateMapperTest` 8건 + 전체 빌드 106/106 통과.
+**검증**: 전체 빌드 98/98 통과.
 
 **남은 일**: 캐릭터 상태별 이미지(3명×5상태=15장) 도착 후 프론트가 이 값으로 이미지를
 바꾸는 작업. 이 문서 범위 밖.

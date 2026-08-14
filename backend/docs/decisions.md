@@ -990,7 +990,7 @@ AI 파트가 `docs/request/backend/ai-service-integration-v1.md`로 실 AI 서�
 
 ---
 
-### D-40 · `/respond` 실패 폴백 — 장면 강제 종료 대신 고정 중간 대사 유지
+### D-40 · `/respond` 실패 폴백 — 장면 강제 종료 대신 고정 중간 대사 유지 (D-44로 원복)
 
 AI 파트가 `docs/request/backend/free-speech-provider-and-ai-fallback.md`에서 지적한 문제.
 기존 B-12는 `/respond`가 실패하면 무조건 `character_closing`으로 장면을 즉시 닫았다 —
@@ -1021,7 +1021,7 @@ AI 서버 장애 한 번으로 아이의 생각과 무관하게 이야기가 넘
 
 ---
 
-### D-41 · O-12 `characterState` — D-27을 뒤집는다. AI 판단 대신 `reactionKey` 고정 매핑
+### D-41 · O-12 `characterState` — D-27을 뒤집는다. AI 판단 대신 `reactionKey` 고정 매핑 (D-44로 원복)
 
 AI 파트가 `docs/request/backend/ai-service-integration-v1.md`에서 캐릭터 LLM 응답을
 `{ "text": "..." }` 하나로 못박았다 — "AI 응답에 이미지 URL·이미지 프롬프트·표정 판정을
@@ -1133,6 +1133,65 @@ Whisper 대비 개선됐다고 OpenAI가 공식 문서에서 밝히고 있다.
 
 ---
 
+### D-44 · D-40·D-41 원복 — AI 파트가 `ai-service-integration-v1.md`를 다시 뒤집었다
+
+D-40·D-41을 커밋(18:16)하기 13분 전(18:03, `9c6628c docs(ai): align audio scope with backend`)에
+AI 파트가 같은 문서를 다시 고쳤는데, 그 사실을 모르고 예전(v3) 버전 기준으로 구현했다.
+main이 그 사이 `ai/quality-service-v4`를 머지해서 지금은 최신 버전이 정본이다.
+
+**`/respond` 실패 처리 — B-12로 원복**. v3는 "장면을 닫지 않는 고정 중간 대사"였는데, 현재
+문서(제약 조건)는 "응답 실패 시 백엔드는 현재 운영 규칙(D-03)에 따라 검수된
+`character_closing`으로 장면을 이어서 종료한다"로 되돌아갔다. D-40에서 만든 `character_midline`
+컬럼·`resolveCharacterResponse()`의 폴백 분기를 전부 되돌렸다 — `MessageServiceImpl`은
+다시 실패 시 `CLOSING`+`character_closing`으로 장면을 닫는다.
+
+**`characterState` — D-27로 원복**. v3는 `/respond` 응답이 `{ "text": "..." }` 뿐이었는데,
+현재 문서·실제 `ai-server` 코드(`schemas.py`) 둘 다 `characterState`를 다시 요구한다.
+
+```python
+class RespondResponse(StrictModel):
+    text: CharacterLine
+    characterState: CharacterState   # 이제 필수 필드
+```
+
+D-41에서 만든 `CharacterStateMapper`(`reactionKey` 기반 백엔드 추측)는 삭제하고,
+`AiRespondClientImpl.parseCharacterState()`(AI가 준 값을 파싱, 모르는 값이면 null 폴백)를
+그대로 복원했다.
+
+**교훈**: 공용 요청 문서를 오래 열어두고 여러 결정을 순차로 내리기보다, 구현 직전에
+한 번 더 최신 상태를 확인해야 한다 — 이번엔 세션 안에서 문서가 바뀌는 바람에 13분 차이로
+엇갈렸다.
+
+**되돌린 파일**: `MessageServiceImpl`, `StoryScene`(`character_midline` 컬럼 제거),
+`ContentSeeder`(중간 대사 4건 제거), `RespondAiResult`, `AiRespondClientImpl`,
+`AiMockController`, `CharacterState` 주석. `CharacterStateMapper`·그 테스트 삭제.
+
+**검증**: 전체 빌드 98/98 통과(D-41 전용 테스트 8건 삭제로 106 → 98). 로컬 DB의
+`character_midline` 컬럼도 `ALTER TABLE ... DROP COLUMN`으로 정리.
+
+---
+
+### D-45 · 정적 배경 이미지 경로 연결 — 장면 1·2·4·6·8
+
+`docs/request/backend/banggui-static-asset-paths.md`(AI 파트, 2026-08-14, 필수). 프론트
+저장소에 `frontend/public/story-assets/banggui/sc_banggui_{01,02,04,06,08}.webp`가
+실제로 도착해 있는 것을 확인하고, `ContentSeeder`의 해당 5개 장면 `backgroundImageUrl`을
+`null`에서 지정된 상대 경로로 채웠다.
+
+- 대화 장면(3·5·7·9)은 이번 요청 대상이 아니다 — 문서가 "새 배경 없는 장면은 프론트가
+  직전 배경을 유지한다"고 명시해서 그대로 `null`로 둔다.
+- 같은 김에 `frontend/public/story-assets/banggui/`에 `ch_banggui_*_{NEUTRAL,HAPPY,
+  WORRIED,SURPRISED,MOVED}.png` 15장(O-12 `characterState` 이미지)도 이미 도착해 있는
+  걸 확인했다 — 이 문서 범위 밖이라 손대지 않았지만, 프론트가 이 값으로 이미지를
+  바꾸는 작업(work-items.md O-12 "남은 일")이 이제 가능한 상태다.
+
+**검증**: 로컬 DB에 5개 행 직접 백필(`ContentSeeder`는 재기동 시 기존 스토리가 있으면
+재시드를 건너뛰므로) 후, 실제로 세션을 새로 만들어 `POST /sessions` 응답의
+`currentScene.backgroundImageUrl`이 `/story-assets/banggui/sc_banggui_01.webp`로
+정확히 내려오는 것을 확인. 전체 빌드 98/98 통과.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
@@ -1156,7 +1215,7 @@ Whisper 대비 개선됐다고 OpenAI가 공식 문서에서 밝히고 있다.
 | --- | --- | --- | --- |
 | **U-01** | AI 서버 **배포 주소 · 엔드포인트 경로 · 내부 인증 토큰** | AI 담당 명세 수령 대기. `POST /analyze`·`POST /respond` 가정 | Phase 6. **mock 스텁으로 우회 가능** |
 | **U-02** | 프론트 15초 타임아웃 유지 가능 여부 | **실측 후 확정.** 요청을 3개로 나눠 각 구간을 줄여둔 상태 | Phase 6 배포 후 측정 |
-| **U-03** | 이미지 URL 실제 형태 | Supabase Storage 우선. **에셋 수령 시 확정** | 에셋 도착 시. 컬럼은 미리 만들어 둠 |
+| ~~U-03~~ | 이미지 URL 실제 형태 | **해소(D-45).** Supabase Storage가 아니라 프론트 저장소 정적 파일 상대 경로(`/story-assets/banggui/...`, `frontend/public/` 서빙)로 확정 — 배경 5종 연결 완료 | — |
 | **U-04** | 음성(Whisper·TTS) 비용 상한 | 문서에 예산 없음. [PRD 10.4](../../docs/product/prd.md)는 대화 LLM 토큰만 규정 | 사용량이 늘면 |
 | **U-05** | Supabase 무료 티어 일시정지 기간·용량 한도 | 신규 가입. 가입 시 확인 필요 | 시연 전 확인 |
 | **U-06** | `highlightWords` 데이터 출처 | 장면별 고정 목록(팀 창작) vs `/respond` 응답 확장(AI 재합의) | 단어장 구현 시 |

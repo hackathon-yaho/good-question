@@ -74,10 +74,6 @@ public class StoryScene {
     @Column(name = "character_closing", columnDefinition = "text")
     private String characterClosing;
 
-    /** D-40. /respond 실패 시 장면을 끝내지 않고 재생하는 검수된 고정 대사. */
-    @Column(name = "character_midline", columnDefinition = "text")
-    private String characterMidline;
-
     @Column(name = "scene_goal", columnDefinition = "text")
     private String sceneGoal;
 
@@ -108,9 +104,9 @@ public class StoryScene {
 
     public static StoryScene createDialogue(Story story, int sceneOrder, String sceneDescription,
                                              String backgroundImageUrl, String conflict, String characterName,
-                                             String characterOpening, String characterClosing, String characterMidline,
-                                             String sceneGoal, List<String> requiredElements,
-                                             Map<String, String> elementCriteria, int preferredTurns, int maxTurns) {
+                                             String characterOpening, String characterClosing, String sceneGoal,
+                                             List<String> requiredElements, Map<String, String> elementCriteria,
+                                             int preferredTurns, int maxTurns) {
         StoryScene scene = new StoryScene();
         scene.story = story;
         scene.sceneOrder = sceneOrder;
@@ -121,7 +117,6 @@ public class StoryScene {
         scene.characterName = characterName;
         scene.characterOpening = characterOpening;
         scene.characterClosing = characterClosing;
-        scene.characterMidline = characterMidline;
         scene.sceneGoal = sceneGoal;
         scene.requiredElements = requiredElements;
         scene.elementCriteria = elementCriteria;
