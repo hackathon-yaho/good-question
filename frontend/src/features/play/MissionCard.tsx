@@ -35,19 +35,21 @@
 
 "use client";
 
-import Image from "next/image";
 import type { MissionTrigger } from "@/lib/api/types";
-import { MISSION1_SAFE_PLAN_IMAGE } from "@/lib/story-images";
 
 type Props = {
   mission: MissionTrigger;
+  /** 완료된 항목 수. 0~checklist.length (satisfiedIndexes가 없을 때 fallback) */
+  doneCount?: number;
+  /** 서버가 알려준 충족된 체크리스트 인덱스. 있으면 이 값으로 개별 항목 완료를 판단한다 */
+  satisfiedIndexes?: number[];
   /** 한 번 해보고 어려울 때 힌트를 붙인다 */
   showHint?: boolean;
 };
 
-export function MissionCard({ mission, showHint = false }: Props) {
+export function MissionCard({ mission, doneCount = 0, satisfiedIndexes, showHint = false }: Props) {
   return (
-    <section className="flex max-h-full min-h-0 w-full flex-col overflow-y-auto rounded-card border-2 border-accent bg-accent-soft p-4">
+    <section className="flex max-h-full min-h-0 w-full flex-col overflow-y-auto rounded-card border-2 border-accent bg-surface p-4">
       {/* 미션 헤더 */}
       <div className="shrink-0">
         <p className="mb-1 w-fit rounded-pill bg-primary px-3 py-0.5 text-sm font-bold text-white">
@@ -58,39 +60,52 @@ export function MissionCard({ mission, showHint = false }: Props) {
         </h3>
       </div>
 
-      {/* 미션 1 장면 이미지 — 안전하게 배를 떨어뜨릴 방법 */}
-      <div className="relative mb-3 aspect-[16/10] w-full shrink-0 overflow-hidden rounded-bubble bg-primary-soft">
-        <Image
-          src={MISSION1_SAFE_PLAN_IMAGE}
-          alt="안전하게 배를 떨어뜨릴 방법"
-          fill
-          className="object-contain"
-          sizes="(max-width: 768px) 100vw, 50vw"
-        />
-      </div>
-
-      {/* 4가지 관찰/생각 항목 가이드 리스트 */}
+      {/* 4가지 관찰/생각 항목 가이드 리스트 — 서버가 만족시킨 항목만 "완료"로 표시 */}
       <ul className="flex shrink-0 flex-col gap-2">
-        {mission.checklist.map((item, index) => (
-          <li
-            key={item.label || index}
-            className="flex min-w-0 items-center gap-2.5 rounded-bubble bg-surface px-3.5 py-2.5 ring-1 ring-accent/50"
-          >
-            <span className="flex size-6.5 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary">
-              {index + 1}
-            </span>
-            <span className="min-w-0 text-kid-body font-bold text-text">
-              {item.label}
-            </span>
-          </li>
-        ))}
+        {mission.checklist.map((item, index) => {
+          // satisfiedIndexes가 있으면 개별 항목 단위로 완료 판단, 없으면 doneCount로 순차 판단
+          const completed = satisfiedIndexes
+            ? satisfiedIndexes.includes(index)
+            : index < doneCount;
+          return (
+            <li
+              key={item.label || index}
+              className={[
+                "flex min-w-0 items-center gap-2.5 rounded-bubble px-3.5 py-2.5 transition-colors",
+                completed
+                  ? "bg-secondary/15 ring-1 ring-secondary/40"
+                  : "bg-bg/60 ring-1 ring-border",
+              ].join(" ")}
+            >
+              {/* 번호/체크 표시 */}
+              <span
+                className={[
+                  "flex size-6.5 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                  completed ? "bg-secondary text-white" : "bg-border text-muted",
+                ].join(" ")}
+              >
+                {completed ? "✓" : index + 1}
+              </span>
+
+              {/* 라벨 */}
+              <span
+                className={[
+                  "min-w-0 text-kid-body font-bold",
+                  completed ? "text-muted" : "text-text",
+                ].join(" ")}
+              >
+                {item.label}
+              </span>
+            </li>
+          );
+        })}
       </ul>
 
       {/* 힌트 영역 — 배경을 더 투명하게 해 카드 배경이 비치도록 한다 */}
       {showHint ? (
         <p className="mt-3 shrink-0 rounded-bubble bg-surface/40 px-3.5 py-2.5 text-parent-body leading-snug text-text backdrop-blur-sm">
           <span className="font-bold text-primary">힌트 </span>
-          위의 내용을 생각해보면서 마이크를 누르고 자유롭게 말해보자!
+          위의 내용을 생각해보면서 말해볼래요 버튼을 누르고 자유롭게 말해보자!
         </p>
       ) : null}
     </section>

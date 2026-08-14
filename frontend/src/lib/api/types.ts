@@ -94,6 +94,10 @@ export type UtteranceResponse = {
    */
   nextSceneId: string | null;
   missionTriggered: MissionTrigger | null;
+  missionProgress?: {
+    missionId: string;
+    satisfiedIndexes: number[];
+  };
   highlightWords: HighlightWord[];
 };
 

@@ -52,7 +52,7 @@ import { contentApi as defaultContentApi } from "@/lib/api";
 import type { ContentApi, HighlightWord, PlayApi } from "@/lib/api/types";
 import { getSelectedChildId } from "@/lib/client-store";
 import { STORY_ID } from "@/mocks/story-banggui";
-import { getSceneBackgroundImageByOrder, getCharacterImage } from "@/lib/story-images";
+import { getSceneBackgroundImageByOrder, getCharacterImage, MISSION1_SAFE_PLAN_IMAGE } from "@/lib/story-images";
 import { PlayState, isCharacterTurn, type SceneType } from "@/lib/play-state";
 import { playTurnChime } from "@/lib/sound";
 import { RESPOND_TIMEOUT_MS } from "@/lib/api/speech";
@@ -107,7 +107,10 @@ export function PlayScreen({
   const displayName = scene?.characterDisplayName ?? "";
   // 서버가 backgroundImageUrl을 내려주지 않으면 프론트 정적 에셋으로 대체
   // 백엔드는 sceneId로 UUID를 사용하므로 sceneOrder(1~9)로 매핑한다
-  const backgroundImageUrl = scene?.backgroundImageUrl ?? getSceneBackgroundImageByOrder(scene?.sceneOrder ?? 0);
+  // 미션1 브리프가 열려 있으면 미션 이미지를 좌측 패널 배경으로 표시
+  const backgroundImageUrl = state.missionBriefOpen && state.mission?.id !== "mission_2"
+    ? MISSION1_SAFE_PLAN_IMAGE
+    : (scene?.backgroundImageUrl ?? getSceneBackgroundImageByOrder(scene?.sceneOrder ?? 0));
   // 서버가 characterImageUrl을 내려주지 않으면 프론트 정적 에셋(중립 표정)으로 대체
   const characterImageUrl = scene?.characterImageUrl ?? getCharacterImage(scene?.characterName ?? "");
 
@@ -153,7 +156,14 @@ export function PlayScreen({
     api
       .getSession(sessionId)
       .then((snapshot) => {
-        if (alive) dispatch({ type: "HYDRATE", snapshot });
+        if (alive) {
+          dispatch({ type: "HYDRATE", snapshot });
+          // 이어하기로 진입 시 INTRO가 아닌 상태면 바로 audioUnlock (TTS 재생)
+          if (snapshot.currentScene.sceneType !== "intro") {
+            unlockAudio();
+            setAudioUnlocked(true);
+          }
+        }
       })
       .catch((error) => {
         console.error("[play] 세션 로드 실패", error);
@@ -584,12 +594,14 @@ export function PlayScreen({
    *    도는 동안 계속 살아 있으므로, mission으로 판단하면 아이가 말하는 동안에도
    *    캐릭터 얼굴이 안 보인다. 브리프를 읽을 때만 장면 이미지를 보여준다.
    */
+  // 미션 브리프가 열려 있어도 캐릭터가 말하는 중이면 CharacterStage를 보여준다
   const showScene =
-    state.status === PlayState.SCENE_NARRATION || state.missionBriefOpen;
+    (state.status === PlayState.SCENE_NARRATION || state.missionBriefOpen)
+    && !isCharacterTurn(state.status);
 
   /** 미션 체크리스트에서 완료로 표시할 항목 수 (machine.ts 주석 참조) */
   const missionDone = state.mission
-    ? missionDoneCount(state.mission, state.missionTurns)
+    ? missionDoneCount(state.mission, state.missionTurns, state.satisfiedIndexes)
     : 0;
 
   /**
@@ -699,6 +711,8 @@ export function PlayScreen({
               ) : (
               <MissionCard
                 mission={state.mission}
+                doneCount={missionDone}
+                satisfiedIndexes={state.satisfiedIndexes}
                 /**
                  * 한 번 말해봤는데도 아직 남은 항목이 있으면 힌트를 준다.
                  * 프론트가 발화를 채점하는 것이 아니라 **서버가 준 턴 수**만 본다.

@@ -21,6 +21,7 @@ import { contentApi } from "@/lib/api";
 import type { ContentApi, MypageSnapshot } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { useCharacterVoice } from "@/lib/speech";
+import { getStoryCoverImage } from "@/lib/story-images";
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
@@ -115,8 +116,16 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
                 key={story.sessionId}
                 className="flex w-64 flex-col gap-3 rounded-card border border-border bg-surface p-4"
               >
-                <div className="flex aspect-[4/3] items-center justify-center rounded-bubble bg-primary-soft text-parent-body font-bold text-muted">
-                  표지 준비 중
+                <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-bubble bg-primary-soft">
+                  {(() => {
+                    const cover = getStoryCoverImage(story.storyId, story.title, story.coverImageUrl);
+                    return cover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cover} alt="" className="size-full object-cover" />
+                    ) : (
+                      <span className="text-parent-body font-bold text-muted">표지 준비 중</span>
+                    );
+                  })()}
                 </div>
                 <p className="text-parent-body font-bold text-text">
                   {story.title}

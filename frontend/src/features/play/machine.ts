@@ -46,10 +46,19 @@ import { isChoiceMission } from "@/features/play/mission2";
  *    그게 서버 신호가 필요한 이유다.
  *    (docs/request/backend/mission-progress.md · `missionProgress.satisfiedIndexes`)
  */
+/**
+ * 서버가 `satisfiedIndexes`를 주면 그 값으로, 없으면 턴 카운터로 완료 수를 계산한다.
+ * 둘 중 더 큰 쪽을 써서 발화 전에 이미 채운 요소가 있으면 반영한다.
+ * (docs/request/backend/mission-progress.md)
+ */
 export function missionDoneCount(
   mission: MissionTrigger,
-  missionTurns: number
+  missionTurns: number,
+  satisfiedIndexes?: number[] | null
 ): number {
+  if (satisfiedIndexes && satisfiedIndexes.length > 0) {
+    return Math.max(satisfiedIndexes.length, Math.min(mission.checklist.length, Math.max(0, missionTurns)));
+  }
   return Math.min(mission.checklist.length, Math.max(0, missionTurns));
 }
 
@@ -78,13 +87,17 @@ export const MISSION2_MAX_ATTEMPTS = 2;
 export function shouldOpenMissionBrief(
   mission: MissionTrigger,
   missionTurns: number,
-  satisfied: boolean
+  satisfied: boolean,
+  satisfiedIndexes?: number[]
 ): boolean {
   if (isChoiceMission(mission.id)) {
     if (satisfied) return false;
     return missionTurns < MISSION2_MAX_ATTEMPTS;
   }
-  return missionDoneCount(mission, missionTurns) < mission.checklist.length;
+  // satisfiedIndexes가 있으면 그것의 길이로 완료 여부를 판단한다.
+  // 없으면 기존 턴 카운터로 계산한다.
+  const done = missionDoneCount(mission, missionTurns, satisfiedIndexes);
+  return done < mission.checklist.length;
 }
 
 /**
@@ -160,6 +173,11 @@ export type PlayMachineState = {
    */
   missionTurns: number;
   /**
+   * 서버가 응답한 충족된 체크리스트 인덱스. 없으면 missionTurns로 계산한다.
+   * (docs/request/backend/mission-progress.md)
+   */
+  satisfiedIndexes: number[];
+  /**
    * 미션 2에서 아이가 고른 친구의 index. 안 골랐으면 null.
    *
    * 미션 2는 4개 중 **하나를 골라** 말하는 방식이라 순차 포인터(`missionTurns`)와
@@ -195,6 +213,7 @@ export const initialPlayState: PlayMachineState = {
   mission: null,
   missionBriefOpen: false,
   missionTurns: 0,
+  satisfiedIndexes: [],
   mission2Choice: null,
   highlightWords: [],
   postActivityReady: false,
@@ -411,12 +430,15 @@ export function playReducer(
       const wasRunning = state.mission !== null;
       const missionTurns = wasRunning ? state.missionTurns + 1 : 0;
 
+      // 서버가 보낸 satisfiedIndexes가 있으면 그것을 우선 사용한다.
+      const satisfiedIndexes = result.missionProgress?.satisfiedIndexes ?? [];
+
       const satisfied =
         wasRunning &&
         mission2Satisfied(state.accumulatedElements, result.accumulatedElements);
       const briefOpen =
         mission !== null &&
-        shouldOpenMissionBrief(mission, missionTurns, satisfied);
+        shouldOpenMissionBrief(mission, missionTurns, satisfied, satisfiedIndexes);
 
       const currentSceneId = state.scene?.sceneId ?? "";
       const currentTurn = result.turnCount ?? state.turnCount;
@@ -458,6 +480,7 @@ export function playReducer(
         mission,
         missionBriefOpen: briefOpen,
         missionTurns,
+        satisfiedIndexes,
         highlightWords: result.highlightWords,
         nextSceneId: result.nextSceneId,
         draftText: "",

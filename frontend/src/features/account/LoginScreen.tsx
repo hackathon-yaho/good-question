@@ -129,7 +129,7 @@ export function LoginScreen() {
             type="button"
             onClick={startLogin}
             disabled={pending}
-            className="mt-10 flex min-h-14 w-full items-center justify-center gap-3 rounded-pill bg-[#FEE500] px-6 text-parent-body font-bold text-[#191600] transition-all hover:brightness-105 disabled:opacity-70"
+            className="mt-10 flex min-h-14 w-full max-w-xs items-center justify-center gap-3 rounded-pill bg-[#FEE500] px-6 text-parent-body font-bold text-[#191600] transition-all hover:brightness-105 disabled:opacity-70"
           >
             {pending ? (
               <>
