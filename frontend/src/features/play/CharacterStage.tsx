@@ -120,11 +120,15 @@ export function CharacterStage({
         ) : null}
       </div>
 
-      {/* 우측 상단 — 턴 표시. 점수가 아니라 "몇 번 이야기했나"다.
-          아직 한 번도 말하지 않았으면(0) 숨긴다 — "0 / 4"는 아무 뜻이 없다. */}
-      {typeof turnCount === "number" && turnCount > 0 && maxTurns ? (
+      {/* 우측 상단 — 턴 표시. "몇 번 답했나"가 아니라 "지금 몇 번째 대화 중인가"다.
+          PRD 8.8의 current_child_turn_count는 장면 전체 누적 "완료된" 발화 수이지만,
+          화면에서는 캐릭터가 말을 거는 이 순간 자체를 "N번째 대화"로 읽어야 한다.
+          그래서 turnCount에 +1을 해 표시하고, 0일 때도 숨기지 않는다.
+          (기존엔 turnCount를 그대로 쓰고 0이면 숨겼는데, 그러면 첫 대사엔 칩이
+          안 뜨고 두 번째 대화부터 한 칸씩 밀려 보였다.) */}
+      {typeof turnCount === "number" && maxTurns ? (
         <p className="absolute top-5 right-6 rounded-pill bg-text/40 px-4 py-1.5 text-parent-body font-bold text-white">
-          {Math.min(turnCount, maxTurns)} / {maxTurns}
+          {Math.min(turnCount + 1, maxTurns)} / {maxTurns}
         </p>
       ) : null}
 
