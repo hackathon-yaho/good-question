@@ -8,7 +8,9 @@ def test_analyze_prompt_contains_low_information_guards() -> None:
 
 
 def test_respond_prompt_contains_child_ux_guards() -> None:
-    assert "44자" in RESPOND_DEVELOPER_PROMPT
+    assert "100자" in RESPOND_DEVELOPER_PROMPT
+    assert "32~36자" in RESPOND_DEVELOPER_PROMPT
+    assert "반드시 마침표" in RESPOND_DEVELOPER_PROMPT
     assert "평가 표현" in RESPOND_DEVELOPER_PROMPT
     assert "NORMAL에서는 장면을 끝내거나" in RESPOND_DEVELOPER_PROMPT
     assert "학습지 질문" in RESPOND_DEVELOPER_PROMPT

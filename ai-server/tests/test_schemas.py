@@ -55,13 +55,22 @@ def test_respond_rejects_analysis_fields_owned_by_backend() -> None:
         )
 
 
-def test_character_line_is_limited_to_44_characters() -> None:
+def test_character_line_is_limited_to_100_characters() -> None:
+    result = RespondResponse(text="가" * 99 + ".", characterState="NEUTRAL")
+
+    assert len(result.text) == 100
     with pytest.raises(ValidationError):
-        RespondResponse(text="가" * 45, characterState="NEUTRAL")
+        RespondResponse(text="가" * 100 + ".", characterState="NEUTRAL")
 
 
 @pytest.mark.parametrize("text", ["첫 문장. 둘째 문장.", "첫 줄\n둘째 줄"])
 def test_character_line_is_exactly_one_sentence_and_line(text: str) -> None:
+    with pytest.raises(ValidationError):
+        RespondResponse(text=text, characterState="NEUTRAL")
+
+
+@pytest.mark.parametrize("text", ["문장 중간에서 끝난 응답", "가" * 44])
+def test_character_line_requires_sentence_ending_punctuation(text: str) -> None:
     with pytest.raises(ValidationError):
         RespondResponse(text=text, characterState="NEUTRAL")
 

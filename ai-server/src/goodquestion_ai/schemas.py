@@ -20,7 +20,7 @@ ChildText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 EvidenceText = Annotated[str, StringConstraints(min_length=1, max_length=300)]
 CharacterLine = Annotated[
     str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=44),
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
 ]
 MainPoint = Annotated[
     str | None,
@@ -169,6 +169,8 @@ class RespondResponse(StrictModel):
             raise ValueError("character response must be one line")
         if len(re.findall(r"[.!?。]", value)) > 1:
             raise ValueError("character response must be one sentence")
+        if value[-1] not in ".!?":
+            raise ValueError("character response must end with sentence punctuation")
         return value
 
 

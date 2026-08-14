@@ -105,7 +105,7 @@ AI 서버 기본 주소는 끝 슬래시 없이 `AI_SERVER_BASE_URL`에 둔다. 
 **Response (200)**
 
 ```json
-{ "text": "캐릭터의 짧은 한 문장", "characterState": "MOVED" }
+{ "text": "캐릭터의 짧은 한 문장.", "characterState": "MOVED" }
 ```
 
 - `CLOSING`은 이 엔드포인트로 보내지 않는다. 백엔드가 검수된 `character_closing`을 저장·재생한다.
@@ -113,6 +113,8 @@ AI 서버 기본 주소는 끝 슬래시 없이 `AI_SERVER_BASE_URL`에 둔다. 
 - `mainPoint: null`이어도 호출 가능하며, AI는 아이 원문에 직접 반응한다.
 - `characterState`는 `NEUTRAL`·`HAPPY`·`WORRIED`·`SURPRISED`·`MOVED` 중 하나를 항상 포함한다.
   이는 생성된 한 문장의 캐릭터 정서이며, 아이 발화의 채점·진행 상태가 아니다.
+
+- `text`는 공백을 포함해 최대 100자이며, 줄바꿈 없이 마침표(`.`)·물음표(`?`)·느낌표(`!`)로 끝나는 완결된 한국어 한 문장이다. AI 생성 목표는 32~36자다. 백엔드는 이 값을 자르지 않고 그대로 저장·전달한다.
 
 ### `GET {AI_SERVER_BASE_URL}/health`
 
@@ -122,7 +124,7 @@ AI 서버 기본 주소는 끝 슬래시 없이 `AI_SERVER_BASE_URL`에 둔다. 
 {
   "status": "ok",
   "model": "gpt-5-mini",
-  "promptVersions": { "analyze": "analyze_v3", "respond": "respond_v4" }
+  "promptVersions": { "analyze": "analyze_v3", "respond": "respond_v5" }
 }
 ```
 
