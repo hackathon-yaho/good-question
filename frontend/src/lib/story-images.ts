@@ -1,0 +1,115 @@
+/**
+ * 방귀쟁이 며느리 스토리 이미지 매핑
+ * public/story-assets/banggui/ 디렉토리의 이미지들을 스토리 요소에 매핑
+ */
+
+/**
+ * 장면 ID를 배경 이미지 URL로 매핑
+ */
+export function getSceneBackgroundImage(sceneId: string): string | null {
+  const mapping: Record<string, string> = {
+    "sc_banggui_01": "/story-assets/banggui/sc_banggui_01.webp",
+    "sc_banggui_02": "/story-assets/banggui/sc_banggui_02.webp",
+    "sc_banggui_04": "/story-assets/banggui/sc_banggui_04.webp",
+    "sc_banggui_06": "/story-assets/banggui/sc_banggui_06.webp",
+    "sc_banggui_08": "/story-assets/banggui/sc_banggui_08.webp",
+  };
+  return mapping[sceneId] || null;
+}
+
+/**
+ * 장면 순서(sceneOrder)로 배경 이미지 URL을 찾는다.
+ * 백엔드는 sceneId로 UUID를 사용하므로, 순서 기반 매핑이 더 안정적이다.
+ *
+ * @param sceneOrder 장면 순서 (1~9). 배경이 없는 장면(3,5,7,9)은 null 반환
+ */
+export function getSceneBackgroundImageByOrder(sceneOrder: number): string | null {
+  const mapping: Record<number, string> = {
+    1: "/story-assets/banggui/sc_banggui_01.webp",
+    2: "/story-assets/banggui/sc_banggui_02.webp",
+    4: "/story-assets/banggui/sc_banggui_04.webp",
+    6: "/story-assets/banggui/sc_banggui_06.webp",
+    8: "/story-assets/banggui/sc_banggui_08.webp",
+  };
+  return mapping[sceneOrder] ?? null;
+}
+
+/**
+ * 캐릭터 이름과 감정을 캐릭터 이미지 URL로 매핑
+ */
+export function getCharacterImage(
+  characterName: string,
+  emotion: string = "NEUTRAL"
+): string | null {
+  // 감정을 이미지 파일명에 맞게 변환
+  const emotionMap: Record<string, string> = {
+    "HAPPY": "HAPPY",
+    "MOVED": "MOVED", 
+    "NEUTRAL": "NEUTRAL",
+    "SURPRISED": "SURPRISED",
+    "WORRIED": "WORRIED",
+  };
+  
+  const emotionKey = emotionMap[emotion.toUpperCase()] || "NEUTRAL";
+  
+  const mapping: Record<string, string> = {
+    "ch_banggui_daughter_in_law": `/story-assets/banggui/ch_banggui_daughter_in_law_${emotionKey}.png`,
+    "ch_banggui_father_in_law": `/story-assets/banggui/ch_banggui_father_in_law_${emotionKey}.png`,
+    "ch_banggui_village_chief": `/story-assets/banggui/ch_banggui_village_chief_${emotionKey}.png`,
+  };
+  
+  return mapping[characterName] || null;
+}
+
+/**
+ * 미션 2 옵션 레이블을 이미지 URL로 매핑
+ */
+export function getMission2OptionImage(label: string): string {
+  const mapping: Record<string, string> = {
+    "목소리가 큰 친구": "/story-assets/banggui/mission_banggui_02_loud-friend.webp",
+    "질문이 많은 친구": "/story-assets/banggui/mission_banggui_02_curious-friend.webp",
+    "힘이 센 친구": "/story-assets/banggui/mission_banggui_02_strong-friend.webp",
+    "조용한 친구": "/story-assets/banggui/mission_banggui_02_quiet-friend.webp",
+  };
+  return mapping[label] || "/story-assets/banggui/mission_banggui_02_curious-friend.webp";
+}
+
+/**
+ * 스토리 커버 이미지
+ */
+export const STORY_COVER_IMAGE = "/story-assets/banggui/cover_banggui.webp";
+
+/**
+ * 스토리 ID 또는 제목 → 표지 이미지 URL 매핑.
+ *
+ * 실서버가 `coverImageUrl`을 내려주지 않아도(현재 계약에 표지가 없다) 프론트에 있는
+ * 정적 에셋을 보여준다. 표지가 없는 이야기(카탈로그 편)는 서버 값을 그대로 쓴다.
+ *
+ * 백엔드는 UUID를 스토리 ID로 사용하므로, mock ID(`s_banggui_daughter_in_law_001`)와
+ * 제목("방귀 뀌는 며느리")을 함께 매핑해 어느 쪽이든 매칭되게 한다.
+ */
+const STORY_COVER_IMAGES: Record<string, string> = {
+  "s_banggui_daughter_in_law_001": STORY_COVER_IMAGE,
+  "방귀 뀌는 며느리": STORY_COVER_IMAGE,
+};
+
+/**
+ * 스토리 ID와 제목으로 표지 이미지를 찾는다.
+ * - `storyId`가 매핑에 있으면 해당 이미지 반환
+ * - `title`이 매핑에 있으면 해당 이미지 반환
+ * - 둘 다 없으면 서버가 준 `fallback`을 그대로 반환
+ *
+ * 표지가 없는 이야기는 null이 되어 기존 플레이스홀더 동작을 유지한다.
+ */
+export function getStoryCoverImage(
+  storyId: string,
+  title: string,
+  fallback: string | null | undefined
+): string | null {
+  return STORY_COVER_IMAGES[storyId] ?? STORY_COVER_IMAGES[title] ?? fallback ?? null;
+}
+
+/**
+ * 미션 1 안전 계획 이미지
+ */
+export const MISSION1_SAFE_PLAN_IMAGE = "/story-assets/banggui/mission_banggui_01_safe-plan.webp";

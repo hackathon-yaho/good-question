@@ -42,13 +42,14 @@ export function StoryListRow({
     <Link
       href={`/stories/${storyId}`}
       className={[
-        /* items-center 유지: 세로 중앙 정렬 */
-        "flex h-[33%] w-full items-center gap-3.5 rounded-card border border-border bg-surface p-3.5 shadow-soft transition-transform hover:-translate-y-0.5",
+        /* h-fit으로 내용물 크기에 맞춘다. li의 flex-1이 없으므로 행이 늘어나지 않는다 */
+        "flex h-fit w-full items-center gap-3.5 rounded-card border border-border bg-surface p-3.5 shadow-soft transition-transform hover:-translate-y-0.5",
         className,
       ].join(" ")}
     >
-      {/* 🟢 h-full과 aspect-[4/3]을 지정해 늘어난 카드 높이에 맞춰 표지 영역이 자연스럽게 커집니다 */}
-      <span className="flex aspect-[4/3] h-full shrink-0 items-center justify-center overflow-hidden rounded-bubble bg-primary-soft">
+      {/* 행 높이(96px)에 맞춰 썸네일이 적절한 크기를 유지한다. 카드 형식에서 표지가
+          너무 작거나(66px) 너무 크지(h-full) 않게 한다 */}
+      <span className="flex aspect-[4/3] h-24 shrink-0 items-center justify-center overflow-hidden rounded-bubble bg-primary-soft">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
           <img src={imageUrl} alt="" className="size-full object-cover" />

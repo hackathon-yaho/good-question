@@ -52,6 +52,7 @@ import { contentApi as defaultContentApi } from "@/lib/api";
 import type { ContentApi, HighlightWord, PlayApi } from "@/lib/api/types";
 import { getSelectedChildId } from "@/lib/client-store";
 import { STORY_ID } from "@/mocks/story-banggui";
+import { getSceneBackgroundImageByOrder, getCharacterImage } from "@/lib/story-images";
 import { PlayState, isCharacterTurn, type SceneType } from "@/lib/play-state";
 import { playTurnChime } from "@/lib/sound";
 import { RESPOND_TIMEOUT_MS } from "@/lib/api/speech";
@@ -104,6 +105,13 @@ export function PlayScreen({
 
   const scene = state.scene;
   const displayName = scene?.characterDisplayName ?? "";
+  // 서버가 backgroundImageUrl을 내려주지 않으면 프론트 정적 에셋으로 대체
+  // 백엔드는 sceneId로 UUID를 사용하므로 sceneOrder(1~9)로 매핑한다
+  const backgroundImageUrl = scene?.backgroundImageUrl ?? getSceneBackgroundImageByOrder(scene?.sceneOrder ?? 0);
+  // 서버가 characterImageUrl을 내려주지 않으면 프론트 정적 에셋(중립 표정)으로 대체
+  const characterImageUrl = scene?.characterImageUrl ?? getCharacterImage(scene?.characterName ?? "");
+
+
 
   /**
    * 장면 id → 캐릭터 표시명. "이 캐릭터와 나눈 이야기 전체"를 모으는 데 쓴다.
@@ -513,7 +521,7 @@ export function PlayScreen({
           sentence={currentSentence(state)}
           index={state.sentenceIndex}
           total={state.sentences.length}
-          backgroundImageUrl={scene.backgroundImageUrl}
+          backgroundImageUrl={backgroundImageUrl}
           onNext={() => {
             // 게이트를 건너뛰고 바로 넘긴 경우에도 이후 문장은 소리가 나야 한다.
             unlockAudio();
@@ -555,6 +563,7 @@ export function PlayScreen({
       >
         <SceneTransition
           displayName={displayName}
+          characterImageUrl={characterImageUrl}
           closingText={state.characterText}
           accumulatedElements={state.accumulatedElements}
           nextScreenIndex={nextIndex}
@@ -588,16 +597,6 @@ export function PlayScreen({
    * 판단 근거는 서버가 주는 `id`다 — `mission_2`는 계약에 박힌 고정 문자열이다.
    */
   const isMission2 = state.mission ? isChoiceMission(state.mission.id) : false;
-
-  /**
-   * 미션이 살아 있고 브리프가 닫혀 있으면 — 아이가 말하는 중이다.
-   * 카드는 감추되 **지금 말할 항목은 한 줄로 남긴다.** 카드를 통째로 없애면
-   * 방금 읽은 항목을 잊는다. (계획 D17)
-   */
-  const missionNowItem =
-    state.mission && !state.missionBriefOpen
-      ? (state.mission.checklist[missionDone]?.label ?? null)
-      : null;
 
   /**
    * 이 장면에서 주고받은 대화만. 세션 전체를 보여주면 지난 장면의 다른 캐릭터
@@ -639,7 +638,7 @@ export function PlayScreen({
           <SceneStage
             progress={progress}
             sceneLabel={`장면 ${progress?.current ?? 1}`}
-            backgroundImageUrl={scene.backgroundImageUrl}
+            backgroundImageUrl={backgroundImageUrl}
             subtitle={
               state.status === PlayState.SCENE_NARRATION
                 ? currentSentence(state)
@@ -651,8 +650,8 @@ export function PlayScreen({
         ) : (
           <CharacterStage
             displayName={displayName}
-            characterImageUrl={scene.characterImageUrl}
-            backgroundImageUrl={scene.backgroundImageUrl}
+            characterImageUrl={characterImageUrl}
+            backgroundImageUrl={backgroundImageUrl}
             text={state.characterText}
             speaking={isCharacterTurn(state.status)}
             progress={progress}
@@ -700,7 +699,6 @@ export function PlayScreen({
               ) : (
               <MissionCard
                 mission={state.mission}
-                doneCount={missionDone}
                 /**
                  * 한 번 말해봤는데도 아직 남은 항목이 있으면 힌트를 준다.
                  * 프론트가 발화를 채점하는 것이 아니라 **서버가 준 턴 수**만 본다.
@@ -747,7 +745,6 @@ export function PlayScreen({
 
             {state.status === PlayState.CHILD_TURN || state.status === PlayState.TRANSCRIBING ? (
               <ChildTurnPanel
-                missionItem={missionNowItem}
                 recording={state.recording}
                 transcribing={state.status === PlayState.TRANSCRIBING}
                 interimText={state.interimText}
@@ -756,9 +753,6 @@ export function PlayScreen({
                   if (state.recording) stt.stop();
                   else startRecording();
                 }}
-                onSubmit={submit} // 👈 submit 함수 연결
-                // 💡 핵심: draftText 또는 interimText에 글자가 하나라도 있으면 버튼 활성화!
-                submitDisabled={!state.draftText.trim() && !state.interimText.trim()}
               />
             ) : null}
 

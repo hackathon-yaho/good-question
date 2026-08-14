@@ -239,21 +239,17 @@ export function ConversationPanel({
  * C-4 — 내 차례. 이 화면의 시각 신호가 약하면 서비스 전체가 작동하지 않는다.
  */
 export function ChildTurnPanel({
-  missionItem = null,
   recording,
   transcribing = false,
   interimText,
   micLevel,
   onMicClick,
 }: {
-  missionItem?: string | null;
   recording: boolean;
   transcribing?: boolean;
   interimText: string;
   micLevel: number;
   onMicClick: () => void;
-  onSubmit: () => void;
-  submitDisabled: boolean;
 }) {
   const micState = transcribing
     ? "disabled"
@@ -263,19 +259,8 @@ export function ChildTurnPanel({
 
   return (
     <div className="relative flex size-full min-h-0 flex-col items-center justify-between px-6 pb-8 pt-20">
-      {/* 1. 상단 타이틀 & 미션 영역 (상단 고정) */}
+      {/* 1. 상단 타이틀 (상단 고정) */}
       <div className="flex shrink-0 flex-col items-center gap-2 text-center">
-        {missionItem ? (
-          <p className="flex shrink-0 items-center gap-2 self-start">
-            <span className="rounded-pill bg-primary px-2.5 py-0.5 text-xs font-bold text-white">
-              미션
-            </span>
-            <span className="text-parent-body font-bold text-text">
-              {missionItem}
-            </span>
-          </p>
-        ) : null}
-
         <p className="shrink-0 text-center text-turn leading-tight font-bold text-primary">
           {transcribing ? "잘 들었어!" : "이제 말해 볼까?"}
         </p>

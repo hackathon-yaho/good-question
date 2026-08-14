@@ -39,6 +39,7 @@ import { accountApi } from "@/lib/api";
 import type { AccountApi, HomeSnapshot, HomeStory } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { TOTAL_SCREEN_SCENES } from "@/mocks/story-banggui";
+import { getStoryCoverImage } from "@/lib/story-images";
 
 const RECOMMEND_TITLE = "오늘의 추천 이야기";
 
@@ -179,10 +180,10 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
           <section className="min-w-0">
             <article className="flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-soft">
               <div className="relative flex aspect-[16/9] w-full items-center justify-center bg-primary-soft">
-                {inProgress.coverImageUrl ? (
+                {getStoryCoverImage(inProgress.storyId, inProgress.storyTitle, inProgress.coverImageUrl) ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
                   <img
-                    src={inProgress.coverImageUrl}
+                    src={getStoryCoverImage(inProgress.storyId, inProgress.storyTitle, inProgress.coverImageUrl) ?? undefined}
                     alt=""
                     className="size-full object-cover"
                   />
@@ -255,14 +256,14 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
               <span aria-hidden>✨</span> {RECOMMEND_TITLE}
             </h2>
 
-            {/* 🟢 flex-1과 flex-col을 줘서 li들이 세로 공간을 균등하게 커지도록 설정 */}
+            {/* 행들은 내용물 크기에 맞춰 쌓인다. flex-1로 늘어나면 카드가 위아래로 여백이 생긴다 */}
             <ul className="flex flex-1 flex-col gap-2.5">
               {recommended.map((story, index) => (
-                <li key={`${story.id}-${index}`} className="flex flex-1">
+                <li key={`${story.id}-${index}`} className="flex">
                   <StoryListRow
                     storyId={story.id}
                     title={story.title}
-                    imageUrl={story.coverImageUrl}
+                    imageUrl={getStoryCoverImage(story.id, story.title, story.coverImageUrl)}
                     estimatedMinutes={story.estimatedMinutes}
                     topics={story.topics}
                   />
@@ -318,7 +319,7 @@ function RecommendGrid({
           <StoryCard
             storyId={story.id}
             title={story.title}
-            imageUrl={story.coverImageUrl}
+            imageUrl={getStoryCoverImage(story.id, story.title, story.coverImageUrl)}
             estimatedMinutes={story.estimatedMinutes}
             topics={story.topics}
           />
