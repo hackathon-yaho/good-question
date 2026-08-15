@@ -93,8 +93,13 @@ public class StorySession {
     @Column(name = "mission_revealed_at_turn")
     private Integer missionRevealedAtTurn;
 
-    /** 미션 노출 후 소모된 턴 수 — GUIDED로 응답한 턴은 세지 않는다 (D-50). */
-    @Column(name = "mission_engaged_turns", nullable = false)
+    /**
+     * 미션 노출 후 소모된 턴 수 — GUIDED로 응답한 턴은 세지 않는다 (D-50).
+     * columnDefinition의 DEFAULT 0은 {@code ddl-auto=update}가 기존 데이터가 있는 테이블에
+     * 이 컬럼을 추가할 때도 NOT NULL 제약이 깨지지 않게 한다 (session-mission-turn-columns-migration
+     * 요청 — 수동 SQL 없이 새 checkout·기존 DB 모두 안전).
+     */
+    @Column(name = "mission_engaged_turns", nullable = false, columnDefinition = "integer not null default 0")
     private Integer missionEngagedTurns;
 
     /**
@@ -103,7 +108,7 @@ public class StorySession {
      * GUIDED 턴은 {@link #missionEngagedTurns}를 소모한다 — 가이드 반복으로 턴이 무한히
      * 늘어지는 것을 막는다.
      */
-    @Column(name = "mission_free_guided_turns_used", nullable = false)
+    @Column(name = "mission_free_guided_turns_used", nullable = false, columnDefinition = "integer not null default 0")
     private Integer missionFreeGuidedTurnsUsed;
 
     @Column(name = "scene_goal_met", nullable = false)
