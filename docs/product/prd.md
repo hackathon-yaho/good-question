@@ -1100,7 +1100,9 @@ remainingWorries.SOLUTION
 확인 항목:
 
 - 무엇을 사용할 것인지
-- 주변에 있는 마을 사람들과 시아버지는 어디로 피해야 할지
+- 그 방법이 왜 가능한지 (D-54 — 원래 "주변 사람들이 어디로 피해야 할지"였으나 첫 항목과
+  같은 SOLUTION으로 겹쳐 체크리스트가 채워지지 않는 문제가 있어, 장면7에 이미 있는 REASON
+  요소에 맞춰 정정. [backend/docs/decisions.md D-54](../../backend/docs/decisions.md))
 - 며느리에게 어떻게 부탁할 것인지
 - 그 결과 어떤 일이 생길지
 

@@ -1072,7 +1072,7 @@ Content-Type: application/json
     "title": "높이 있는 배 따기",
     "checklist": [
       { "label": "무엇을 사용할 것인지", "element": "SOLUTION" },
-      { "label": "주변에 있는 마을 사람들과 시아버지는 어디로 피해야 할지", "element": "SOLUTION" },
+      { "label": "그 방법이 왜 가능한지", "element": "REASON" },
       { "label": "며느리에게 어떻게 부탁할 것인지", "element": "REQUEST" },
       { "label": "그 결과 어떤 일이 생길지", "element": "RESULT" }
     ]
