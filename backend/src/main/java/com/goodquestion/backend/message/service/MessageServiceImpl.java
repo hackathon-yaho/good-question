@@ -8,6 +8,7 @@ import com.goodquestion.backend.message.dto.response.HighlightWordResponse;
 import com.goodquestion.backend.message.dto.response.MessageCreateResponse;
 import com.goodquestion.backend.message.dto.response.MissionProgressResponse;
 import com.goodquestion.backend.message.dto.response.MissionTriggeredResponse;
+import com.goodquestion.backend.message.dto.response.RecommendedWordResponse;
 import com.goodquestion.backend.message.entity.DetectedElement;
 import com.goodquestion.backend.message.entity.Message;
 import com.goodquestion.backend.message.entity.UtteranceAnalysis;
@@ -44,6 +45,7 @@ import com.goodquestion.backend.story.constant.DialogueContents;
 import com.goodquestion.backend.story.constant.HighlightWords;
 import com.goodquestion.backend.story.constant.MissionDefinition;
 import com.goodquestion.backend.story.constant.Missions;
+import com.goodquestion.backend.story.constant.SceneVocabulary;
 import com.goodquestion.backend.story.entity.Story;
 import com.goodquestion.backend.story.entity.StoryScene;
 import com.goodquestion.backend.story.repository.StorySceneRepository;
@@ -214,7 +216,8 @@ public class MessageServiceImpl implements MessageService {
                 detectHighlightWords(scene.getSceneOrder(), characterTurn.text()),
                 characterMessage.getId(),
                 characterTurn.characterState() == null ? null : characterTurn.characterState().name(),
-                characterTurn.sceneEnded() ? null : missionProgress(session, scene)
+                characterTurn.sceneEnded() ? null : missionProgress(session, scene),
+                RecommendedWordResponse.from(SceneVocabulary.forSceneOrder(scene.getSceneOrder()))
         );
     }
 
