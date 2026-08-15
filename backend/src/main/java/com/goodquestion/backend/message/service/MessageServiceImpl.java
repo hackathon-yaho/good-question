@@ -12,6 +12,7 @@ import com.goodquestion.backend.message.entity.DetectedElement;
 import com.goodquestion.backend.message.entity.Message;
 import com.goodquestion.backend.message.entity.UtteranceAnalysis;
 import com.goodquestion.backend.message.enums.CharacterState;
+import com.goodquestion.backend.message.enums.ChildIntent;
 import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.enums.UtteranceValidity;
 import com.goodquestion.backend.message.repository.MessageRepository;
@@ -52,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -113,10 +115,14 @@ public class MessageServiceImpl implements MessageService {
         List<String> accumulated = AccumulatedElementsCalculator.accumulate(existingAccumulated, validatedElements);
         List<String> missing = AccumulatedElementsCalculator.missing(scene.getRequiredElements(), accumulated);
 
-        int turnCount = session.getCurrentChildTurnCount() + 1;
+        // candidateTurnCount는 "이번 발화가 예산을 소모한다면" 가정한 턴 수다. GUIDED 보호 턴으로
+        // 확정되면(아래) 세션에는 반영하지 않고 이전 값을 그대로 둔다 (low-engagement-turn-protection.md).
+        int candidateTurnCount = session.getCurrentChildTurnCount() + 1;
         int turnsWithoutNewElement = newlyAccumulated.isEmpty() ? session.getTurnsWithoutNewElement() + 1 : 0;
         boolean isLowInformation = isLowInformation(analysis.utteranceValidity());
         int lowInformationTurns = isLowInformation ? session.getConsecutiveLowInformationTurns() + 1 : 0;
+        boolean explicitZeroInfoRejection = isExplicitZeroInfoRejection(
+                analysis.childIntent(), analysis.utteranceValidity(), validatedElements, request.text());
 
         // 세션에 이번 턴 결과를 반영하기 전에 "직전 턴" 값을 붙잡아 둔다 —
         // 진행 판단(강한 유도 제한)과 미션 조건 4가 둘 다 직전 턴 기준이다.
@@ -125,6 +131,7 @@ public class MessageServiceImpl implements MessageService {
         Integer missionRevealedAtTurn = session.getMissionRevealedAtTurn();
         int missionEngagedTurns = session.getMissionEngagedTurns();
         int missionFreeGuidedTurnsUsed = session.getMissionFreeGuidedTurnsUsed();
+        int guidedTurnProtectionUsed = session.getGuidedTurnProtectionUsed();
 
         // D-29: 대화3·4는 미션이 항상 나와야 한다 — 진행 판단이 GOAL_MET으로 장면을 먼저
         // 닫아버리지 않도록, 이번 장면에 아직 안 보여준 미션이 있는지 미리 알려준다.
@@ -132,10 +139,13 @@ public class MessageServiceImpl implements MessageService {
 
         // ③ 진행 판단 (M-38, M-39) — 판단 순서를 바꾸지 않는다.
         ProgressDecision decision = ProgressJudge.judge(new ProgressInput(
-                turnCount, scene.getPreferredTurns(), scene.getMaxTurns(), missing,
+                candidateTurnCount, scene.getPreferredTurns(), scene.getMaxTurns(), missing,
                 !newlyAccumulated.isEmpty(), previousMode,
                 turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission,
-                missionRevealedAtTurn, missionEngagedTurns));
+                missionRevealedAtTurn, missionEngagedTurns, explicitZeroInfoRejection, guidedTurnProtectionUsed));
+
+        // 보호 턴이면 currentChildTurnCount·미션 진행 턴을 그대로 둔다 (low-engagement-turn-protection.md).
+        int turnCount = decision.protectedTurn() ? session.getCurrentChildTurnCount() : candidateTurnCount;
 
         // ④ 유도 정보 구성 (M-41) + ⑤ 캐릭터 응답. GUIDED 유도 대상과 NORMAL soft-cue 대상(O-13)은
         // 둘 다 reactionKey가 있어야 판단할 수 있어(장난·질문·불명확이면 soft-cue 스킵) resolveCharacterResponse 안에서 함께 계산한다.
@@ -147,10 +157,12 @@ public class MessageServiceImpl implements MessageService {
         session.recordTurnResult(turnCount, accumulated, newlyAccumulated, characterTurn.effectiveMode(),
                 characterTurn.guidanceTarget() == null ? null : ThoughtElement.valueOf(characterTurn.guidanceTarget()),
                 turnsWithoutNewElement, lowInformationTurns, missingEmptyAfterTurn);
-        // D-50: 미션이 이미 노출된 상태에서 GUIDED로 응답한 턴은 최대 FREE_GUIDED_TURNS_AFTER_REVEAL
-        // 회까지만 미션 턴 예산을 소모하지 않는다 — 그 이상 반복되면 일반 턴처럼 예산을 소모해서
-        // 대화가 무한히 늘어지는 것을 막는다.
-        if (missionRevealedAtTurn != null) {
+        if (decision.protectedTurn()) {
+            session.recordGuidedTurnProtectionUsed();
+        } else if (missionRevealedAtTurn != null) {
+            // D-50: 미션이 이미 노출된 상태에서 GUIDED로 응답한 턴은 최대 FREE_GUIDED_TURNS_AFTER_REVEAL
+            // 회까지만 미션 턴 예산을 소모하지 않는다 — 그 이상 반복되면 일반 턴처럼 예산을 소모해서
+            // 대화가 무한히 늘어지는 것을 막는다. 보호 턴은 이미 위에서 처리했으므로 여기서 제외한다.
             if (characterTurn.effectiveMode() == ResponseMode.NORMAL) {
                 session.recordMissionEngagedTurn();
             } else if (characterTurn.effectiveMode() == ResponseMode.GUIDED) {
@@ -252,6 +264,20 @@ public class MessageServiceImpl implements MessageService {
     private boolean isLowInformation(UtteranceValidity validity) {
         return validity == UtteranceValidity.SHORT || validity == UtteranceValidity.UNCLEAR
                 || validity == UtteranceValidity.OFF_TOPIC;
+    }
+
+    /** low-engagement-turn-protection.md 조건 1의 명백한 0정보 거절·회피·거친 말 키워드. */
+    private static final Set<String> ZERO_INFO_REJECTION_KEYWORDS = Set.of("싫어", "몰라", "모르겠어", "닥쳐", "닥처");
+
+    /**
+     * AI 서버가 이 키워드들을 SHORT_RESPONSE + SHORT로 보정해 준다는 전제 위에, 백엔드에서도
+     * 원문 키워드를 한 번 더 대조한다 — 감지된 사고 요소가 전혀 없을 때만 "0정보"로 본다.
+     */
+    private boolean isExplicitZeroInfoRejection(ChildIntent childIntent, UtteranceValidity validity,
+                                                  List<DetectedElement> validatedElements, String childUtterance) {
+        boolean shortLike = childIntent == ChildIntent.SHORT_RESPONSE || validity == UtteranceValidity.SHORT;
+        return shortLike && validatedElements.isEmpty()
+                && childUtterance != null && ZERO_INFO_REJECTION_KEYWORDS.stream().anyMatch(childUtterance::contains);
     }
 
     /**

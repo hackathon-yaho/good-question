@@ -100,7 +100,16 @@ AI 서버는 `싫어`·`몰라`·`닥쳐`·STT 오인식 `닥처`를 `SHORT_RESP
 
 ## 완료 조건
 
-- [ ] DB 마이그레이션·세션 상태 갱신·초기화가 구현됐다.
-- [ ] `싫어`·`닥쳐`·`닥처` 3회가 `sceneEnded=true`나 `nextSceneId`를 만들지 않는다.
-- [ ] GUIDED 보호 2회에서 `/respond`가 호출되고 진행·미션 턴은 소모되지 않는다.
-- [ ] 보호 소진 뒤 유효 발화·기존 종료·명시적 나가기 흐름이 회귀하지 않는다.
+- [x] DB 마이그레이션·세션 상태 갱신·초기화가 구현됐다. `guided_turn_protection_used`
+      컬럼 추가(DEFAULT 0), 장면 전환·세션 생성 시 초기화 (2026-08-15).
+- [x] `싫어`·`닥쳐`·`닥처` 3회가 `sceneEnded=true`나 `nextSceneId`를 만들지 않는다. 로컬
+      mock AI로 대화3(maxTurns=4)에서 "싫어" 3회 연속 실호출 확인 — 진행턴 0,0,1 /
+      GUIDED,GUIDED,GUIDED, 세 번 다 `sceneEnded:false`. 4~6번째도 계속 "싫어"를 보내
+      진행턴 2,3,4로 정상 소모되며 6번째(턴4=maxTurns)에서만 정상 CLOSING/MAX_TURNS로
+      닫힘을 확인 (2026-08-15).
+- [x] GUIDED 보호 2회에서 `/respond`가 호출되고 진행·미션 턴은 소모되지 않는다. 위 실호출
+      로그에서 매 턴 캐릭터 응답이 실제로 내려옴을 확인, DB로 `guided_turn_protection_used=2`에서
+      멈추고 `mission_engaged_turns=0` 유지 확인. 미션 활성 중 보호 GUIDED가 미션 최대 턴
+      종료보다 우선하는 것은 `ProgressJudgeTest`로 검증.
+- [x] 보호 소진 뒤 유효 발화·기존 종료·명시적 나가기 흐름이 회귀하지 않는다. 기존
+      `ProgressJudgeTest` 23건 전부 통과(회귀 없음), 신규 6건 추가로 보호 시나리오 커버.

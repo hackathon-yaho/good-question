@@ -1420,6 +1420,52 @@ NORMAL을 냈어야 할 턴(미션 노출 직후, 필수 요소 미충족)에서
 
 ---
 
+### D-52 · GUIDED 2회 보호 턴 — `ProgressJudge` 판단 순서에 새 단계 삽입
+
+AI팀 요청([low-engagement-turn-protection.md](../../docs/request/backend/low-engagement-turn-protection.md)):
+통합 테스트에서 아이가 "싫어"·"닥쳐"만 반복하면 `maxTurns` 종료가 GUIDED 판단보다 먼저 실행돼
+세 번째 발화에서 바로 다음 장면으로 넘어가 버렸다. GUIDED가 아이를 밀어내는 장치가 아니라
+"대화를 다시 이야기 안으로 이끄는 보호 구간"이어야 한다는 요구.
+
+**바꾼 것**: `story_sessions.guided_turn_protection_used` 컬럼을 추가하고(장면당 초기화),
+`ProgressJudge`의 판단 순서에 GOAL_MET과 MAX_TURNS 사이에 "GUIDED 후보 + 보호 확인" 단계를
+새로 끼워 넣었다 — 이 파일 맨 위 주석에 있던 "판단 순서를 바꾸지 않는다"는 순서 자체를
+리팩터링하지 말라는 뜻이었지, 새 요구사항에 맞춰 단계를 추가하지 말라는 뜻이 아니다. 이번
+삽입은 기존 4단계를 재배치한 게 아니라 GOAL_MET(1)과 MAX_TURNS(기존 2)의 순서는 그대로 두고
+그 사이에 새 단계 하나를 끼워 넣은 것이다.
+
+- `guidedCandidate` = missing 있음 + 신규 요소 없음 + (명백한 0정보 거절·회피·거친 말
+  `싫어`·`몰라`·`모르겠어`·`닥쳐`·`닥처` **또는** 기존 정체·저정보·턴 부족 조건).
+  `guidedTurnProtectionUsed < 2`면 보호 GUIDED를 즉시 반환 — MAX_TURNS/미션 최대 턴
+  종료보다 먼저 본다.
+- **강한 유도 제한(옛 2단계, 현재 4단계) 완화**: `hasNewlyAccumulatedElement`는 여전히
+  무조건 NORMAL을 강제하지만, `isFirstUtterance`·`previousWasGuided`는 `guidedCandidate`가
+  아닐 때만 NORMAL을 강제하도록 좁혔다. 보호 예산(2회)이 소진된 뒤에도 정체가 이어지면
+  "직전이 GUIDED였다"는 이유만으로 NORMAL로 되돌리지 않고, 예산을 소모하는 일반 GUIDED를
+  낸다 (AI팀 요구사항 5). 이 완화가 없으면 3번째 "싫어"가 다시 NORMAL로 튕겨 나가
+  대화가 부자연스러워진다 — 검증 시나리오(진행턴 0,0,1 / 보호 1,2,2)로 직접 확인.
+- 보호 턴은 `currentChildTurnCount`·`missionEngagedTurns`를 늘리지 않는다 —
+  `MessageServiceImpl`에서 candidate turnCount를 계산해 `ProgressJudge`에 넘긴 뒤,
+  `decision.protectedTurn()`이면 세션에는 이전 값을 그대로 기록한다. 미션의 기존
+  `missionFreeGuidedTurnsUsed`(D-50)와는 별개 카운터 — 보호 턴이면 미션 쪽 회계
+  블록 자체를 건너뛴다(이중 소모 방지).
+- AI 서버가 위 5개 키워드를 `SHORT_RESPONSE`+`SHORT`로 보정해 준다는 전제 위에,
+  백엔드도 발화 원문을 한 번 더 키워드로 대조한다(방어적 이중 확인, `MissionTrigger`의
+  `FART_KEYWORD` 패턴과 동일).
+- `AiMockController`(B-11 mock)에도 같은 키워드 분기를 추가해 실서버 없이 이 경로를
+  로컬에서 재현할 수 있게 했다.
+
+**검증**: `ProgressJudgeTest`에 신규 6건 추가 + 기존 23건 전부 통과(회귀 없음). 로컬
+mock AI로 대화3(maxTurns=4)에서 "싫어"를 6회 연속 실제 호출 — 1~3턴째는 진행턴 0,0,1로
+보호 GUIDED, 4~6턴째는 진행턴 2,3,4로 예산을 소모하는 일반 GUIDED/CLOSING까지 정상 진행
+확인. `guided_turn_protection_used`가 2에서 멈추고 `mission_engaged_turns`는 영향받지
+않음을 DB로 확인.
+
+**변경 파일**: `ProgressJudge.java`, `ProgressInput.java`, `ProgressDecision.java`,
+`StorySession.java`(신규 컬럼), `MessageServiceImpl.java`, `AiMockController.java`.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

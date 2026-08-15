@@ -111,6 +111,14 @@ public class StorySession {
     @Column(name = "mission_free_guided_turns_used", nullable = false, columnDefinition = "integer not null default 0")
     private Integer missionFreeGuidedTurnsUsed;
 
+    /**
+     * 이번 장면에서 소비한 GUIDED 보호 턴 수 (low-engagement-turn-protection.md). 장면당 최대
+     * {@link com.goodquestion.backend.session.engine.ProgressJudge#GUIDED_TURN_PROTECTION_LIMIT}회까지
+     * 진행·미션 턴을 소모하지 않는다. missionFreeGuidedTurnsUsed와는 별개 — 미션 예산 전용이 아니다.
+     */
+    @Column(name = "guided_turn_protection_used", nullable = false, columnDefinition = "integer not null default 0")
+    private Integer guidedTurnProtectionUsed;
+
     @Column(name = "scene_goal_met", nullable = false)
     private Boolean sceneGoalMet;
 
@@ -150,6 +158,7 @@ public class StorySession {
         session.consecutiveLowInformationTurns = 0;
         session.missionEngagedTurns = 0;
         session.missionFreeGuidedTurnsUsed = 0;
+        session.guidedTurnProtectionUsed = 0;
         session.sceneGoalMet = false;
         session.status = SessionStatus.IN_PROGRESS;
         return session;
@@ -173,6 +182,7 @@ public class StorySession {
         this.missionRevealedAtTurn = null;
         this.missionEngagedTurns = 0;
         this.missionFreeGuidedTurnsUsed = 0;
+        this.guidedTurnProtectionUsed = 0;
         this.lastActivityAt = Instant.now();
     }
 
@@ -233,5 +243,10 @@ public class StorySession {
     /** 미션 노출 후 GUIDED 턴이 "공짜로" 한 번 더 넘어갔음을 기록한다 (D-50). */
     public void recordMissionFreeGuidedTurn() {
         this.missionFreeGuidedTurnsUsed++;
+    }
+
+    /** GUIDED 보호 턴을 한 번 더 소비했음을 기록한다 (low-engagement-turn-protection.md). */
+    public void recordGuidedTurnProtectionUsed() {
+        this.guidedTurnProtectionUsed++;
     }
 }

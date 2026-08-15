@@ -25,10 +25,23 @@ public class AiMockController {
      * childIntent만 발화 내용에 따라 갈라준다. 미션 노출 조건(PRD 7.6)이 childIntent를 보기 때문에
      * 고정값만 돌려주면 그 경로를 호출로 검증할 수 없어서다. 나머지 필드는 여전히 고정이다.
      */
+    /** low-engagement-turn-protection.md가 정의한, AI 서버가 SHORT_RESPONSE+SHORT로 보정하는 키워드. */
+    private static final List<String> ZERO_INFO_REJECTION_KEYWORDS = List.of("싫어", "몰라", "모르겠어", "닥쳐", "닥처");
+
     @PostMapping("/analyze")
     public Map<String, Object> analyze(@RequestBody(required = false) Map<String, Object> request) {
         String childUtterance = request == null ? "" : String.valueOf(request.getOrDefault("childUtterance", ""));
         boolean looksLikeProposal = childUtterance.contains("방귀") || childUtterance.contains("장대");
+        boolean looksLikeRejection = ZERO_INFO_REJECTION_KEYWORDS.stream().anyMatch(childUtterance::contains);
+
+        if (looksLikeRejection) {
+            return Map.of(
+                    "childIntent", "SHORT_RESPONSE",
+                    "mainPoint", "",
+                    "detectedElements", List.of(),
+                    "utteranceValidity", "SHORT"
+            );
+        }
 
         return Map.of(
                 "childIntent", looksLikeProposal ? "SOLUTION" : "PERSPECTIVE",

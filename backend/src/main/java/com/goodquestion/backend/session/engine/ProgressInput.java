@@ -25,6 +25,13 @@ public record ProgressInput(
          * 미션 노출 이후 소모된 턴 수 — GUIDED로 응답한 턴은 세지 않는다 (D-50).
          * 미션이 노출되지 않았으면 의미 없음(0).
          */
-        int missionEngagedTurns
+        int missionEngagedTurns,
+        /**
+         * 명백한 0정보 거절·회피·거친 말(싫어·몰라·모르겠어·닥쳐·닥처)인가
+         * (low-engagement-turn-protection.md 조건 1). true면 첫 발화부터 GUIDED 후보다.
+         */
+        boolean isExplicitZeroInfoRejection,
+        /** 이번 장면에서 이미 사용한 GUIDED 보호 턴 수. {@link ProgressJudge#GUIDED_TURN_PROTECTION_LIMIT}에 도달하면 더 이상 보호하지 않는다. */
+        int guidedTurnProtectionUsed
 ) {
 }

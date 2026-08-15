@@ -11,9 +11,15 @@ import com.goodquestion.backend.session.enums.SceneEndReason;
  *    — 미공개 미션이 있으면(D-29) maxTurns 전까지는 GOAL_MET으로 닫지 않는다.
  *    — 미션이 이미 노출됐으면(D-50) 장면의 maxTurns는 더 이상 안 보고, 미션 자체의
  *      턴 예산(최소 1 ~ 최대 4, GUIDED 턴 미포함)만 따른다.
- * 2. 강한 유도 제한 조건 확인 (첫 발화 / 신규 요소 확인 / 직전 GUIDED → NORMAL 강제)
- * 3. 유도 필요성 확인 (missing 있고 정체·저정보·턴 부족 중 하나)
- * 4. 그 외 NORMAL
+ * 2. GUIDED 보호 턴 확인 (low-engagement-turn-protection.md) — MAX_TURNS/미션 최대 턴
+ *    종료보다 먼저 본다. 장면당 최대 {@link #GUIDED_TURN_PROTECTION_LIMIT}회까지는
+ *    진행·미션 턴을 소모하지 않는다.
+ * 3. 최대 대화 범위 도달 확인 (MAX_TURNS / 미션 최대 턴)
+ * 4. 강한 유도 제한 조건 확인 (신규 요소 확인 → 무조건 NORMAL. 첫 발화 / 직전 GUIDED는
+ *    GUIDED 후보가 아닐 때만 NORMAL을 강제한다 — 보호가 소진된 뒤에도 정체·저정보가
+ *    이어지면 GUIDED를 유지한다)
+ * 5. 유도 필요성 확인 (missing 있고 정체·저정보·턴 부족·명백한 0정보 거절 중 하나)
+ * 6. 그 외 NORMAL
  */
 public final class ProgressJudge {
 
@@ -32,6 +38,8 @@ public final class ProgressJudge {
      * 도달하면 무조건 닫는다.
      */
     private static final int MISSION_MAX_TURNS_AFTER_REVEAL = 4;
+    /** 장면당 GUIDED 보호 턴 최대 횟수 (low-engagement-turn-protection.md). */
+    public static final int GUIDED_TURN_PROTECTION_LIMIT = 2;
 
     private ProgressJudge() {
     }
@@ -40,45 +48,57 @@ public final class ProgressJudge {
         boolean missingEmpty = input.missingElements().isEmpty();
         boolean missionActive = input.missionRevealedAtTurn() != null;
 
-        // 1. 종료 조건
+        // 1. GOAL_MET
+        boolean deferGoalMet = missionActive
+                ? input.missionEngagedTurns() < MISSION_MIN_TURNS_AFTER_REVEAL
+                : input.hasUnrevealedMission() && input.turnCount() < input.maxTurns();
+        if (missingEmpty && input.turnCount() >= input.preferredTurns() && !deferGoalMet) {
+            return ProgressDecision.closing(SceneEndReason.GOAL_MET);
+        }
+
+        // 2. GUIDED 보호 턴 — hasNewlyAccumulatedElement인 턴은 후보에서 제외한다. 신규 요소가
+        // 막 확인된 turnCount가 신규 요소가 확인된 조건을 다시 강제 NORMAL로 보내는 4단계와
+        // 충돌하지 않게 하기 위함이다 (그 턴은 이미 "진행됨"이지 "정체"가 아니다).
+        boolean stagnant = input.turnsWithoutNewElement() >= STAGNATION_THRESHOLD;
+        boolean lowInformation = input.consecutiveLowInformationTurns() >= LOW_INFORMATION_THRESHOLD;
+        int remainingTurns = missionActive
+                ? MISSION_MAX_TURNS_AFTER_REVEAL - input.missionEngagedTurns()
+                : input.maxTurns() - input.turnCount();
+        boolean turnsRunningOut = remainingTurns <= LOW_REMAINING_TURNS_THRESHOLD;
+        boolean guidedCandidate = !missingEmpty && !input.hasNewlyAccumulatedElement()
+                && (input.isExplicitZeroInfoRejection() || stagnant || lowInformation || turnsRunningOut);
+
+        if (guidedCandidate && input.guidedTurnProtectionUsed() < GUIDED_TURN_PROTECTION_LIMIT) {
+            return ProgressDecision.protectedGuided();
+        }
+
+        // 3. MAX_TURNS / 미션 최대 턴 종료
         if (missionActive) {
-            // D-50: 미션이 노출된 뒤엔 장면의 maxTurns를 더 이상 보지 않는다 — 미션 자체의
-            // 턴 예산(최소 1 ~ 최대 4, GUIDED 턴 미포함)만 따른다.
-            boolean deferGoalMetForMission = input.missionEngagedTurns() < MISSION_MIN_TURNS_AFTER_REVEAL;
-            if (missingEmpty && input.turnCount() >= input.preferredTurns() && !deferGoalMetForMission) {
-                return ProgressDecision.closing(SceneEndReason.GOAL_MET);
-            }
             if (input.missionEngagedTurns() >= MISSION_MAX_TURNS_AFTER_REVEAL) {
                 return ProgressDecision.closing(SceneEndReason.MAX_TURNS);
             }
         } else {
-            // D-29: 대화3·4는 미션이 항상 나와야 한다(주최측 확정) — 미공개 미션이 있으면
-            // maxTurns 도달 전까지는 GOAL_MET으로 닫지 않는다.
-            boolean deferGoalMetForUnrevealedMission = input.hasUnrevealedMission() && input.turnCount() < input.maxTurns();
-            if (missingEmpty && input.turnCount() >= input.preferredTurns() && !deferGoalMetForUnrevealedMission) {
-                return ProgressDecision.closing(SceneEndReason.GOAL_MET);
-            }
             if (input.turnCount() >= input.maxTurns()) {
                 return ProgressDecision.closing(SceneEndReason.MAX_TURNS);
             }
         }
 
-        // 2. 강한 유도 제한 조건 — 하나라도 해당하면 NORMAL 강제
+        // 4. 강한 유도 제한 조건 — 신규 요소는 무조건 NORMAL. 첫 발화·직전 GUIDED는 guidedCandidate가
+        // 아닐 때만 NORMAL을 강제한다. guidedCandidate인데 보호 예산이 이미 소진됐다면(2단계에서
+        // 반환하지 못한 경우) 여기서 NORMAL로 되돌리지 않고 5단계의 일반 GUIDED로 넘긴다 —
+        // "직전이 GUIDED였다"는 이유만으로 정체가 풀린 것처럼 되돌리지 않는다.
         boolean isFirstUtterance = input.turnCount() <= 1;
         boolean previousWasGuided = input.previousMode() == ResponseMode.GUIDED;
-        if (isFirstUtterance || input.hasNewlyAccumulatedElement() || previousWasGuided) {
+        if (input.hasNewlyAccumulatedElement() || ((isFirstUtterance || previousWasGuided) && !guidedCandidate)) {
             return ProgressDecision.normal();
         }
 
-        // 3. 유도 필요성 확인
-        boolean stagnant = input.turnsWithoutNewElement() >= STAGNATION_THRESHOLD;
-        boolean lowInformation = input.consecutiveLowInformationTurns() >= LOW_INFORMATION_THRESHOLD;
-        boolean turnsRunningOut = (input.maxTurns() - input.turnCount()) <= LOW_REMAINING_TURNS_THRESHOLD;
-        if (!missingEmpty && (stagnant || lowInformation || turnsRunningOut)) {
+        // 5. 유도 필요성 확인 — 보호 예산이 소진된 뒤에도 정체가 이어지면 예산을 소모하는 일반 GUIDED.
+        if (guidedCandidate) {
             return ProgressDecision.guided();
         }
 
-        // 4. 기본값
+        // 6. 기본값
         return ProgressDecision.normal();
     }
 }
