@@ -85,31 +85,33 @@ export function LoginScreen() {
 
   return (
     <div className="flex min-h-dvh w-full bg-bg">
-      {/* 좌 55% 일러스트 패널 — 일러스트 미수령이라 색면 + 로고타입으로 대체 */}
-      <aside className="relative hidden w-[55%] shrink-0 flex-col justify-between bg-primary-soft p-12 lg:flex">
-        {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
-        <img
-          src="/logo-wordmark.webp"
-          alt="굿퀘스천"
-          width={200}
-          height={72}
-          className="h-auto w-50"
+      {/* 좌 55% — 커버 이미지 배경 전체 채움 + 로고·텍스트 오버레이 */}
+      <aside className="relative hidden w-[55%] shrink-0 flex-col justify-between overflow-hidden lg:flex">
+        <Image
+          src={STORY_COVER_IMAGE}
+          alt=""
+          fill
+          className="object-cover opacity-40"
+          sizes="50vw"
+          priority
         />
-
-        <p className="max-w-md text-parent-title leading-relaxed font-bold text-text">
-          옛이야기 속 인물과 이야기를 나누며
-          <br />
-          아이가 자기 생각을 말로 꺼냅니다.
-        </p>
-
-        <div className="relative h-48 w-full max-w-md">
-          <Image
-            src={STORY_COVER_IMAGE}
-            alt=""
-            fill
-            className="object-contain"
-            sizes="(max-width: 768px) 100vw, 50vw"
+        <div aria-hidden className="absolute inset-0 bg-black/10" />
+        <div className="relative z-10 p-12">
+          {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
+          <img
+            src="/logo-wordmark.webp"
+            alt="굿퀘스천"
+            width={200}
+            height={72}
+            className="h-auto w-50"
           />
+        </div>
+        <div className="relative z-10 p-12">
+          <p className="max-w-md text-parent-title leading-relaxed font-bold text-text">
+            옛이야기 속 인물과 이야기를 나누며
+            <br />
+            아이가 자기 생각을 말로 꺼냅니다.
+          </p>
         </div>
       </aside>
 
@@ -156,9 +158,11 @@ export function LoginScreen() {
           </p>
 
           <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
-            <p className="text-sm text-muted">
-              연동 모드 <b>{API_MODE}</b>
-            </p>
+            {process.env.NODE_ENV === "development" ? (
+              <p className="text-sm text-muted">
+                개발용 · 연동 모드 <b>{API_MODE}</b>
+              </p>
+            ) : null}
             {API_MODE === "backend" ? (
               <button
                 type="button"
@@ -169,13 +173,15 @@ export function LoginScreen() {
                 카카오 없이 로그인 (dev-login)
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={resetDemo}
-              className="text-sm text-muted underline"
-            >
-              데모 상태 초기화
-            </button>
+            {process.env.NODE_ENV === "development" ? (
+              <button
+                type="button"
+                onClick={resetDemo}
+                className="text-sm text-muted underline"
+              >
+                데모 상태 초기화
+              </button>
+            ) : null}
           </div>
         </div>
       </main>
