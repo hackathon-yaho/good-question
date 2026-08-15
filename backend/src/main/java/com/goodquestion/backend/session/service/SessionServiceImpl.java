@@ -39,8 +39,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SessionServiceImpl implements SessionService {
 
-    private static final List<SessionStatus> ACTIVE_STATUSES = List.of(SessionStatus.IN_PROGRESS, SessionStatus.POST_ACTIVITY);
-
     private final ChildRepository childRepository;
     private final ChildConsentRepository childConsentRepository;
     private final StoryRepository storyRepository;
@@ -58,7 +56,7 @@ public class SessionServiceImpl implements SessionService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
         var existing = storySessionRepository.findFirstByChildAndStoryOrderByLastActivityAtDesc(child, story)
-                .filter(session -> ACTIVE_STATUSES.contains(session.getStatus()));
+                .filter(session -> session.getStatus().isResumable());
 
         if (request.isRestart()) {
             existing.ifPresent(StorySession::stop);
@@ -100,6 +98,9 @@ public class SessionServiceImpl implements SessionService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         if (!session.getChild().getParent().getId().equals(parentId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "진행 중인 세션이 아닙니다.");
         }
 
         StoryScene currentScene = session.getCurrentScene();

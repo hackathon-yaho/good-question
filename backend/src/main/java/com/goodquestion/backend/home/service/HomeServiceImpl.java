@@ -29,9 +29,6 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class HomeServiceImpl implements HomeService {
 
-    /** 진행 중으로 취급하는 상태 (decisions.md D-12, api.md 3.3). */
-    private static final List<SessionStatus> RESUMABLE_STATUSES = List.of(SessionStatus.IN_PROGRESS, SessionStatus.POST_ACTIVITY);
-
     private final ChildRepository childRepository;
     private final StorySessionRepository storySessionRepository;
     private final StoryRepository storyRepository;
@@ -42,7 +39,7 @@ public class HomeServiceImpl implements HomeService {
         Child child = getOwnedChild(parentId, childId);
 
         InProgressResponse inProgress = storySessionRepository
-                .findFirstByChildAndStatusInOrderByLastActivityAtDesc(child, RESUMABLE_STATUSES)
+                .findFirstByChildAndStatusInOrderByLastActivityAtDesc(child, SessionStatus.resumableStatuses())
                 .map(this::toInProgressResponse)
                 .orElse(null);
 

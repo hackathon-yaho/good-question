@@ -35,6 +35,7 @@ import com.goodquestion.backend.session.engine.ProgressJudge;
 import com.goodquestion.backend.session.engine.ReactionKeyMapper;
 import com.goodquestion.backend.session.entity.StorySession;
 import com.goodquestion.backend.session.enums.ResponseMode;
+import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.enums.SceneEndReason;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
 import com.goodquestion.backend.session.support.NameSubstitutor;
@@ -76,6 +77,9 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         if (!session.getChild().getParent().getId().equals(parentId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        if (session.getStatus() != SessionStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "진행 중인 세션이 아닙니다.");
         }
         if (request.text() == null || request.text().isBlank()) {
             throw new BusinessException(ErrorCode.STT_EMPTY);

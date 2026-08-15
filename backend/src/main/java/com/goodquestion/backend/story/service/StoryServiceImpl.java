@@ -73,6 +73,7 @@ public class StoryServiceImpl implements StoryService {
 
         ExistingSessionResponse existingSession = storySessionRepository
                 .findFirstByChildAndStoryOrderByLastActivityAtDesc(child, story)
+                .filter(session -> session.getStatus().isResumable())
                 .map(ExistingSessionResponse::of)
                 .orElse(null);
 

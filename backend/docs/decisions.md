@@ -1241,6 +1241,50 @@ $0.0045/분으로 `gpt-4o-transcribe`($0.006/분)보다 싸다. 즉 정확도·�
 
 ---
 
+### D-48 · 상세 화면 `existingSession`이 `stopped`/`completed` 세션까지 이어가기 대상으로 잡히던 문제
+
+팀원 보고: 홈에서는 `inProgress`가 `null`로 정상인데, 같은 이야기의 상세 화면
+(`GET /stories/{storyId}`)에 들어가면 `existingSession`이 채워져서 "이어서 할까요?"
+모달이 뜬다. 확인해보니 아이가 "이야기 나가기"(C-13)로 나간(`stopped`) 세션도, 이미
+다 끝낸(`completed`) 세션도 여기 걸렸다.
+
+**원인**: `HomeServiceImpl`은 처음부터 `IN_PROGRESS`·`POST_ACTIVITY`만 "이어가기
+대상"으로 걸렀는데(구 이름 `RESUMABLE_STATUSES`), `StoryServiceImpl.getStoryDetail()`은
+상태 필터 없이 그냥 "가장 최근 세션"을 `existingSession`에 그대로 담아 보내고 있었다.
+`SessionServiceImpl.createSession()`도 별도로 같은 필터(`ACTIVE_STATUSES`)를 복붙해
+셋이 제각각이었다 — 상세 화면만 필터가 아예 빠진 상태.
+
+`api.md` 3.3을 다시 보니 `existingSession` 필드의 스펙 의도 자체가 명확했다:
+"있으면 프론트가 B-4 모달을 띄웁니다. 없으면 `null`" — 예시도 `in_progress`만 보여준다.
+즉 상세 화면 쪽이 스펙과 어긋난 구현이었다.
+
+**결정**: 프론트는 건드리지 않는다. `StoryDetailScreen.tsx`가 `existingSession.status`를
+아예 안 읽고 존재 여부만 보므로(`onStart()`), 백엔드가 `null`/값 하나로 완전히 제어
+가능하다. `SessionStatus`에 `isResumable()`(+ `resumableStatuses()`)을 추가해 세 곳
+(`HomeServiceImpl`, `SessionServiceImpl.createSession`, `StoryServiceImpl.getStoryDetail`)이
+전부 이 하나만 쓰도록 통일했다. `COMPLETED`도 `STOPPED`와 동일하게 `null` 처리한다 —
+프론트가 상태를 구분 못 하는 이상 "이어가기"는 이분법(가능/불가능)일 수밖에 없고,
+완료작을 "이어간다"는 개념 자체가 없기 때문이다.
+
+**같이 처리한 방어 가드**: 위 수정만으로 정상 흐름에선 막히지만, `stopped`/`completed`
+세션 ID로 `POST /messages`·`POST /scenes/{id}/complete`를 직접 호출하면 막을 장치가
+없었다 (`MessageServiceImpl`·`SessionServiceImpl.completeScene()` 둘 다 세션 상태를
+안 봄). `IN_PROGRESS`가 아니면 `ErrorCode.INVALID_REQUEST`로 막는 가드를 추가했다 —
+`isResumable()`이 아니라 **`IN_PROGRESS` 단독** 조건이다. `POST_ACTIVITY`는
+`startPostActivity()`가 `currentScene`을 안 바꿔서(장면9를 계속 가리킴) 이미 닫힌
+장면에 또 발화를 보낼 수 있는 별개의 구멍이라, "이어가기 가능" 범위보다 좁게 잡았다.
+새 `ErrorCode`는 안 만들었다 — 같은 메서드 안에 이미 `INVALID_REQUEST`를 이런 용도로
+쓰는 선례가 있어 재사용, `api.md` 2.3 에러 코드 표 변경 없음.
+
+**검증**: 실제 프론트+백엔드+AI 서버를 띄우고 브라우저로 직접 확인. `stopped`로 바꾼
+세션의 이야기 상세 화면에 "이어서 할까요?" 없이 "이야기 시작하기" 버튼만 뜨는 것,
+눌렀을 때 기존 세션이 아니라 새 세션 ID로 이동하는 것, 콘솔 에러 없는 것까지 확인.
+`POST /messages`도 실제 API로 `stopped` 세션에 호출해 `400 INVALID_REQUEST`로 막히는
+것 확인. 전체 테스트 98/98 통과. API 응답 스키마·에러 코드 표 변경 없음 — 프론트
+작업 불필요.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
