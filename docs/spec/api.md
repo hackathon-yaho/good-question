@@ -617,7 +617,8 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
     { "word": "구박", "meaning": "누군가를 못마땅해하며 자꾸 나무라는 것" }
   ],
   "messageId": "d82d423b-e4af-43c6-b99c-3b34e1941cfc",
-  "characterState": "WORRIED"
+  "characterState": "WORRIED",
+  "recommendedWord": { "word": "창피한", "meaning": "다른 사람이 볼까 봐 얼굴이 뜨거운 마음" }
 }
 ```
 
@@ -635,6 +636,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `messageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)). 필드명 `characterMessageId`→`messageId` 정정은 [D-26](../../backend/docs/decisions.md) |
 | `characterState` | **신규 (O-12).** 대화 중 캐릭터 이미지 전환용 상태값. AI가 대사 내용에 맞춰 판단해 내려줌. `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 중 하나, `CLOSING`이면 항상 `null` ([D-27](../../backend/docs/decisions.md)). 상태별 캐릭터 이미지는 [request/ai/story-image-assets.md](../request/ai/story-image-assets.md) 도착 대기 중 |
 | `missionProgress` | **신규.** 미션 체크리스트 항목 단위 진행(`{ missionId, satisfiedIndexes }`). 미션 노출 전이거나 `CLOSING`이면 `null` ([D-30](../../backend/docs/decisions.md), [request/backend/mission-progress.md](../request/backend/mission-progress.md)) |
+| `recommendedWord` | **신규.** 오늘의 단어 카드 `{ word, meaning }`. `highlightWords`와 달리 대사에 실제 등장하는지와 무관하게 장면마다 항상 하나씩 내려옴(후보 없는 장면이면 `null`). LLM 입출력에는 관여하지 않는 코드 상수 데이터 ([request/backend/scene-vocabulary-recommendation.md](../request/backend/scene-vocabulary-recommendation.md)) |
 
 **프론트가 하지 말아야 할 것**
 
