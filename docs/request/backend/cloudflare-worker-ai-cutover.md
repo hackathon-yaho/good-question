@@ -14,11 +14,11 @@
 
 ## 변경 요청
 
-배포 주소 확정 후 Render 백엔드 환경 변수에 아래 값을 설정해 주세요.
+Cloudflare Worker 배포 주소가 확정되었습니다. Render 백엔드 환경 변수에 아래 값을 설정해 주세요.
 
 | 환경 변수 | 값 | 비고 |
 | --- | --- | --- |
-| `AI_SERVER_BASE_URL` | `https://<cloudflare-worker>.workers.dev` | 끝 슬래시 없이 설정 |
+| `AI_SERVER_BASE_URL` | `https://goodquestion-ai.goodquestion-kty2253.workers.dev` | 끝 슬래시 없이 설정 |
 | `AI_SERVER_INTERNAL_TOKEN` | AI 파트가 Worker Secret `AI_INTERNAL_TOKEN`에 입력한 값과 동일 | 실제 값은 Git·문서·로그에 기록 금지 |
 | `AI_SERVER_TIMEOUT_SECONDS` | `10` | 기존 확정값 유지 |
 
