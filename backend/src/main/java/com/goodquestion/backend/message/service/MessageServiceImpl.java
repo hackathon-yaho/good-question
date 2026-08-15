@@ -122,6 +122,7 @@ public class MessageServiceImpl implements MessageService {
         // 진행 판단(강한 유도 제한)과 미션 조건 4가 둘 다 직전 턴 기준이다.
         ResponseMode previousMode = session.getLastResponseMode();
         ThoughtElement previousGuidanceTarget = session.getLastGuidanceTarget();
+        Integer missionRevealedAtTurn = session.getMissionRevealedAtTurn();
 
         // D-29: 대화3·4는 미션이 항상 나와야 한다 — 진행 판단이 GOAL_MET으로 장면을 먼저
         // 닫아버리지 않도록, 이번 장면에 아직 안 보여준 미션이 있는지 미리 알려준다.
@@ -131,7 +132,7 @@ public class MessageServiceImpl implements MessageService {
         ProgressDecision decision = ProgressJudge.judge(new ProgressInput(
                 turnCount, scene.getPreferredTurns(), scene.getMaxTurns(), missing,
                 !newlyAccumulated.isEmpty(), previousMode,
-                turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission));
+                turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission, missionRevealedAtTurn));
 
         // ④ 유도 정보 구성 (M-41) + ⑤ 캐릭터 응답. GUIDED 유도 대상과 NORMAL soft-cue 대상(O-13)은
         // 둘 다 reactionKey가 있어야 판단할 수 있어(장난·질문·불명확이면 soft-cue 스킵) resolveCharacterResponse 안에서 함께 계산한다.
@@ -165,6 +166,9 @@ public class MessageServiceImpl implements MessageService {
                 : judgeMission(session, scene, hasUnrevealedMission, new MissionTriggerContext(
                         turnCount, analysis.childIntent(), request.text(), accumulated, missing,
                         previousMode, previousGuidanceTarget, scene.getMaxTurns()), nextTurnOrder + 1);
+        if (missionTriggered != null) {
+            session.recordMissionRevealed(turnCount);
+        }
 
         String characterDisplayName = DialogueContents.forSceneOrder(scene.getSceneOrder()).characterDisplayName();
 

@@ -88,6 +88,10 @@ public class StorySession {
     @Column(name = "consecutive_low_information_turns", nullable = false)
     private Integer consecutiveLowInformationTurns;
 
+    /** 미션이 노출된 턴 번호. 노출 전이면 null (D-49 — 미션과 대화 세션의 턴 예산 분리). */
+    @Column(name = "mission_revealed_at_turn")
+    private Integer missionRevealedAtTurn;
+
     @Column(name = "scene_goal_met", nullable = false)
     private Boolean sceneGoalMet;
 
@@ -145,6 +149,7 @@ public class StorySession {
         this.sceneEndReason = null;
         this.lastResponseMode = null;
         this.lastGuidanceTarget = null;
+        this.missionRevealedAtTurn = null;
         this.lastActivityAt = Instant.now();
     }
 
@@ -188,5 +193,10 @@ public class StorySession {
     public void closeScene(SceneEndReason reason) {
         this.sceneEndReason = reason;
         this.lastActivityAt = Instant.now();
+    }
+
+    /** 미션이 노출된 턴을 기록한다 (D-49). 이후 진행 판단이 이 턴 기준으로 별도 턴 예산을 준다. */
+    public void recordMissionRevealed(int turnCount) {
+        this.missionRevealedAtTurn = turnCount;
     }
 }

@@ -20,6 +20,12 @@ public final class ProgressJudge {
     private static final int LOW_INFORMATION_THRESHOLD = 2;
     /** 남은 대화 기회가 이 값 이하이면 "부족"으로 본다. */
     private static final int LOW_REMAINING_TURNS_THRESHOLD = 2;
+    /**
+     * 미션 노출 후 보장하는 최소 대화 턴 (D-49). 대화 세션의 원래 maxTurns를 넘기더라도
+     * 노출 턴부터 이 턴 수만큼은 닫지 않는다 — MissionTrigger.FORCE_REVEAL_TURNS_BEFORE_MAX와
+     * 같은 설계 의도(미션은 대화 세션과 턴을 공유하지 않는다)를 공유하는 상수라 값을 맞춰둔다.
+     */
+    private static final int MISSION_TURN_BUDGET = 2;
 
     private ProgressJudge() {
     }
@@ -28,14 +34,18 @@ public final class ProgressJudge {
         boolean missingEmpty = input.missingElements().isEmpty();
 
         // 1. 종료 조건
-        // D-29: 대화3·4는 미션이 항상 나와야 한다(주최측 확정) — 미공개 미션이 있으면
-        // maxTurns 도달 전까지는 GOAL_MET으로 닫지 않고, MissionTrigger의 강제 노출 턴
-        // (maxTurns-1)까지 대화를 이어간다. maxTurns 하한선(바로 아래 분기)은 그대로 유지된다.
-        boolean deferGoalMetForUnrevealedMission = input.hasUnrevealedMission() && input.turnCount() < input.maxTurns();
-        if (missingEmpty && input.turnCount() >= input.preferredTurns() && !deferGoalMetForUnrevealedMission) {
+        // D-29/D-49: 대화3·4는 미션이 항상 나와야 한다(주최측 확정). 미공개 미션이 있으면
+        // maxTurns 도달 전까지, 이미 노출된 미션이 있으면 노출 턴+예산(MISSION_TURN_BUDGET)까지
+        // GOAL_MET으로 닫지 않는다 — 이 확장된 값(effectiveMaxTurns)이 MAX_TURNS 하드컷의 기준도 된다.
+        int effectiveMaxTurns = input.missionRevealedAtTurn() == null
+                ? input.maxTurns()
+                : Math.max(input.maxTurns(), input.missionRevealedAtTurn() + MISSION_TURN_BUDGET);
+        boolean deferGoalMetForMission = (input.hasUnrevealedMission() || input.missionRevealedAtTurn() != null)
+                && input.turnCount() < effectiveMaxTurns;
+        if (missingEmpty && input.turnCount() >= input.preferredTurns() && !deferGoalMetForMission) {
             return ProgressDecision.closing(SceneEndReason.GOAL_MET);
         }
-        if (input.turnCount() >= input.maxTurns()) {
+        if (input.turnCount() >= effectiveMaxTurns) {
             return ProgressDecision.closing(SceneEndReason.MAX_TURNS);
         }
 

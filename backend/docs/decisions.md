@@ -1285,6 +1285,58 @@ $0.0045/분으로 `gpt-4o-transcribe`($0.006/분)보다 싸다. 즉 정확도·�
 
 ---
 
+### D-49 · 미션 노출 후 턴 예산을 대화 세션의 `max_turns`와 분리
+
+사용자(백엔드 담당) 지적: 미션2(장면9, `max_turns=4`)는 강제 노출 조건(D-29)이
+`turnCount >= maxTurns - 1`이라 3턴째 뜨는데, 뜬 직후 남는 대화 턴이 4턴째 딱 1턴뿐이라
+"미션 진행 한 번 하자마자 클로징 멘트"가 나온다. 미션이 대화 세션의 턴 예산을 그대로
+나눠 쓰는 게 아니라 **자기 턴 예산을 따로 가져야** 한다는 요구.
+
+**로컬 DB로 실측**: `mission_revealed_at_turn` 도입 전, 오늘(2026-08-15) 이전 세션 중
+장면9에서 `current_child_turn_count=4`(=`MAX_TURNS`로 종료)까지 갔는데 `SYSTEM` 메시지가
+0건인 세션이 다수 있었다 — 단, 전부 D-29 커밋(2026-08-13 15:36, `1f2e4d4`) **이전**인
+2026-08-12 데이터였다. D-29 이후(8/14~) 세션은 전부 미션이 뜨긴 뜨되, 뜬 뒤 남는 턴이
+1턴뿐인 패턴(`ccc9cc2b` 세션: 3턴째 노출 → 4턴째 "싫어싫어싫어싫어" → 즉시 클로징)이
+확인됐다 — 사용자가 설명한 증상과 정확히 일치.
+
+**바꾼 것**:
+1. `MissionTrigger.FORCE_REVEAL_TURNS_BEFORE_MAX`를 1→2로 당겼다 — 강제 노출이 장면
+   종료 두 턴 전에 뜬다.
+2. `StorySession`에 `mission_revealed_at_turn`(nullable) 컬럼을 추가해 미션이 노출된
+   턴을 기록한다(`recordMissionRevealed()`, `advanceToScene()`에서 초기화).
+3. `ProgressJudge`에 `MISSION_TURN_BUDGET=2`를 도입해 `effectiveMaxTurns =
+   max(maxTurns, missionRevealedAtTurn + 2)`를 계산하고, GOAL_MET 유예와 MAX_TURNS
+   하드컷 둘 다 이 값을 기준으로 판단하도록 일반화했다(기존 D-29의 `hasUnrevealedMission`
+   유예를 노출 *이후*까지 확장한 형태). 미션이 늦게 뜨더라도(이론상) 원래
+   `max_turns`를 넘겨서까지 최소 2턴은 보장한다 — 강제 노출 오프셋(1)과 이 예산(2)이
+   짝을 이루므로 실제로는 거의 항상 `effectiveMaxTurns == maxTurns`가 된다.
+
+**API 계약은 안 바꿨다**: 응답의 `maxTurns` 필드는 여전히 `scene.getMaxTurns()` 그대로
+내려간다(사용자 결정) — 프론트가 이미 `missionProgress != null` 여부로 "미션 진행 중"을
+판별하고 있어, 진행률 표시용 `maxTurns`를 굳이 동적으로 바꿀 필요가 없다고 봤다.
+
+**검증**: `ProgressJudgeTest`·`MissionTriggerTest`에 각각 신규 케이스 추가, 전체 테스트
+통과. 로컬 앱 기동 후 실제 세션으로 장면9까지 진행 — 미션2가 2턴째(예전 3턴째)에 뜨고,
+`mission_revealed_at_turn=2`로 저장되며, 3·4턴 두 번 다 대화가 이어진 뒤 4턴째에
+`MAX_TURNS`로 종료되는 것을 DB·API 응답 양쪽에서 확인. 응답 `maxTurns`는 4로 고정 유지됨.
+
+**별개로 확인, 미해결로 남긴 것 — "미션2가 아예 안 떴다" report 관련**: 사용자가 같이
+요청한 "프론트에서 미션2가 강제발동 조건(3턴)에도 안 뜨고 대화가 끝나버렸다"는 별도
+제보를 로컬 DB로 재현하려 했으나, 재현되지 않았다(8/14 이후 세션은 전부 미션이 떴다).
+가능성 있는 원인 두 가지를 남긴다 — 둘 다 이번 커밋 범위 밖이라 고치지 않았다:
+1. **`/respond` AI 호출 실패 시 즉시 `character_closing`으로 장면을 강제 종료하는
+   경로(B-12, D-44에서 재확정)**가 `judgeMission()` 호출(`!sceneEnded`가 조건)보다
+   먼저 장면을 닫아버릴 수 있다 — 로컬 mock은 항상 성공해서 재현 불가, 실 AI 서버
+   장애 시에만 발생 가능한 경로로 추정.
+2. **이미 문서화된 별개 이슈(U-08,
+   [mission2-success-signal-gap.md](../../docs/request/frontend/mission2-success-signal-gap.md))**
+   — 미션2가 *자연 발동*(내용 조건으로, 강제 아님)하면 `mission2Satisfied` 프론트
+   판정이 구조적으로 절대 `true`가 될 수 없어 성공 표시 없이 조용히 닫힌다. 사용자가
+   말한 "강제발동 조건(3턴)"과는 결이 다르지만, 테스터 입장에서는 둘 다 "미션2가
+   제대로 안 나타났다"로 보일 수 있어 함께 남긴다.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

@@ -18,6 +18,8 @@ public record ProgressInput(
         int turnsWithoutNewElement,
         int consecutiveLowInformationTurns,
         /** 이번 장면에 아직 노출 안 된 미션이 있는가 (D-29). true면 GOAL_MET을 maxTurns 전까지 미룬다. */
-        boolean hasUnrevealedMission
+        boolean hasUnrevealedMission,
+        /** 미션이 노출된 턴 번호. 노출 전이면 null (D-49 — 미션과 대화 세션의 턴 예산 분리). */
+        Integer missionRevealedAtTurn
 ) {
 }
