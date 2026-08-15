@@ -18,7 +18,7 @@ AI 서버는 이미지 생성·선택을 하지 않는다. `characterState`는 `
 
 - 기본 모델: `gpt-5-mini`
 - 분석 최대 200토큰, 캐릭터 답변 최대 80토큰
-- 호출당 5초, SDK 재시도 0회
+- 엔드포인트당 전체 10초(최초 요청 포함 최대 3회), SDK 재시도 0회
 - Responses API `store=false`, 이전 응답/대화 상태 미사용
 - 아이 발화에 실제 있는 근거만 통과시킨다.
 - `SHORT`·`UNCLEAR`·`OFF_TOPIC`·`PLAYFUL`은 요소와 요약을 강제로 비운다.
@@ -51,7 +51,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 | `OPENAI_API_KEY` | 없음 | AI 서버에서만 읽는 API 키 |
 | `AI_INTERNAL_TOKEN` | 스크립트가 생성 | 백엔드와 공유하는 16자 이상 토큰 |
 | `OPENAI_MODEL` | `gpt-5-mini` | 대화 모델 |
-| `OPENAI_TIMEOUT_SECONDS` | `5` | 호출 제한 시간(초) |
+| `OPENAI_TIMEOUT_SECONDS` | `10` | 엔드포인트 전체 제한 시간(초). 최초 요청을 포함해 최대 3회 안에서 사용 |
 | `OPENAI_REASONING_EFFORT` | `minimal` | 비용·속도 우선 추론 강도 |
 
 ## 검증
@@ -77,7 +77,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 - `401 UNAUTHORIZED`: 내부 토큰이 없거나 다름
 - `422 INVALID_REQUEST`: 계약 위반
-- `502 MODEL_UPSTREAM_ERROR`: 모델 오류·구조화 출력 오류·안전하지 않은 캐릭터 대사
-- `504 MODEL_TIMEOUT`: 5초 제한 초과
+- `502 MODEL_UPSTREAM_ERROR`: 재시도 가능한 모델 오류·구조화 출력 오류·안전하지 않은 캐릭터 대사가 3회 모두 실패
+- `504 MODEL_TIMEOUT`: 10초 전체 제한 초과 또는 3회 모두 시간 초과
 
 모든 응답은 `X-Request-Id`를 반환한다.
