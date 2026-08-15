@@ -1391,6 +1391,33 @@ D-49는 미션 노출 후 "고정 2턴"만 보장했다. 사용자(백엔드 담
 
 ---
 
+### D-51 · `/respond` 실패로 장면이 통째로 강제 종료되는 문제 — AI 서버 재시도 + 백엔드 타임아웃 5→10초
+
+실 AI 서버(`gpt-5-mini`)로 직접 테스트하다가 같은 세션 안에서 `/respond`가 `502
+MODEL_UPSTREAM_ERROR`로 두 번 실패했다. B-12/D-44 정책상 `/respond` 실패는 재시도 없이
+즉시 `character_closing`으로 장면을 강제 종료하는데, 두 번 다 `ProgressJudge`가 정상
+NORMAL을 냈어야 할 턴(미션 노출 직후, 필수 요소 미충족)에서 발생해 대화1·미션1이 각각
+1턴만에 스킵됐다 — 아이 진행과 무관하게 AI 서버가 한 번 삐끗한 것만으로 장면 전체가
+날아가는 셈이다.
+
+**바꾼 것**: 완전한 해결(D-40 방식 재도입 등)은 AI 파트 스펙 재확인이 필요해 이번엔
+손대지 않고, 재발 빈도를 낮추는 선에서 처리했다.
+- `ai-server`: OpenAI 호출 타임아웃 5→10초, SDK `max_retries` 0→3 (사용자가 직접 적용)
+- `backend`: `ai.server.timeout-seconds`(`AI_SERVER_TIMEOUT_SECONDS`) 5→10 — AI 서버
+  쪽 재시도가 원래 타임아웃(5초) 안에서 다 안 끝날 수 있어 백엔드 쪽도 맞춰 올렸다.
+  `AiAnalyzeClientImpl`·`AiRespondClientImpl` 둘 다 이 값을 공유해서 씀.
+
+- ponytail: 재시도 최대 3회 × 10초면 ai-server 쪽 최악 응답 시간이 이론상 10초를
+  넘을 수 있는데(SDK 재시도가 외부 `asyncio.wait_for(timeout=10)` 안에서 도는 구조라
+  실제로는 10초에서 잘릴 가능성이 큼), 백엔드 타임아웃(10초)과 정확히 안 맞을 수 있다.
+  근본 해결은 아니고 발생 빈도만 줄인 완화책이다 — 재발하면 D-40처럼 "실패해도 장면을
+  안 닫고 계속 진행" 쪽을 다시 검토해야 한다.
+
+**변경 파일**: `application.yml`(`AI_SERVER_TIMEOUT_SECONDS` 기본값), `.env`,
+`.env.example`.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

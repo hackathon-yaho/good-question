@@ -52,7 +52,7 @@ ai:
   server:
     # 실 AI 서버 주소 미결(U-01). 기본값은 우리 자신의 mock 스텁(B-11)을 가리킨다.
     base-url: ${AI_SERVER_BASE_URL:http://localhost:8080/api/mock-ai}
-    timeout-seconds: ${AI_SERVER_TIMEOUT_SECONDS:5}           # D-03
+    timeout-seconds: ${AI_SERVER_TIMEOUT_SECONDS:10}          # D-03, D-51 — AI 서버 재시도(최대 3회) 도입에 맞춰 5→10
     internal-token: ${AI_SERVER_INTERNAL_TOKEN:}              # U-01 해소. mock은 인증 없음, 값 없어도 동작
 
 # STT/TTS 전용 키 — gpt-5-mini(AI 담당) 키와 분리 (D-16)
