@@ -21,7 +21,7 @@
 | --- | --- |
 | AI 서버 `/analyze`, `/respond` | 요청 전체 10초, 최초 요청 포함 최대 3회 |
 | 재시도 소유자 | AI 서버만. OpenAI SDK와 백엔드는 0회 |
-| 백엔드 연결 대기 | 11초 (`AI_SERVER_TIMEOUT_SECONDS`) |
+| 백엔드 연결 대기 | 10초 (`AI_SERVER_TIMEOUT_SECONDS`, D-51) |
 | 최종 오류 | 시간 초과는 504, 모델/구조화 출력 실패는 502 |
 | 백엔드 폴백 | 분석 실패는 빈 분석, 응답 실패는 `character_closing`; 프론트 500 금지 |
 
