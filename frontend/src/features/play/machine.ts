@@ -186,6 +186,8 @@ export type PlayMachineState = {
    */
   mission2Choice: number | null;
   highlightWords: HighlightWord[];
+  /** 서버가 알려준 캐릭터 표정 상태 (NEUTRAL/HAPPY/WORRIED/SURPRISED/MOVED) */
+  characterState: string | null;
 
   /** 마지막 장면이 끝나 /activity로 넘어가야 하는지 */
   postActivityReady: boolean;
@@ -216,6 +218,7 @@ export const initialPlayState: PlayMachineState = {
   satisfiedIndexes: [],
   mission2Choice: null,
   highlightWords: [],
+  characterState: null,
   postActivityReady: false,
   nextSceneId: null,
   recording: false,
@@ -482,6 +485,7 @@ export function playReducer(
         missionTurns,
         satisfiedIndexes,
         highlightWords: result.highlightWords,
+        characterState: result.characterState ?? null,
         nextSceneId: result.nextSceneId,
         draftText: "",
         sttRawText: "",

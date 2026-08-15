@@ -84,9 +84,8 @@ export function MicButton({
       }
       className="relative flex aspect-square shrink-0 items-center justify-center"
     >
-      {/* 동심원 펄스 링 2개 — idle/recording에서만 (§C-4)
-          비율(-inset-%)로 잡아야 마이크가 줄어들 때 함께 줄어든다. */}
-      {!disabled ? (
+      {/* 동심원 펄스 링 2개 — recording에서만. idle은 점등되지 않는다 */}
+      {state === "recording" ? (
         <>
           <span
             aria-hidden

@@ -6,12 +6,14 @@
 
 "use client";
 
+import Image from "next/image";
 import { Modal } from "@/components/ui/Modal";
 import { MicButton } from "@/components/ui/MicButton";
 import { PillButton } from "@/components/ui/PillButton";
 import { StarDustIcon } from "@/components/ui/StarDust";
 import { StarDustRain } from "@/components/ui/StarDustRain";
 import type { ActivityCard, RetellingResult } from "@/lib/api/types";
+import { STORY_COVER_IMAGE } from "@/lib/story-images";
 
 /** D-1 활동 인트로 */
 export function ActivityIntro({ onStart }: { onStart: () => void }) {
@@ -19,9 +21,15 @@ export function ActivityIntro({ onStart }: { onStart: () => void }) {
     <div className="flex size-full flex-col items-center justify-center gap-6 px-10 text-center">
       <div
         aria-hidden
-        className="flex h-[23.75rem] w-full max-w-[34rem] items-center justify-center rounded-card bg-primary-soft text-kid-body font-bold text-muted"
+        className="relative flex h-[23.75rem] w-full max-w-[34rem] items-center justify-center overflow-hidden rounded-card"
       >
-        단체 일러스트 준비 중
+        <Image
+          src={STORY_COVER_IMAGE}
+          alt=""
+          fill
+          className="object-contain"
+          sizes="(max-width: 768px) 100vw, 34rem"
+        />
       </div>
 
       <span className="rounded-pill bg-secondary px-5 py-1.5 text-parent-body font-bold text-white">
@@ -409,9 +417,15 @@ export function ActivityComplete({
 
       <div
         aria-hidden
-        className="z-10 flex h-[22.5rem] w-full max-w-[32rem] items-center justify-center rounded-card bg-primary-soft text-kid-body font-bold text-muted"
+        className="z-10 relative flex h-[22.5rem] w-full max-w-[32rem] items-center justify-center overflow-hidden rounded-card"
       >
-        단체 일러스트 준비 중
+        <Image
+          src={STORY_COVER_IMAGE}
+          alt=""
+          fill
+          className="object-contain"
+          sizes="(max-width: 768px) 100vw, 32rem"
+        />
       </div>
 
       <h1 className="z-10 text-hero leading-tight font-bold text-text">
