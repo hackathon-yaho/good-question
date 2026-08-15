@@ -79,17 +79,11 @@ export function IntroFullscreen({
             {sentence}
           </p>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onReplay}
-              className="flex min-h-touch-kid items-center justify-center gap-2 rounded-pill border-2 border-white/50 px-8 py-3.5 text-kid-body font-bold text-white/90 hover:bg-white/10"
-            >
-              <span aria-hidden>🔊</span> 다시 듣기
-            </button>
+          {index >= total - 1 ? (
             <PillButton size="kid" onClick={onNext}>
-              {index >= total - 1 ? "이야기 시작하기" : "다음"}
+              이야기 시작하기
             </PillButton>
-          </div>
+          ) : null}
         </div>
       </div>
 

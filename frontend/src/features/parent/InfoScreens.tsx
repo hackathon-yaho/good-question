@@ -18,7 +18,7 @@ import { PillButton } from "@/components/ui/PillButton";
 import { parentApi } from "@/lib/api";
 import type { NoticeItem, ParentApi } from "@/lib/api/types";
 
-const BACK = <BackButton href="/parent/settings" label="설정" />;
+const BACK = <BackButton label="뒤로 가기" />;
 
 /* ── H-3 공지사항 ──────────────────────────────────────────────────── */
 
@@ -202,20 +202,7 @@ const GUIDE_CARDS = [
   },
 ] as const;
 
-const HIDE_KEY = "gq.hideGuide";
-
 export function UsageGuideScreen() {
-  const [hidden, setHidden] = useState(false);
-
-  const hide = useCallback(() => {
-    try {
-      window.localStorage.setItem(HIDE_KEY, "1");
-    } catch {
-      // 저장 실패해도 화면은 닫아 준다.
-    }
-    setHidden(true);
-  }, []);
-
   return (
     <CenteredShell width="full">
       {BACK}
@@ -241,11 +228,6 @@ export function UsageGuideScreen() {
         ))}
       </ul>
 
-      <div className="mt-8 flex justify-center">
-        <PillButton variant="outlined" onClick={hide} disabled={hidden}>
-          {hidden ? "다시 보지 않기로 했어요" : "다시 보지 않기"}
-        </PillButton>
-      </div>
     </CenteredShell>
   );
 }

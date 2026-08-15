@@ -8,6 +8,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +18,7 @@ import { FilterChipRow } from "@/components/ui/FilterChipRow";
 import { parentApi } from "@/lib/api";
 import type { ParentApi, ReportListResult } from "@/lib/api/types";
 import { setSelectedChildId, useSelectedChildId } from "@/lib/client-store";
+import { STORY_COVER_IMAGE } from "@/lib/story-images";
 import type { SessionStatus } from "@/lib/play-state";
 
 const STATUS_CHIP: Record<SessionStatus, { label: string; className: string }> = {
@@ -128,9 +130,15 @@ export function ReportListScreen({ api = parentApi }: { api?: ParentApi }) {
               <>
                 <span
                   aria-hidden
-                  className="flex size-16 shrink-0 items-center justify-center rounded-bubble bg-primary-soft text-sm font-bold text-muted"
+                  className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-bubble"
                 >
-                  표지
+                  <Image
+                    src={STORY_COVER_IMAGE}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="4rem"
+                  />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-parent-body font-bold text-text">

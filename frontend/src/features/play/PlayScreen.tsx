@@ -80,7 +80,19 @@ export function PlayScreen({
   const [state, dispatch] = useReducer(playReducer, initialPlayState);
 
   const [paused, setPaused] = useState(false);
-  const [settings, setSettings] = useState<PlaySettings>(DEFAULT_PLAY_SETTINGS);
+  // localStorage에서 설정 불러오기
+  const [settings, setSettings] = useState<PlaySettings>(() => {
+    try {
+      const saved = localStorage.getItem("playSettings");
+      if (saved) return JSON.parse(saved) as PlaySettings;
+    } catch { /* ignore */ }
+    return DEFAULT_PLAY_SETTINGS;
+  });
+  // 설정 변경 시 localStorage에 저장
+  const persistSettings = useCallback((next: PlaySettings) => {
+    setSettings(next);
+    try { localStorage.setItem("playSettings", JSON.stringify(next)); } catch { /* ignore */ }
+  }, []);
   const [thinkingElapsed, setThinkingElapsed] = useState(0);
   const [micLevel, setMicLevel] = useState(0);
   /** 장면 전환 중 버튼을 잠그기 위한 표시용 상태. 중복 실행 방지는 ref가 맡는다. */
@@ -317,7 +329,7 @@ export function PlayScreen({
   useEffect(() => {
     if (paused || !scene) return;
 
-    // 도입(C-1)은 아이가 "다음"으로 넘긴다. 자동 진행하지 않는다.
+    // 도입(C-1) — 각 문장이 끝나면 0.5초 후 자동으로 다음 문장으로 넘어간다.
     if (state.status === PlayState.INTRO) {
       // 제스처 전에 speak를 부르면 조용히 차단되고 spokenKey만 소모된다.
       if (!audioUnlocked) return;
@@ -327,12 +339,20 @@ export function PlayScreen({
       // 자막은 메시지가 아니라 messageId가 없다. 텍스트로 음성을 요청한다.
       speak(
         { text: currentSentence(state) },
-        { rate: settings.rate, volume: settings.volume }
+        {
+          rate: settings.rate,
+          volume: settings.volume,
+          onDone: () => {
+            // 마지막 문장이면 "이야기 시작하기" 버튼을 기다린다. 자동 진입하지 않는다.
+            if (isLastSentence(state)) return;
+            setTimeout(() => dispatch({ type: "SENTENCE_NEXT" }), 500);
+          },
+        }
       );
       return;
     }
 
-    // 전개(C-2)는 자막이 끝나면 자동으로 캐릭터 발화로 넘어간다.
+    // 전개(C-2)는 자막이 끝나면 0.5초 후 자동으로 다음 문장으로 넘어간다.
     if (state.status === PlayState.SCENE_NARRATION) {
       const key = `narr:${scene.sceneId}:${state.sentenceIndex}`;
       if (spokenKeyRef.current === key) return;
@@ -344,8 +364,10 @@ export function PlayScreen({
           rate: settings.rate,
           volume: settings.volume,
           onDone: () => {
-            if (isLastSentence(state)) void advanceScene(scene.sceneId, scene.sceneType);
-            else dispatch({ type: "SENTENCE_NEXT" });
+            setTimeout(() => {
+              if (isLastSentence(state)) void advanceScene(scene.sceneId, scene.sceneType);
+              else dispatch({ type: "SENTENCE_NEXT" });
+            }, 500);
           },
         }
       );
@@ -501,7 +523,7 @@ export function PlayScreen({
       <PauseSheet
         open={paused}
         settings={settings}
-        onChange={setSettings}
+        onChange={persistSettings}
         onResume={resume}
         onExit={exit}
       />

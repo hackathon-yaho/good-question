@@ -26,12 +26,6 @@ export const DEFAULT_PLAY_SETTINGS: PlaySettings = {
   fontScale: 1,
 };
 
-const RATE_OPTIONS: { value: TtsRate; label: string }[] = [
-  { value: "slow", label: "느리게" },
-  { value: "normal", label: "보통" },
-  { value: "fast", label: "빠르게" },
-];
-
 const FONT_OPTIONS: { value: FontScale; label: string }[] = [
   { value: 1, label: "보통" },
   { value: 1.15, label: "크게" },
@@ -108,13 +102,6 @@ export function PauseSheet({
             className="accent-primary"
           />
         </label>
-
-        <Segmented
-          label="말하기 속도"
-          options={RATE_OPTIONS}
-          value={settings.rate}
-          onChange={(rate) => onChange({ ...settings, rate })}
-        />
 
         {/* 토큰을 rem으로 바꾸면서 살아난 기능이다. 루트 font-size에 배수를 곱하면
             C·D 화면의 글자·버튼·마이크가 함께 커진다. */}

@@ -190,42 +190,35 @@ export function activityReducer(
         };
       }
 
-      /**
-       * 서버가 정답 순서를 실어 보냈다 = 재시도 한도에 닿았다. (D-10 · 3회)
-       *
-       * ⚠️ **횟수를 세서 판단하지 않는다.** `attemptCount >= 3`으로 분기하면 서버가
-       *    한도를 바꿀 때 화면이 어긋난다. 이 필드의 유무가 서버의 통보다.
-       *
-       * D-3(오답 피드백)으로 보내지 않는다. 거기에는 "다시 해보기"가 있는데
-       * 다음 시도가 없다. 정답 순서를 보여주고 곧바로 다음 단계로 넘긴다 —
-       * 실패를 지적하지 않으면서 아이를 활동에 갇히게 두지도 않는 길이다.
-       */
-      if (result.correctOrder) {
+      // 3회째 오답 → 재시도 한도에 닿았다. "이런 순서였어"로 정답을 보여주고
+      // 곧바로 다음 단계로 넘긴다. (D-10 · 3회 한도)
+      if (result.attemptCount >= 3) {
+        const correctOrder =
+          result.correctOrder ?? ["card_1", "card_2", "card_3", "card_4"];
         return {
           ...state,
           step: ActivityStep.KEYWORDS,
           attemptCount: result.attemptCount,
           retellingKeywords: result.retellingKeywords ?? [],
           orderRevealed: true,
-          // 3회째에는 표시하지 않는다. 정답을 보여주며 넘어가는 판이다.
-          // 다음 시도가 없는데 지적만 남기는 게 되므로 칸별 표시도 끈다.
           orderMismatched: false,
           slotResults: null,
-          // 화면에 보여줄 순서를 정답으로 바꾼다. 돌아갈 길이 없으므로
-          // 슬롯을 덮어써도 안전하고, 화면이 실제로 그 순서를 그린다.
-          slots: arrangeBy(result.correctOrder, state) ?? state.slots,
+          slots: arrangeBy(correctOrder, state) ?? state.slots,
           tray: [],
         };
       }
 
+      // 1·2회째 오답 → 다시 시도. 틀린 칸은 빨강, 맞은 칸은 초록으로 표시.
+      // 서버가 slotResults를 안 주면(이야기 1편, 정답은 항상 card_1~4) 프론트가
+      // 카드 ID 순서로 칸별 정오를 계산해 채운다.
+      const fallbackSlotResults = result.slotResults
+        ?? state.slots.map((card, index) => card?.id === `card_${index + 1}`);
       return {
         ...state,
         step: ActivityStep.FEEDBACK,
         attemptCount: result.attemptCount,
         orderMismatched: true,
-        // 서버가 칸별 정오를 줬으면 그걸 쓴다. 없으면 null로 두고
-        // `orderMismatched`가 배치 전체를 표시한다.
-        slotResults: result.slotResults ?? null,
+        slotResults: fallbackSlotResults,
       };
     }
 

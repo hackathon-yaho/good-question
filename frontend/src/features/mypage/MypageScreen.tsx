@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { SidebarShell } from "@/components/shells/SidebarShell";
@@ -85,8 +85,16 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
           <h1 className="text-parent-title font-bold text-text">{child.name}</h1>
           <p className="mt-1 text-parent-body text-muted">{child.age}세</p>
         </div>
-        {/* 별가루 — 서버가 값을 줄 때만 보인다 */}
-        <StarDustChip amount={child.starDust} size={24} />
+        <div className="flex items-center gap-2">
+          <StarDustChip amount={child.starDust} size={24} />
+          <button
+            type="button"
+            onClick={() => router.push("/profiles")}
+            className="flex items-center justify-center rounded-pill border border-border px-3 py-2 text-sm font-bold text-muted hover:bg-primary-soft hover:text-text transition-colors"
+          >
+            아이 전환
+          </button>
+        </div>
       </section>
 
       <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
