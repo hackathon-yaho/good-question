@@ -61,6 +61,7 @@ LOW_ENGAGEMENT_UTTERANCES = frozenset(
         "몰라",
         "모르겠어",
         "닥쳐",
+        "닥처",
         "닥쳐라",
         "시끄러워",
         "꺼져",

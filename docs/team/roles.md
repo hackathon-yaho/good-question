@@ -300,9 +300,10 @@ AI가 반환한 분석 결과를 그대로 신뢰하지 않고 검증한다.
 | 조건 | 결과 |
 | --- | --- |
 | `turnCount >= preferred_turns` AND missing 없음 | `CLOSING` / `GOAL_MET` |
-| `turnCount >= max_turns` | `CLOSING` / `MAX_TURNS` |
-| 첫 발화 / 신규 요소 있음 / 직전이 GUIDED | `NORMAL` 강제 |
-| missing 있음 + 직전 GUIDED 아님 + (저정보 2연속 OR 신규요소없음 2연속 OR 남은턴 ≤ 2) | `GUIDED` |
+| missing 있음 + (저정보 2연속 OR 신규요소없음 2연속 OR 남은턴 ≤ 2) | `GUIDED` |
+| GUIDED 보호 횟수가 장면당 2회 미만 | 해당 GUIDED는 진행·미션 턴을 소모하지 않고 `MAX_TURNS`보다 우선 |
+| `turnCount >= max_turns`이고 GUIDED 보호 없음 | `CLOSING` / `MAX_TURNS` |
+| 첫 발화 / 신규 요소 있음 | `NORMAL` 강제 (단, GUIDED 보호가 우선) |
 
 보조 상태 판정:
 
@@ -316,10 +317,11 @@ AI가 반환한 분석 결과를 그대로 신뢰하지 않고 검증한다.
 **판단 순서를 지킬 것.** 순서를 바꾸면 결과가 달라진다.
 
 ```
-1. 종료 조건 확인      (요소 충족+최소턴 / 최대턴 도달)
-2. 강한 유도 제한 확인  (첫 발화 / 신규 요소 있음 / 직전 GUIDED)
-3. 유도 필요성 확인     (missing 있음 + 정체 / 저정보 / 남은턴 부족)
-4. 해당 없으면 NORMAL
+1. 목표 충족 종료 확인   (요소 충족+최소턴)
+2. GUIDED 필요성·보호 확인 (missing 있음 + 정체 / 저정보 / 남은턴 부족 / 보호 2회 미만)
+3. 최대 턴 종료 확인     (GUIDED 보호가 없을 때만)
+4. 일반 반응 제한 확인   (첫 발화 / 신규 요소 있음)
+5. 해당 없으면 NORMAL
 ```
 
 누적 계산:
@@ -370,18 +372,19 @@ AI에 전달할 `reactionKey`를 백엔드가 결정한다.
 | 필드 | 갱신 규칙 |
 | --- | --- |
 | `current_scene_id` | 현재 장면 |
-| `current_child_turn_count` | +1 |
+| `current_child_turn_count` | 일반 진행 턴에만 +1, 보호 GUIDED에서는 유지 |
 | `accumulated_elements` | 합집합 갱신 |
 | `last_detected_elements` | 이번 턴 결과로 교체 |
 | `last_response_mode` | `NORMAL` / `GUIDED` / `CLOSING` |
 | `last_guidance_target` | 유도 대상 요소 |
 | `turns_without_new_element` | 신규 요소 없으면 +1, 있으면 0 |
 | `consecutive_low_information_turns` | `SHORT`/`UNCLEAR`/`OFF_TOPIC`이면 +1, 아니면 0 |
+| `guided_turn_protection_used` | 보호 GUIDED면 +1, 장면당 최대 2 |
 | `scene_goal_met` | missing이 비었으면 `true` |
 | `scene_end_reason` | `GOAL_MET` / `MAX_TURNS` |
 | `last_activity_at` | 현재 시각 |
 
-장면 전환 시 초기화할 필드: `current_child_turn_count`, `accumulated_elements`, `turns_without_new_element`, `consecutive_low_information_turns`, `scene_goal_met`, `scene_end_reason`
+장면 전환 시 초기화할 필드: `current_child_turn_count`, `accumulated_elements`, `turns_without_new_element`, `consecutive_low_information_turns`, `guided_turn_protection_used`, `scene_goal_met`, `scene_end_reason`
 
 > 초기화하지 않으면 다음 장면이 이전 장면의 요소를 물려받아 첫 턴에 즉시 종료된다.
 > 다만 이 초기화 규칙은 제공 자료와 PRD에 명시되어 있지 않은 **팀 판단 사항**이다.
@@ -569,7 +572,7 @@ AI 서버는 **엔드포인트 2개만** 구현한다. DB 접근이 없고 상�
 | `playfulUtterance` | 장난을 실제 사건으로 단정하지 않고 받아친다 |
 | `questionFromChild` | 질문에 먼저 답한다 |
 | `proposalFromChild` | 제안의 좋은 점을 인정하고 걱정을 하나만 제시한다 |
-| `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용한다. GUIDED에서는 되묻지 않고 `remainingWorry`의 구체적 걱정을 드러낸다 |
+| `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용한다. GUIDED에서는 `remainingWorry`의 구체적 걱정과 장면 질문 하나로 대화를 다시 잇는다 |
 | `empathyFromChild` | 공감으로 반응한다 |
 | `disagreement` | 무조건 부정하지 않고 걱정을 하나 제시한다 |
 | `directResponse` | 최신 말에 직접 반응한다 |

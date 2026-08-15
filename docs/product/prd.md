@@ -551,9 +551,10 @@ missingElements = requiredElements − 새 accumulatedElements
 | 조건 | 결과 |
 | --- | --- |
 | `turnCount >= preferred_turns` 이고 missing 없음 | `CLOSING`, `endReason = GOAL_MET` |
-| `turnCount >= max_turns` | `CLOSING`, `endReason = MAX_TURNS` |
-| 첫 아이 발화 / 이번 턴 신규 요소 있음 / 직전 GUIDED | `NORMAL` 강제 |
-| missing 있고, 직전 GUIDED 아님, (저정보 2회 연속 또는 신규 요소 없음 2회 또는 남은 턴 ≤ 2) | `GUIDED` + `guidanceTarget` |
+| missing 있고, 저정보 2회 연속 또는 신규 요소 없음 2회 또는 남은 턴 ≤ 2 | `GUIDED` + `guidanceTarget` |
+| GUIDED 보호 횟수가 장면당 2회 미만 | 해당 GUIDED 턴은 진행·미션 턴을 소모하지 않고 `CLOSING`보다 우선 |
+| `turnCount >= max_turns`이고 GUIDED 보호 없음 | `CLOSING`, `endReason = MAX_TURNS` |
+| 첫 아이 발화 / 이번 턴 신규 요소 있음 | `NORMAL` 강제 (단, 위 GUIDED 보호 조건이 우선) |
 
 보조 상태 판정 기준:
 
@@ -567,22 +568,24 @@ missingElements = requiredElements − 새 accumulatedElements
 내부 임계값은 장면과 운영 정책에 따라 관리하되, 판단 순서는 다음을 따른다. **순서를 바꾸면 결과가 달라지므로 구현 시 이 순서를 지킨다.**
 
 ```
-1. 종료 조건 확인
-   ├─ 필수 요소 충족 및 최소 대화량 충족
-   └─ 최대 대화 범위 도달
+1. 목표 충족 종료 확인
+   └─ 필수 요소 충족 및 최소 대화량 충족
 
-2. 강한 유도 제한 조건 확인
-   ├─ 첫 발화
-   ├─ 이번 턴에 새로운 요소가 확인됨
-   └─ 직전 턴이 GUIDED였음
-
-3. 유도 필요성 확인
+2. GUIDED 필요성·보호 확인
    ├─ 필수 요소가 남아 있음
-   ├─ 대화가 정체됨
-   ├─ 저정보 발화가 반복됨
-   └─ 남은 대화 기회가 부족함
+   ├─ 짧거나 불명확한 발화가 반복됨
+   ├─ 여러 턴 동안 새로운 사고 요소가 확인되지 않음
+   ├─ 장면 종료까지 남은 대화 기회가 적음
+   └─ 장면당 GUIDED 보호 2회를 아직 쓰지 않음
 
-4. 위 조건에 해당하지 않으면 NORMAL
+3. 최대 대화 범위 확인
+   └─ GUIDED 보호가 없을 때만 `MAX_TURNS` 종료
+
+4. 일반 반응 제한 확인
+   ├─ 첫 발화
+   └─ 이번 턴에 새로운 요소가 확인됨
+
+5. 위 조건에 해당하지 않으면 NORMAL
 ```
 
 진행 판단의 핵심은 한 발화의 점수만 보는 것이 아니라, 누적된 사고 요소와 최근 대화 흐름을 함께 보는 것이다.
@@ -597,6 +600,7 @@ missingElements = requiredElements − 새 accumulatedElements
 | `missingElements` | 필수 요소 중 아직 확인되지 않은 요소 | 서버 계산 |
 | `turnsWithoutProgress` | 새로운 요소가 확인되지 않은 대화의 연속 횟수 | `turns_without_new_element` |
 | `lowInformationTurns` | 짧거나 불명확한 발화가 이어진 횟수 | `consecutive_low_information_turns` |
+| `guidedTurnProtectionUsed` | 현재 장면에서 소모한 GUIDED 보호 횟수(최대 2) | `guided_turn_protection_used` |
 | `previousMode` | 직전 턴의 진행 모드 | `last_response_mode` |
 | `previousGuidanceTarget` | 직전에 유도한 사고 요소 | `last_guidance_target` |
 
@@ -616,7 +620,7 @@ missingElements = requiredElements − 새 accumulatedElements
 | 모드 | 처리 |
 | --- | --- |
 | `NORMAL` | 일반 반응. 캐릭터 모델 호출 |
-| `GUIDED` | 부족한 요소로 유도. 캐릭터 모델 호출 + `guidanceTarget` 및 캐릭터 걱정 정보 전달 |
+| `GUIDED` | 부족한 요소로 유도. 캐릭터 모델 호출 + `guidanceTarget` 및 캐릭터 걱정 정보 전달. 장면당 처음 2회는 진행·미션 턴 보호 |
 | `CLOSING` | 장면 종료. 고정 마지막 대사(`character_closing`)를 조회해 `messages`에 저장하고 재생 |
 
 > **`CLOSING`이 결정되면 LLM이 마지막 대사를 생성하지 않는다.**
@@ -673,7 +677,7 @@ missingElements = requiredElements − 새 accumulatedElements
 | PLAYFUL / OFF_TOPIC / validity PLAYFUL | `playfulUtterance` | 장난을 실제 사건으로 단정하지 않고 받아침 |
 | QUESTION | `questionFromChild` | 질문에 먼저 답함 |
 | SOLUTION intent 또는 detected | `proposalFromChild` | 제안의 도움 되는 점 인정, 중간 턴에서는 걱정 하나만 |
-| SHORT / UNCLEAR 등 | `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용, GUIDED에서는 되묻지 않고 캐릭터의 구체적 걱정을 드러냄 |
+| SHORT / UNCLEAR 등 | `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용. GUIDED에서는 캐릭터의 구체적 걱정과 장면 질문 하나로 대화를 다시 이음 |
 | EMPATHY detected 등 | `empathyFromChild` / `directResponse` | 공감 반응 |
 | 의견·반박·결정 등 | `disagreement` | 무조건 부정하지 않고 걱정 하나 |
 | CLOSING | `directResponse` | 마무리 톤 (중간 턴 "장면 닫지 말 것"과 충돌 방지) |
@@ -746,6 +750,14 @@ remainingWorries.SOLUTION
 ```
 
 이 구조를 통해 유도 질문이 학습지 문항처럼 보이지 않고 이야기 속 대화로 이어지도록 한다.
+
+`SHORT`·`UNCLEAR`·`OFF_TOPIC`이 반복되어 GUIDED가 된 경우에는, 캐릭터의 구체적 걱정을 먼저
+드러낸 뒤 **장면에 답할 수 있는 질문 하나**를 덧붙일 수 있다. 이 질문은 아이를 꾸짖거나 답을
+채점하지 않고, 다시 이야기 안으로 참여시키는 용도다.
+
+```
+하기 싫을 수도 있지, 나는 배를 안전하게 딸 길이 걱정되는데 넌 어때?
+```
 
 강한 유도(`GUIDED`) 시 추가 원칙:
 
@@ -1389,6 +1401,7 @@ character_opening
 | `last_guidance_target` | `varchar` | 선택 | GUIDED 또는 soft-cue 대상 사고 요소 |
 | `turns_without_new_element` | `smallint` | Y | 신규 요소 없이 이어진 아이 발화 횟수 |
 | `consecutive_low_information_turns` | `smallint` | Y | 저정보 발화 연속 횟수 |
+| `guided_turn_protection_used` | `smallint` | Y | 현재 장면에서 사용한 GUIDED 진행·미션 턴 보호 횟수(0~2) |
 | `scene_goal_met` | `boolean` | Y | 현재 장면 목표 충족 여부 |
 | `scene_end_reason` | `varchar` | 선택 | 현재 장면 종료 이유 |
 | `status` | `varchar` | Y | 이야기 진행 상태 |
@@ -1878,6 +1891,7 @@ M-29는 9.3절의 STT 방식이 확정되어야 착수 가능하다. Web Speech 
 | I-17 | `remainingWorries`·`guidanceStyle` 값 미제공 | GUIDED·soft-cue 유도의 재료이며 값이 없으면 "교육용 fallback 문구를 넣지 않는다"고 규정되어 있으나, 장면별 실제 값이 제공되지 않음 | 팀이 캐릭터·장면 조합별로 작성 (7.5.3 참조). 코드 상수로 관리. **주최측 확인 권장** |
 | I-18 | 말하기 후 활동 카드·키워드 구성 | MVP 요건은 "카드 4~5개, 핵심 단어 3~4개", 주최측 Q&A 답변은 "대표 장면 이미지 4개, 각 장면에 키워드 3~4개(총 12~16개)" | MVP 요건 기준 채택. 카드 4개(이미지+텍스트 병기), 키워드 전체 4개. 인지 부담과 인터뷰 요구를 근거로 함. **주최측 확인 권장** |
 | I-19 | 카드 이미지 제공 여부 | 주최측이 "말하기 후 활동 카드 이미지는 제공 자료에 포함되는 이미지"라고 답변 | 전개 이미지를 카드 이미지로 사용. 이미지 파일 수령 전까지 플레이스홀더로 진행 |
+| I-20 | GUIDED 보호 횟수 상태 | 제공 테이블에는 반복 저정보 발화에서 GUIDED 기회를 보존할 상태가 없음 | 팀이 `guided_turn_protection_used`를 세션 상태에 추가. 장면당 2회만 진행·미션 턴을 보호하고, 보호 소진 뒤에는 기존 종료 규칙을 적용 |
 
 ---
 
