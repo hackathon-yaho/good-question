@@ -43,9 +43,9 @@ const respondSchema = {
 
 export function outputSchema(operation) {
   if (operation === "analyze") {
-    return { name: "goodquestion_analyze", schema: analyzeSchema, strict: true };
+    return { type: "json_schema", name: "goodquestion_analyze", schema: analyzeSchema, strict: true };
   }
-  return { name: "goodquestion_respond", schema: respondSchema, strict: true };
+  return { type: "json_schema", name: "goodquestion_respond", schema: respondSchema, strict: true };
 }
 
 function delay(milliseconds) {

@@ -104,6 +104,7 @@ test("analyze preserves request ID and filters hallucinated or duplicate evidenc
         assert.equal(payload.store, false);
         assert.equal(payload.max_output_tokens, 200);
         assert.equal(payload.reasoning.effort, "minimal");
+        assert.equal(payload.text.format.type, "json_schema");
         assert.equal(payload.text.format.strict, true);
         assert.equal(payload.text.format.schema.type, "object");
         return openAiResponse({
