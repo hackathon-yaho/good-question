@@ -146,23 +146,43 @@ class MissionTriggerTest {
         assertThat(MissionTrigger.shouldRevealMission2(context)).isFalse();
     }
 
-    // ── 노출 원칙(D-29): 내용 조건이 없어도 maxTurns 한 턴 전이면 무조건 노출된다 ────────────
+    // ── 노출 원칙(D-49): 내용 조건이 없어도 maxTurns 두 턴 전이면 무조건 노출된다 ────────────
+    // (D-29 최초값은 한 턴 전이었으나, 노출 뒤 대화할 여유가 1턴뿐이라 D-49에서 두 턴 전으로 당겼다.)
 
     @Test
-    void 노출_원칙_어떤_조건도_없어도_maxTurns_한턴_전이면_미션1이_강제_노출된다() {
+    void 노출_원칙_어떤_조건도_없어도_maxTurns_두턴_전이면_미션1이_강제_노출된다() {
         MissionTriggerContext context = new MissionTriggerContext(
-                4, ChildIntent.OPINION, "잘 모르겠어요.",
+                3, ChildIntent.OPINION, "잘 모르겠어요.",
                 List.of("SOLUTION"), List.of(), ResponseMode.NORMAL, null, 5);
 
         assertThat(MissionTrigger.shouldRevealMission1(context)).isTrue();
     }
 
     @Test
-    void 노출_원칙_PERSPECTIVE가_없어도_maxTurns_한턴_전이면_미션2가_강제_노출된다() {
+    void 노출_원칙_maxTurns_두턴_전보다_이르면_미션1이_강제_노출되지_않는다() {
+        // baseline과 동일하게 내용 조건에도 안 걸리는 상태 — turnCount만 두 턴 전 바로 이전으로.
         MissionTriggerContext context = new MissionTriggerContext(
-                3, ChildIntent.EMOTION, "속상했을 것 같아요.",
+                2, ChildIntent.OPINION, "배가 높이 있네요.",
+                List.of("REASON"), List.of("REQUEST", "RESULT"), ResponseMode.NORMAL, null, 5);
+
+        assertThat(MissionTrigger.shouldRevealMission1(context)).isFalse();
+    }
+
+    @Test
+    void 노출_원칙_PERSPECTIVE가_없어도_maxTurns_두턴_전이면_미션2가_강제_노출된다() {
+        MissionTriggerContext context = new MissionTriggerContext(
+                2, ChildIntent.EMOTION, "속상했을 것 같아요.",
                 List.of(), List.of("PERSPECTIVE", "RESULT"), ResponseMode.NORMAL, null, 4);
 
         assertThat(MissionTrigger.shouldRevealMission2(context)).isTrue();
+    }
+
+    @Test
+    void 노출_원칙_maxTurns_두턴_전보다_이르면_미션2가_강제_노출되지_않는다() {
+        MissionTriggerContext context = new MissionTriggerContext(
+                1, ChildIntent.EMOTION, "속상했을 것 같아요.",
+                List.of(), List.of("PERSPECTIVE", "RESULT"), ResponseMode.NORMAL, null, 4);
+
+        assertThat(MissionTrigger.shouldRevealMission2(context)).isFalse();
     }
 }

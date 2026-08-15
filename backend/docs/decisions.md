@@ -1285,6 +1285,112 @@ $0.0045/분으로 `gpt-4o-transcribe`($0.006/분)보다 싸다. 즉 정확도·�
 
 ---
 
+### D-49 · 미션 노출 후 턴 예산을 대화 세션의 `max_turns`와 분리
+
+사용자(백엔드 담당) 지적: 미션2(장면9, `max_turns=4`)는 강제 노출 조건(D-29)이
+`turnCount >= maxTurns - 1`이라 3턴째 뜨는데, 뜬 직후 남는 대화 턴이 4턴째 딱 1턴뿐이라
+"미션 진행 한 번 하자마자 클로징 멘트"가 나온다. 미션이 대화 세션의 턴 예산을 그대로
+나눠 쓰는 게 아니라 **자기 턴 예산을 따로 가져야** 한다는 요구.
+
+**로컬 DB로 실측**: `mission_revealed_at_turn` 도입 전, 오늘(2026-08-15) 이전 세션 중
+장면9에서 `current_child_turn_count=4`(=`MAX_TURNS`로 종료)까지 갔는데 `SYSTEM` 메시지가
+0건인 세션이 다수 있었다 — 단, 전부 D-29 커밋(2026-08-13 15:36, `1f2e4d4`) **이전**인
+2026-08-12 데이터였다. D-29 이후(8/14~) 세션은 전부 미션이 뜨긴 뜨되, 뜬 뒤 남는 턴이
+1턴뿐인 패턴(`ccc9cc2b` 세션: 3턴째 노출 → 4턴째 "싫어싫어싫어싫어" → 즉시 클로징)이
+확인됐다 — 사용자가 설명한 증상과 정확히 일치.
+
+**바꾼 것**:
+1. `MissionTrigger.FORCE_REVEAL_TURNS_BEFORE_MAX`를 1→2로 당겼다 — 강제 노출이 장면
+   종료 두 턴 전에 뜬다.
+2. `StorySession`에 `mission_revealed_at_turn`(nullable) 컬럼을 추가해 미션이 노출된
+   턴을 기록한다(`recordMissionRevealed()`, `advanceToScene()`에서 초기화).
+3. `ProgressJudge`에 `MISSION_TURN_BUDGET=2`를 도입해 `effectiveMaxTurns =
+   max(maxTurns, missionRevealedAtTurn + 2)`를 계산하고, GOAL_MET 유예와 MAX_TURNS
+   하드컷 둘 다 이 값을 기준으로 판단하도록 일반화했다(기존 D-29의 `hasUnrevealedMission`
+   유예를 노출 *이후*까지 확장한 형태). 미션이 늦게 뜨더라도(이론상) 원래
+   `max_turns`를 넘겨서까지 최소 2턴은 보장한다 — 강제 노출 오프셋(1)과 이 예산(2)이
+   짝을 이루므로 실제로는 거의 항상 `effectiveMaxTurns == maxTurns`가 된다.
+
+**API 계약은 안 바꿨다**: 응답의 `maxTurns` 필드는 여전히 `scene.getMaxTurns()` 그대로
+내려간다(사용자 결정) — 프론트가 이미 `missionProgress != null` 여부로 "미션 진행 중"을
+판별하고 있어, 진행률 표시용 `maxTurns`를 굳이 동적으로 바꿀 필요가 없다고 봤다.
+
+**검증**: `ProgressJudgeTest`·`MissionTriggerTest`에 각각 신규 케이스 추가, 전체 테스트
+통과. 로컬 앱 기동 후 실제 세션으로 장면9까지 진행 — 미션2가 2턴째(예전 3턴째)에 뜨고,
+`mission_revealed_at_turn=2`로 저장되며, 3·4턴 두 번 다 대화가 이어진 뒤 4턴째에
+`MAX_TURNS`로 종료되는 것을 DB·API 응답 양쪽에서 확인. 응답 `maxTurns`는 4로 고정 유지됨.
+
+**별개로 확인, 미해결로 남긴 것 — "미션2가 아예 안 떴다" report 관련**: 사용자가 같이
+요청한 "프론트에서 미션2가 강제발동 조건(3턴)에도 안 뜨고 대화가 끝나버렸다"는 별도
+제보를 로컬 DB로 재현하려 했으나, 재현되지 않았다(8/14 이후 세션은 전부 미션이 떴다).
+가능성 있는 원인 두 가지를 남긴다 — 둘 다 이번 커밋 범위 밖이라 고치지 않았다:
+1. **`/respond` AI 호출 실패 시 즉시 `character_closing`으로 장면을 강제 종료하는
+   경로(B-12, D-44에서 재확정)**가 `judgeMission()` 호출(`!sceneEnded`가 조건)보다
+   먼저 장면을 닫아버릴 수 있다 — 로컬 mock은 항상 성공해서 재현 불가, 실 AI 서버
+   장애 시에만 발생 가능한 경로로 추정.
+2. **이미 문서화된 별개 이슈(U-08,
+   [mission2-success-signal-gap.md](../../docs/request/frontend/mission2-success-signal-gap.md))**
+   — 미션2가 *자연 발동*(내용 조건으로, 강제 아님)하면 `mission2Satisfied` 프론트
+   판정이 구조적으로 절대 `true`가 될 수 없어 성공 표시 없이 조용히 닫힌다. 사용자가
+   말한 "강제발동 조건(3턴)"과는 결이 다르지만, 테스터 입장에서는 둘 다 "미션2가
+   제대로 안 나타났다"로 보일 수 있어 함께 남긴다.
+
+---
+
+### D-50 · 미션 턴 예산을 최소1~최대4로, GUIDED 턴은 최대 2회까지만 무료로 재설계
+
+D-49는 미션 노출 후 "고정 2턴"만 보장했다. 사용자(백엔드 담당) 요구: 미션은 대화 세션의
+`max_turns`와 완전히 무관하게 **자체 예산(최소 1 ~ 최대 4턴)**을 가져야 하고, 그 안에서
+캐릭터가 GUIDED(유도)로 응답한 턴은 턴 소모 없이 지나가야 한다 — 아이가 방향을 못 잡고
+있을 때 유도 한 번 했다고 기회가 줄어들면 안 된다는 취지.
+
+**1차 구현**: `ProgressJudge`의 판단 1단계를 미션 활성 여부로 완전히 분기했다.
+- 미션 비활성: 기존 D-29 로직 그대로(장면 `max_turns` 기준).
+- 미션 활성: 장면의 `max_turns`는 더 이상 보지 않고, `StorySession.missionEngagedTurns`
+  (미션 노출 후 GUIDED가 아닌 턴 수)만 본다 — `< 1`이면 GOAL_MET 유예, `>= 4`면
+  MAX_TURNS로 무조건 닫는다. `MessageServiceImpl`이 각 턴 응답의 `effectiveMode`가
+  `NORMAL`일 때만 `session.recordMissionEngagedTurn()`을 호출해 카운트한다.
+
+**문제 발견**: 로컬에서 실제로 돌려보니(필수 요소가 채워지지 않는 발화를 반복 입력)
+`ProgressJudge` 2·3단계(강한 유도 제한 → 정체 시 GUIDED) 특성상 GUIDED 다음 턴은
+`previousWasGuided` 규칙으로 무조건 NORMAL이 되고, NORMAL 다음엔 정체 조건이 다시
+쌓여 GUIDED가 재발동되는 식으로 **NORMAL·GUIDED가 거의 1:1로 번갈아 나왔다**. GUIDED가
+전부 무료면 이 패턴이 무한히 반복돼도 안 닫힌다 — 장면7·9 둘 다 10턴까지 진행되는 것을
+실측으로 확인(사용자가 우려한 "가이드가 반복되면 턴이 무한대로 반복될 수 있겠다"가
+그대로 재현됨).
+
+**2차 구현 (사용자 요청)**: GUIDED 무료 횟수에도 상한을 뒀다.
+`MissionTrigger.FREE_GUIDED_TURNS_AFTER_REVEAL = 2` — 미션 노출 후 GUIDED 응답은
+**2회까지만** 무료로 넘어가고, 3회째부터는 `NORMAL`과 똑같이 `missionEngagedTurns`를
+소모한다. `StorySession`에 `missionFreeGuidedTurnsUsed`(장면 전환·미션 재노출 시 0으로
+초기화)를 추가해 세었다. `ProgressJudge`의 판단 로직 자체는 안 건드렸다 — "이 턴이
+예산을 쓰는가"는 여전히 `MessageServiceImpl`이 `effectiveMode`와 무료 횟수를 보고
+정하고, `ProgressJudge`는 그 결과(`missionEngagedTurns`)만 본다.
+
+- ponytail: 이 상한(2회)도 궁극적으로는 무한 루프를 아예 막는 하드 캡은 아니다 —
+  GUIDED가 아니라 NORMAL/GUIDED가 아닌 다른 사유로 대화가 안 끝나는 경로가 새로
+  생기면 같은 문제가 재발할 수 있다. 지금은 실측으로 확인된 유일한 무한 루프
+  경로(GUIDED 반복)만 막았다. 다른 경로가 보고되면 그때 다시 본다.
+
+**변경 파일**: `MissionTrigger`(`FREE_GUIDED_TURNS_AFTER_REVEAL` 추가),
+`ProgressJudge`(`MISSION_MIN/MAX_TURNS_AFTER_REVEAL`로 D-49의 `MISSION_TURN_BUDGET`
+대체, 판단 1단계를 미션 활성/비활성으로 분기), `ProgressInput`(`missionEngagedTurns`
+추가), `StorySession`(`missionEngagedTurns`·`missionFreeGuidedTurnsUsed` 컬럼 추가),
+`MessageServiceImpl`(카운팅 연동).
+
+**로컬 DB 마이그레이션 주의**: `ddl-auto=update`는 기존 행이 있는 테이블에
+`NOT NULL` 컬럼을 기본값 없이 추가하지 못한다(`contains null values` 에러). 로컬은
+`ALTER TABLE ... ADD COLUMN ... NOT NULL DEFAULT 0`으로 직접 백필했다 — Flyway
+미도입(D-14) 상태라 배포 시에도 기존 세션 행이 있다면 같은 문제가 날 수 있다는 점을
+남겨둔다.
+
+**검증**: 전체 테스트 통과. 로컬 앱으로 장면7·9를 실제로 진행 — GUIDED 응답이 2회까지는
+무료로 넘어가고 3회째부터 예산을 소모해, 예전엔 10턴까지 갔던 반복이 9턴에 종료되는
+것을 DB(`mission_engaged_turns=4`, `mission_free_guided_turns_used=2`)·API 응답
+양쪽에서 확인.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
