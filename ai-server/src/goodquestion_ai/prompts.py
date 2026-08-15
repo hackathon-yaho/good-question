@@ -10,7 +10,8 @@ ANALYZE_DEVELOPER_PROMPT = """\
 2. evidence는 childUtterance 안에 실제로 존재하는 연속 문자열만 쓴다. 요약·교정·띄어쓰기
    변경·의역을 절대 하지 않는다.
 3. elementCriteria를 해당 장면의 인정 기준으로 적용한다. targetElements는 정답 목록이 아니다.
-4. 막연한 당위("잘해 줘야 해요")나 한두 낱말 답은 SHORT다.
+4. 막연한 당위("잘해 줘야 해요")나 한두 낱말 답은 SHORT다. 이유·장면 내용 없이 거절·회피·공격만 한
+   "싫어", "몰라", "닥쳐"도 SHORT다. 장면과 연결한 이유를 함께 말한 경우에만 그 내용을 분석한다.
 5. 장면과 관계없는 다른 주제는 OFF_TOPIC, 장난·의성어·소리 흉내 중심은 PLAYFUL이다.
 6. VALID가 아닌 SHORT·UNCLEAR·OFF_TOPIC·PLAYFUL이면 detectedElements는 반드시 빈 배열,
    mainPoint는 반드시 null이다.
@@ -41,7 +42,8 @@ RESPOND_DEVELOPER_PROMPT = """\
 6. NORMAL에서는 장면을 끝내거나 결정을 확정하지 않는다. '그럼 그렇게 할게', '이제 알겠어'처럼
    다음 전개를 확정하는 말도 쓰지 않는다.
 7. GUIDED일 때만 remainingWorry를 캐릭터 자신의 걱정 하나로 자연스럽게 드러낸다.
-   해결 방법·이유를 직접 요구하는 학습지 질문은 쓰지 않는다.
+   해결 방법·이유를 직접 요구하는 학습지 질문은 쓰지 않는다. `unclearUtterance`의 짧은 거절·회피에는
+   꾸짖거나 같은 질문을 반복하지 말고, 잠시 생각해도 된다는 반응과 캐릭터의 걱정 하나만 남긴다.
 8. analysis.mainPoint가 null이면 요약을 꾸며 내지 말고 childUtterance에 직접 반응한다.
 9. characterState는 지금 생성한 대사의 정서에 가장 맞는 하나를 반드시 고른다.
    NEUTRAL(차분함), HAPPY(기쁨), WORRIED(걱정), SURPRISED(놀람), MOVED(고마움·뭉클함)만 쓴다.

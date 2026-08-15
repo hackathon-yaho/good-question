@@ -48,13 +48,13 @@ def settings() -> Settings:
     return Settings(openai_api_key="test-openai-key", internal_token="test-internal-token-1234")
 
 
-def analyze_request() -> AnalyzeRequest:
+def analyze_request(child_utterance: str = "창피해서 계속 참아야 할 것 같아.") -> AnalyzeRequest:
     return AnalyzeRequest.model_validate(
         {
             "sceneContext": "며느리는 방귀를 참고 있다.",
             "goal": "입장을 이해시킨다.",
             "previousCharacterMessage": "말해도 될까?",
-            "childUtterance": "창피해서 계속 참아야 할 것 같아.",
+            "childUtterance": child_utterance,
             "targetElements": ["PERSPECTIVE", "EMOTION"],
             "elementCriteria": {"PERSPECTIVE": "입장을 알아림", "EMOTION": "감정이 직접 있음"},
         }
@@ -211,3 +211,17 @@ async def test_returns_timeout_only_after_three_total_attempts() -> None:
         await service.analyze(analyze_request(), "request-retry-timeout")
 
     assert len(client.responses.calls) == 3
+
+
+@pytest.mark.parametrize("utterance", ["싫어", "닥쳐!!!", "말하기 싫어요."])
+async def test_known_low_engagement_utterance_skips_the_model_and_is_short(utterance: str) -> None:
+    client = FakeOpenAI("{}")
+    service = OpenAIService(settings(), client=client)
+
+    result = await service.analyze(analyze_request(utterance), "request-low-engagement")
+
+    assert result.childIntent.value == "SHORT_RESPONSE"
+    assert result.utteranceValidity.value == "SHORT"
+    assert result.mainPoint is None
+    assert result.detectedElements == []
+    assert client.responses.calls == []
