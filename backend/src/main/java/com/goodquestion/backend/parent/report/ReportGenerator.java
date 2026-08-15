@@ -5,6 +5,7 @@ import com.goodquestion.backend.parent.entity.ElementCount;
 import com.goodquestion.backend.parent.entity.HomeGuide;
 import com.goodquestion.backend.parent.entity.RepresentativeUtterance;
 import com.goodquestion.backend.parent.entity.ReportVocabulary;
+import com.goodquestion.backend.parent.report.ai.CompetencyHint;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -100,6 +101,18 @@ public final class ReportGenerator {
                             matched ? def.strengthSeen() : def.strengthUnseen(),
                             def.next());
                 })
+                .toList();
+    }
+
+    /**
+     * parent-report-ai-generation.md 입력 — 카테고리별 matched 여부. "사실 판정은 백엔드"
+     * 원칙에 따라 이 boolean은 백엔드가 계산해서 AI에 힌트로 넘긴다. competenciesOf()와
+     * 같은 판정식을 쓴다(중복이지만 둘의 용도가 달라 하나로 합치면 오히려 읽기 어려워진다).
+     */
+    public static List<CompetencyHint> competencyHintsOf(List<String> detectedElementTypes) {
+        Set<String> seen = Set.copyOf(detectedElementTypes);
+        return CompetencyDefinitions.ALL.stream()
+                .map(def -> new CompetencyHint(def.name(), def.elements().stream().anyMatch(seen::contains)))
                 .toList();
     }
 

@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,5 +96,37 @@ public class AiMockController {
     @PostMapping("/respond")
     public Map<String, Object> respond(@RequestBody(required = false) Map<String, Object> request) {
         return Map.of("text", "그랬구나, 네 말을 들으니 마음이 좀 놓이는구나.", "characterState", "MOVED");
+    }
+
+    /** parent-report-ai-generation.md. matched 힌트대로 evidenceIndex를 채워 실제 스키마를 흉내낸다. */
+    @SuppressWarnings("unchecked")
+    @PostMapping("/report")
+    public Map<String, Object> report(@RequestBody(required = false) Map<String, Object> request) {
+        List<Map<String, Object>> utterances = request == null
+                ? List.of() : (List<Map<String, Object>>) request.getOrDefault("utterances", List.of());
+        List<Map<String, Object>> hints = request == null
+                ? List.of() : (List<Map<String, Object>>) request.getOrDefault("competencyHints", List.of());
+
+        List<Map<String, Object>> competencies = hints.stream()
+                .map(hint -> {
+                    String name = String.valueOf(hint.get("name"));
+                    boolean matched = Boolean.TRUE.equals(hint.get("matched"));
+                    Map<String, Object> card = new HashMap<>();
+                    card.put("name", name);
+                    card.put("feature", "(mock) " + name + " 관련 발화가 " + (matched ? "보였어요" : "아직 안 보였어요"));
+                    card.put("evidenceIndex", matched && !utterances.isEmpty() ? 0 : null);
+                    card.put("strength", "(mock) 잘한 점 문구");
+                    card.put("next", "(mock) 다음 질문 제안");
+                    return card;
+                })
+                .toList();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("competencies", competencies);
+        response.put("representativeIndex", utterances.isEmpty() ? null : 0);
+        response.put("representativeReason", "(mock) 생각과 까닭이 잘 이어진 발화라서 골랐어요");
+        response.put("storyQuestions", List.of("(mock) 이야기 질문 1", "(mock) 이야기 질문 2"));
+        response.put("dailyQuestions", List.of("(mock) 일상 질문 1", "(mock) 일상 질문 2"));
+        return response;
     }
 }

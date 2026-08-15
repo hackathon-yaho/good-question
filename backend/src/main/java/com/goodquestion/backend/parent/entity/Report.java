@@ -26,8 +26,10 @@ import java.util.UUID;
 /**
  * PRD 8.12 확장 (decisions.md D-24). 원 스키마(summary·strengths·next_focus 3컬럼)로는
  * 리포트 가이드가 요구하는 구조(어휘·역량 5개·사고요소 집계·대표 발화·가정 가이드)를 담을 수
- * 없어 jsonb로 확장했다. 세션 완료(M-57) 시점에 **한 번만** 생성한다 — 계산 로직을
- * 나중에 바꿔도 이미 만들어진 리포트는 그대로 남는다.
+ * 없어 jsonb로 확장했다. 세션 완료(M-57) 시점에 규칙 기반으로 **한 번 생성**한다 — 계산 로직을
+ * 나중에 바꿔도 이미 만들어진 리포트는 그대로 남는다. 다만 {@link #updateFromAi}로 AI가
+ * 백그라운드에서 competencies·representative·guide만 한 번 더 덮어쓸 수 있다
+ * (parent-report-ai-generation.md).
  */
 @Entity
 @Table(name = "reports")
@@ -88,5 +90,16 @@ public class Report {
         report.representative = representative;
         report.guide = guide;
         return report;
+    }
+
+    /**
+     * AI 생성 결과로 규칙 기반 내용을 덮어쓴다 (parent-report-ai-generation.md). 세션 완료 시
+     * 동기로 만든 규칙 기반 리포트가 이미 저장돼 있고, 이건 그 뒤 백그라운드에서 AI가 성공했을
+     * 때만 호출된다 — summary·vocabulary·elementCounts는 그대로 둔다(AI 담당 아님).
+     */
+    public void updateFromAi(List<CompetencyCard> competencies, RepresentativeUtterance representative, HomeGuide guide) {
+        this.competencies = competencies;
+        this.representative = representative;
+        this.guide = guide;
     }
 }

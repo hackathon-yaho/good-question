@@ -1571,6 +1571,62 @@ SOLUTION 슬롯이 이제 1개뿐이라) 중복으로 안 채워지는 것도 �
 
 ---
 
+### D-55 · 보호자 리포트 AI 고도화 백엔드 구현 (parent-report-ai-generation.md)
+
+설계는 그릴링으로 [parent-report-ai-generation.md](../../docs/request/ai/parent-report-ai-generation.md)에
+확정해뒀고, AI Worker의 실제 `/report` 엔드포인트가 아직 없어 로컬 mock(`AiMockController`)에
+같은 스키마로 구현해 백엔드 쪽을 먼저 완성했다.
+
+**구현**:
+- `parent/report/ai` 패키지 신규 — `ReportAiClient`/`ReportAiClientImpl`(RestClient, 응답
+  60초·재시도 없음), `ReportAiRequest`/`ReportUtterance`/`CompetencyHint`(요청),
+  `ReportAiResult`/`CompetencyAiCard`(응답). `AiRespondClientImpl`과 같은 패턴 — 실패는
+  전부 `ReportAiResult.failure()`로 묶는다.
+- `ReportAiClientImpl.isWellFormed()`가 완료조건에 적힌 제약을 전부 검증한다: `storyQuestions`·
+  `dailyQuestions` 정확히 2개, `representativeIndex`·`evidenceIndex`가 요청에 보낸 발화 개수
+  범위 안, matched=true인데 `evidenceIndex`가 `null`이면 실패. 검증을 클라이언트에서 끝내
+  서비스 레이어는 index를 그대로 믿고 조회한다.
+- `ReportGenerator.competencyHintsOf()` 신규 — matched 여부 계산은 `competenciesOf()`와 같은
+  판정식을 재사용(사실 판정은 백엔드가 하고 AI에는 힌트로만 준다는 설계 원칙 그대로).
+- `Report.updateFromAi()` 신규 — `summary`·`vocabulary`·`elementCounts`는 안 건드리고
+  `competencies`·`representative`·`guide`만 덮어쓴다.
+- `ParentReportServiceImpl.enhanceReportWithAi()` — 세션의 아이 발화 전체를 index 순으로
+  `ReportUtterance`로 조립하고, AI가 성공하면 `evidenceIndex`·`representativeIndex`로 원문을
+  백엔드가 직접 채워 넣는다(AI가 발화 원문을 직접 쓰지 않는다는 설계 원칙).
+
+**막힌 지점과 해결 — 트랜잭션 커밋 전 비동기 호출 경쟁 조건**: 처음엔
+`ActivityServiceImpl.submitRetelling()`이 `generateReportIfAbsent()` 바로 뒤에
+`parentReportService.enhanceReportWithAi(sessionId)`(`@Async`)를 직접 불렀는데, `@Async`는
+호출 즉시 다른 스레드에서 실행을 시작하는 반면 `submitRetelling()`의 트랜잭션은 메서드가 끝나야
+커밋된다 — 백그라운드 스레드가 방금 저장한 `Report` 행을 아직 못 보고 조용히 리턴할 위험이
+있었다. `ReportSessionCompletedEvent` + `ReportEnhancementListener`
+(`@TransactionalEventListener(phase = AFTER_COMMIT)`)로 바꿔, 커밋이 끝난 뒤에만 이벤트가
+발행되도록 했다. 리스너는 반드시 **다른 빈**(`ParentReportServiceImpl`)의 `@Async` 메서드를
+호출해야 한다 — 같은 클래스 안에서 자기 자신의 `@Async`·`@Transactional` 메서드를 부르면
+프록시를 안 거쳐 두 어노테이션이 조용히 무시된다(Spring 자기호출 함정).
+`GoodQuestionApplication`에 `@EnableAsync` 추가.
+
+**검증**: 로컬 mock으로 이야기 1편을 처음부터 끝까지(장면1~9 + 활동 + 재구성 발화 제출)
+완주 — `submitRetelling` 응답은 그대로 즉시 오고, 곧바로 `GET /parent/reports/{id}`를 폴링해
+AI 버전으로 덮어써진 것을 확인. 5개 역량 카드의 `evidence`가 카테고리마다 다른 발화를 가리키는
+것(matched=false 2개는 `null`, 나머지 3개는 실제 발화 원문)까지 확인 — 배포에서 봤던 "5개 카드
+전부 동일 문장" 문제가 해소됐다. `AiMockController`의 `/report`를 일부러 예외를 던지게 바꿔
+재기동한 뒤 같은 시나리오를 다시 돌려, 규칙 기반 리포트(하드코딩된 질문·재사용 evidence)가
+그대로 유지되는 것도 확인 — 완료조건 3번(AI 실패 시 규칙 기반 유지). 단위 테스트
+`ReportAiClientImplTest`(6건), `ReportGeneratorTest`(신규 3건) 추가, 전체 120/120 통과.
+
+**아직 안 한 것**: 실제 AI Worker `/report`는 AI팀 몫(request 문서 완료조건 1). "다른 이야기에도
+하드코딩 없이 생성"(완료조건 5)은 지금 시스템에 이야기가 1편뿐이라 직접 검증은 못 했다 —
+다만 `storyTitle`을 매 요청에 실어 보내고 백엔드 코드 어디에도 이야기별 분기가 없어 구조적으로는
+막혀있지 않다.
+
+**변경 파일**: `parent/report/ai/*`(신규), `Report.java`, `ReportGenerator.java`,
+`ParentReportService(Impl).java`, `ReportSessionCompletedEvent.java`(신규),
+`ReportEnhancementListener.java`(신규), `ActivityServiceImpl.java`, `GoodQuestionApplication.java`,
+`application.yml`, `AiMockController.java`(검증용 `/report` mock).
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
