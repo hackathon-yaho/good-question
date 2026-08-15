@@ -19,6 +19,9 @@ D-50 최신 코드의 `StorySession`은 `mission_engaged_turns`, `mission_free_g
 
 ## 완료 조건
 
-- [ ] 기존 DB로 백엔드를 재시작해도 두 컬럼 누락 SQL 오류가 없다.
-- [ ] `POST /api/auth/dev-login` 뒤 `GET /api/children`이 200으로 응답한다.
-- [ ] 기존 `story_sessions` 행이 삭제·초기화되지 않는다.
+- [x] 기존 DB로 백엔드를 재시작해도 두 컬럼 누락 SQL 오류가 없다. `StorySession.java`에
+      `columnDefinition = "integer not null default 0"` 지정 — 로컬 DB에서 두 컬럼을 지운 뒤
+      (행 43개 보존 상태) 재기동해 `ddl-auto=update`가 DEFAULT 0 NOT NULL로 안전하게
+      복구함을 확인 (2026-08-15).
+- [x] `POST /api/auth/dev-login` 뒤 `GET /api/children`이 200으로 응답한다.
+- [x] 기존 `story_sessions` 행이 삭제·초기화되지 않는다. 재기동 전후 `count(*) = 43`으로 동일.
