@@ -5,7 +5,7 @@ from typing import Any
 from httpx import ASGITransport, AsyncClient
 
 from goodquestion_ai.config import Settings
-from goodquestion_ai.errors import ModelTimeoutError
+from goodquestion_ai.errors import ModelTimeoutError, ModelUpstreamError
 from goodquestion_ai.main import create_app
 from goodquestion_ai.schemas import (
     AnalyzeRequest,
@@ -69,6 +69,11 @@ class FakeService:
 class TimeoutService(FakeService):
     async def analyze(self, request: AnalyzeRequest, request_id: str) -> AnalyzeResponse:
         raise ModelTimeoutError
+
+
+class UpstreamService(FakeService):
+    async def analyze(self, request: AnalyzeRequest, request_id: str) -> AnalyzeResponse:
+        raise ModelUpstreamError
 
 
 @asynccontextmanager
@@ -156,4 +161,17 @@ async def test_model_timeout_is_stable_504_error() -> None:
 
     assert response.status_code == 504
     assert response.json()["code"] == "MODEL_TIMEOUT"
+    assert response.json()["requestId"] == response.headers["X-Request-Id"]
+
+
+async def test_model_upstream_failure_is_stable_502_error() -> None:
+    async with make_client(UpstreamService()) as client:
+        response = await client.post(
+            "/analyze",
+            headers={"X-Internal-Token": TOKEN},
+            json=analyze_payload(),
+        )
+
+    assert response.status_code == 502
+    assert response.json()["code"] == "MODEL_UPSTREAM_ERROR"
     assert response.json()["requestId"] == response.headers["X-Request-Id"]

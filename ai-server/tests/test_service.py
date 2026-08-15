@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from goodquestion_ai.config import Settings
-from goodquestion_ai.errors import ModelUpstreamError
+from goodquestion_ai.errors import ModelTimeoutError, ModelUpstreamError
 from goodquestion_ai.schemas import AnalyzeRequest, AnalyzeResponse, RespondRequest, RespondResponse
 from goodquestion_ai.service import OpenAIService
 
@@ -24,6 +24,24 @@ class FakeResponses:
 class FakeOpenAI:
     def __init__(self, output_text: str) -> None:
         self.responses = FakeResponses(output_text)
+
+
+class SequenceResponses:
+    def __init__(self, outcomes: list[str | Exception]) -> None:
+        self.outcomes = outcomes
+        self.calls: list[dict[str, Any]] = []
+
+    async def parse(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(output_parsed=json.loads(outcome))
+
+
+class SequenceOpenAI:
+    def __init__(self, outcomes: list[str | Exception]) -> None:
+        self.responses = SequenceResponses(outcomes)
 
 
 def settings() -> Settings:
@@ -64,7 +82,7 @@ def test_client_disables_sdk_retries() -> None:
 
     assert client_constructor.call_args.kwargs == {
         "api_key": "test-openai-key",
-        "timeout": 5.0,
+        "timeout": 10.0,
         "max_retries": 0,
     }
 
@@ -161,3 +179,35 @@ async def test_response_rejects_incomplete_character_lines() -> None:
 
     with pytest.raises(ModelUpstreamError):
         await service.respond(respond_request(), "request-incomplete")
+
+
+async def test_retries_transient_model_failure_until_a_valid_response_arrives() -> None:
+    parsed = {
+        "childIntent": "PERSPECTIVE",
+        "mainPoint": "창피해서 참는다",
+        "detectedElements": [],
+        "utteranceValidity": "VALID",
+    }
+    client = SequenceOpenAI(
+        [
+            TimeoutError(),
+            TimeoutError(),
+            AnalyzeResponse.model_validate(parsed).model_dump_json(),
+        ]
+    )
+    service = OpenAIService(settings(), client=client)
+
+    result = await service.analyze(analyze_request(), "request-retry-success")
+
+    assert result.mainPoint == "창피해서 참는다"
+    assert len(client.responses.calls) == 3
+
+
+async def test_returns_timeout_only_after_three_total_attempts() -> None:
+    client = SequenceOpenAI([TimeoutError(), TimeoutError(), TimeoutError()])
+    service = OpenAIService(settings(), client=client)
+
+    with pytest.raises(ModelTimeoutError):
+        await service.analyze(analyze_request(), "request-retry-timeout")
+
+    assert len(client.responses.calls) == 3

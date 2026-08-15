@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     internal_token: SecretStr = Field(validation_alias="AI_INTERNAL_TOKEN", min_length=16)
     openai_model: str = Field(default="gpt-5-mini", validation_alias="OPENAI_MODEL")
     openai_timeout_seconds: float = Field(
-        default=5.0,
+        default=10.0,
         gt=0,
         le=30,
         validation_alias="OPENAI_TIMEOUT_SECONDS",

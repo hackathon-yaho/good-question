@@ -2,9 +2,16 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Callable
 from typing import Any, TypeVar
 
-from openai import APITimeoutError, AsyncOpenAI
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncOpenAI,
+    InternalServerError,
+    RateLimitError,
+)
 from openai.types.shared_params import Reasoning
 from pydantic import BaseModel, ValidationError
 
@@ -40,6 +47,16 @@ LOW_INFORMATION_INTENTS = {
     UtteranceValidity.PLAYFUL: ChildIntent.PLAYFUL,
 }
 
+# The product decision is a 10-second deadline, including the initial request,
+# with at most three total attempts.  The SDK must not add hidden retries.
+MAX_MODEL_ATTEMPTS = 3
+ATTEMPT_TIMEOUT_SECONDS = 3.0
+RETRY_BACKOFF_SECONDS = (0.1, 0.2)
+
+
+class _RetryableModelOutputError(Exception):
+    """A completed model request whose structured output cannot be used."""
+
 
 class OpenAIService:
     """Stateless OpenAI Responses client for analysis and character dialogue only."""
@@ -71,11 +88,9 @@ class OpenAIService:
             max_output_tokens=self._settings.respond_max_output_tokens,
             operation="respond",
             request_id=request_id,
+            result_is_acceptable=lambda result: self._is_safe_character_line(result.text),
         )
-        if self._is_safe_character_line(result.text):
-            return result
-        logger.warning("model_unsafe_response operation=respond request_id=%s", request_id)
-        raise ModelUpstreamError
+        return result
 
     async def _parse(
         self,
@@ -86,60 +101,97 @@ class OpenAIService:
         max_output_tokens: int,
         operation: str,
         request_id: str,
+        result_is_acceptable: Callable[[T], bool] | None = None,
     ) -> T:
         reasoning: Reasoning = {"effort": self._settings.openai_reasoning_effort}
-        try:
-            response = await asyncio.wait_for(
-                self._client.responses.parse(
-                    model=self._settings.openai_model,
-                    instructions=prompt,
-                    input=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
-                    text_format=response_model,
-                    max_output_tokens=max_output_tokens,
-                    reasoning=reasoning,
-                    store=False,
-                ),
-                timeout=self._settings.openai_timeout_seconds,
-            )
-        except (TimeoutError, APITimeoutError) as exc:
-            logger.warning("model_timeout operation=%s request_id=%s", operation, request_id)
-            raise ModelTimeoutError from exc
-        except Exception as exc:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._settings.openai_timeout_seconds
+        last_error: ModelTimeoutError | ModelUpstreamError | None = None
+        last_cause: Exception | None = None
+
+        for attempt in range(1, MAX_MODEL_ATTEMPTS + 1):
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise ModelTimeoutError from last_error
+
+            try:
+                response = await asyncio.wait_for(
+                    self._client.responses.parse(
+                        model=self._settings.openai_model,
+                        instructions=prompt,
+                        input=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                        text_format=response_model,
+                        max_output_tokens=max_output_tokens,
+                        reasoning=reasoning,
+                        store=False,
+                    ),
+                    timeout=min(ATTEMPT_TIMEOUT_SECONDS, remaining),
+                )
+                parsed = getattr(response, "output_parsed", None)
+                if parsed is None:
+                    raise _RetryableModelOutputError("empty_output")
+                result = (
+                    parsed
+                    if isinstance(parsed, response_model)
+                    else response_model.model_validate(parsed)
+                )
+                if result_is_acceptable is not None and not result_is_acceptable(result):
+                    raise _RetryableModelOutputError("unsafe_output")
+            except (TimeoutError, APITimeoutError) as exc:
+                last_error = ModelTimeoutError()
+                last_cause = exc
+                error_kind = "timeout"
+            except (
+                APIConnectionError,
+                InternalServerError,
+                RateLimitError,
+                ValidationError,
+                _RetryableModelOutputError,
+            ) as exc:
+                last_error = ModelUpstreamError()
+                last_cause = exc
+                error_kind = "upstream"
+            except Exception as exc:
+                logger.warning(
+                    "model_non_retryable_error operation=%s request_id=%s error_type=%s",
+                    operation,
+                    request_id,
+                    type(exc).__name__,
+                )
+                raise ModelUpstreamError from exc
+            else:
+                logger.info(
+                    "model_completed operation=%s request_id=%s model=%s attempt=%s",
+                    operation,
+                    request_id,
+                    self._settings.openai_model,
+                    attempt,
+                )
+                return result
+
+            if attempt == MAX_MODEL_ATTEMPTS:
+                logger.warning(
+                    "model_failed operation=%s request_id=%s error_kind=%s attempts=%s",
+                    operation,
+                    request_id,
+                    error_kind,
+                    attempt,
+                )
+                raise last_error from last_cause
+
+            delay = min(RETRY_BACKOFF_SECONDS[attempt - 1], max(0.0, deadline - loop.time()))
+            if delay <= 0:
+                raise ModelTimeoutError from last_cause
             logger.warning(
-                "model_upstream_error operation=%s request_id=%s error_type=%s",
+                "model_retry operation=%s request_id=%s error_kind=%s next_attempt=%s",
                 operation,
                 request_id,
-                type(exc).__name__,
+                error_kind,
+                attempt + 1,
             )
-            raise ModelUpstreamError from exc
+            await asyncio.sleep(delay)
 
-        parsed = getattr(response, "output_parsed", None)
-        if parsed is None:
-            logger.warning("model_empty_output operation=%s request_id=%s", operation, request_id)
-            raise ModelUpstreamError
-
-        try:
-            result = (
-                parsed
-                if isinstance(parsed, response_model)
-                else response_model.model_validate(parsed)
-            )
-        except ValidationError as exc:
-            logger.warning(
-                "model_invalid_output operation=%s request_id=%s error_type=%s",
-                operation,
-                request_id,
-                type(exc).__name__,
-            )
-            raise ModelUpstreamError from exc
-
-        logger.info(
-            "model_completed operation=%s request_id=%s model=%s",
-            operation,
-            request_id,
-            self._settings.openai_model,
-        )
-        return result
+        raise ModelTimeoutError
 
     @staticmethod
     def _filter_analysis(result: AnalyzeResponse, request: AnalyzeRequest) -> AnalyzeResponse:
