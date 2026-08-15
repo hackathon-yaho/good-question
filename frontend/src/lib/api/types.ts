@@ -98,6 +98,7 @@ export type UtteranceResponse = {
     missionId: string;
     satisfiedIndexes: number[];
   };
+  characterState?: string | null;
   highlightWords: HighlightWord[];
 };
 

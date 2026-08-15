@@ -35,7 +35,9 @@
 
 "use client";
 
+import Image from "next/image";
 import type { MissionTrigger } from "@/lib/api/types";
+import { MISSION1_SAFE_PLAN_IMAGE } from "@/lib/story-images";
 
 type Props = {
   mission: MissionTrigger;
@@ -58,6 +60,17 @@ export function MissionCard({ mission, doneCount = 0, satisfiedIndexes, showHint
         <h3 className="mb-3 text-parent-title font-bold text-text">
           {mission.title}
         </h3>
+      </div>
+
+      {/* 미션 1 장면 이미지 — 안전하게 배를 떨어뜨릴 방법 */}
+      <div className="relative mb-3 aspect-[16/10] w-full shrink-0 overflow-hidden rounded-bubble">
+        <Image
+          src={MISSION1_SAFE_PLAN_IMAGE}
+          alt="안전하게 배를 떨어뜨릴 방법"
+          fill
+          className="object-contain"
+          sizes="(max-width: 768px) 100vw, 50vw"
+        />
       </div>
 
       {/* 4가지 관찰/생각 항목 가이드 리스트 — 서버가 만족시킨 항목만 "완료"로 표시 */}

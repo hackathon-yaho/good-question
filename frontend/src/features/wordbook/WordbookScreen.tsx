@@ -104,13 +104,12 @@ export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
           </p>
         </div>
       ) : (
-        // 4열 분기는 `lg:`(1024px)다. `xl:`(1280px)이면 태블릿 1133·1180px이
-        // 2열로 떨어진다 — 이야기 목록과 같은 이유다.
-        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        // 3열 + 최소 width로 모바일에서도 카드가 너무 작아지지 않게 한다
+        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {words.map((word, index) => (
             <li
               key={word.id}
-              className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5 shadow-soft"
+              className="flex min-w-[260px] flex-col gap-3 rounded-card border border-border bg-surface p-5 shadow-soft"
             >
               <div className="flex items-start justify-between gap-2">
                 <button
@@ -150,9 +149,17 @@ export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
                   }
                   aria-pressed={word.liked}
                   onClick={() => void toggleLiked(word.id, !word.liked)}
-                  className="flex size-touch items-center justify-center rounded-full text-xl"
+                  className="flex size-touch items-center justify-center rounded-full"
                 >
-                  {word.liked ? "❤️" : "🤍"}
+                  {word.liked ? (
+                    <svg viewBox="0 0 24 24" className="size-6 text-red-500" fill="currentColor" stroke="none">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="size-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </li>
@@ -188,9 +195,17 @@ export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
                 }
                 aria-pressed={open.liked}
                 onClick={() => void toggleLiked(open.id, !open.liked)}
-                className="flex size-14 items-center justify-center rounded-full text-3xl"
+                className="flex size-14 items-center justify-center rounded-full"
               >
-                {open.liked ? "❤️" : "🤍"}
+                {open.liked ? (
+                  <svg viewBox="0 0 24 24" className="size-8 text-red-500" fill="currentColor" stroke="none">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="size-8 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                  </svg>
+                )}
               </button>
             </div>
 

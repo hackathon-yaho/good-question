@@ -52,7 +52,7 @@ import { contentApi as defaultContentApi } from "@/lib/api";
 import type { ContentApi, HighlightWord, PlayApi } from "@/lib/api/types";
 import { getSelectedChildId } from "@/lib/client-store";
 import { STORY_ID } from "@/mocks/story-banggui";
-import { getSceneBackgroundImageByOrder, getCharacterImage, MISSION1_SAFE_PLAN_IMAGE } from "@/lib/story-images";
+import { getSceneBackgroundImageByOrder, getCharacterImage } from "@/lib/story-images";
 import { PlayState, isCharacterTurn, type SceneType } from "@/lib/play-state";
 import { playTurnChime } from "@/lib/sound";
 import { RESPOND_TIMEOUT_MS } from "@/lib/api/speech";
@@ -107,12 +107,11 @@ export function PlayScreen({
   const displayName = scene?.characterDisplayName ?? "";
   // 서버가 backgroundImageUrl을 내려주지 않으면 프론트 정적 에셋으로 대체
   // 백엔드는 sceneId로 UUID를 사용하므로 sceneOrder(1~9)로 매핑한다
-  // 미션1 브리프가 열려 있으면 미션 이미지를 좌측 패널 배경으로 표시
-  const backgroundImageUrl = state.missionBriefOpen && state.mission?.id !== "mission_2"
-    ? MISSION1_SAFE_PLAN_IMAGE
-    : (scene?.backgroundImageUrl ?? getSceneBackgroundImageByOrder(scene?.sceneOrder ?? 0));
-  // 서버가 characterImageUrl을 내려주지 않으면 프론트 정적 에셋(중립 표정)으로 대체
-  const characterImageUrl = scene?.characterImageUrl ?? getCharacterImage(scene?.characterName ?? "");
+  const backgroundImageUrl = scene?.backgroundImageUrl ?? getSceneBackgroundImageByOrder(scene?.sceneOrder ?? 0);
+  // 서버가 characterImageUrl을 내려주지 않으면 프론트 정적 에셋으로 대체
+  // characterState가 있으면 해당 표정 이미지로 변경
+  const characterImageUrl = scene?.characterImageUrl
+    ?? getCharacterImage(scene?.characterName ?? "", state.characterState ?? undefined);
 
 
 
@@ -158,10 +157,14 @@ export function PlayScreen({
       .then((snapshot) => {
         if (alive) {
           dispatch({ type: "HYDRATE", snapshot });
-          // 이어하기로 진입 시 INTRO가 아닌 상태면 바로 audioUnlock (TTS 재생)
+          // 이어하기로 진입 시 INTRO가 아닌 상태면 audioUnlock (TTS 재생).
+          // unlockAudio()는 호출하지 않는다 — STT에 영향을 줄 수 있다.
           if (snapshot.currentScene.sceneType !== "intro") {
-            unlockAudio();
             setAudioUnlocked(true);
+          }
+          // dialogue 장면 이어하기면 STT가 켜져 있을 수 있으니 중지한다
+          if (snapshot.currentScene.sceneType === "dialogue" && stt) {
+            stt.stop();
           }
         }
       })
