@@ -18,12 +18,14 @@
 
 "use client";
 
+import Image from "next/image";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { resetAllMockSessions } from "@/lib/api/mock";
 import { resetMockAccount } from "@/lib/api/mock-account";
 import { resetMockWordbook } from "@/lib/api/mock-content";
+import { STORY_COVER_IMAGE } from "@/lib/story-images";
 import {
   authApi,
   clearMockSession,
@@ -100,10 +102,15 @@ export function LoginScreen() {
           아이가 자기 생각을 말로 꺼냅니다.
         </p>
 
-        <p className="text-parent-body text-muted">
-          {/* 일러스트가 도착하면 이 패널을 이미지로 교체한다. (assets.md §3-1) */}
-          일러스트 준비 중
-        </p>
+        <div className="relative h-48 w-full max-w-md">
+          <Image
+            src={STORY_COVER_IMAGE}
+            alt=""
+            fill
+            className="object-contain"
+            sizes="(max-width: 768px) 100vw, 50vw"
+          />
+        </div>
       </aside>
 
       {/* 우 45% 폼 */}
@@ -148,30 +155,28 @@ export function LoginScreen() {
             아동 개인정보는 보호자 동의 후에만 처리합니다.
           </p>
 
-          {process.env.NODE_ENV === "development" ? (
-            <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
-              <p className="text-sm text-muted">
-                개발용 · 연동 모드 <b>{API_MODE}</b>
-              </p>
-              {API_MODE === "backend" ? (
-                <button
-                  type="button"
-                  onClick={() => void devLogin()}
-                  disabled={pending}
-                  className="text-sm text-muted underline"
-                >
-                  카카오 없이 로그인 (dev-login)
-                </button>
-              ) : null}
+          <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
+            <p className="text-sm text-muted">
+              연동 모드 <b>{API_MODE}</b>
+            </p>
+            {API_MODE === "backend" ? (
               <button
                 type="button"
-                onClick={resetDemo}
+                onClick={() => void devLogin()}
+                disabled={pending}
                 className="text-sm text-muted underline"
               >
-                데모 상태 초기화
+                카카오 없이 로그인 (dev-login)
               </button>
-            </div>
-          ) : null}
+            ) : null}
+            <button
+              type="button"
+              onClick={resetDemo}
+              className="text-sm text-muted underline"
+            >
+              데모 상태 초기화
+            </button>
+          </div>
         </div>
       </main>
     </div>
