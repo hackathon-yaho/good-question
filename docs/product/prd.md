@@ -673,7 +673,7 @@ missingElements = requiredElements − 새 accumulatedElements
 | PLAYFUL / OFF_TOPIC / validity PLAYFUL | `playfulUtterance` | 장난을 실제 사건으로 단정하지 않고 받아침 |
 | QUESTION | `questionFromChild` | 질문에 먼저 답함 |
 | SOLUTION intent 또는 detected | `proposalFromChild` | 제안의 도움 되는 점 인정, 중간 턴에서는 걱정 하나만 |
-| SHORT / UNCLEAR 등 | `unclearUtterance` | 필요할 때만 짧게 되물음 |
+| SHORT / UNCLEAR 등 | `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용, GUIDED에서는 되묻지 않고 캐릭터의 구체적 걱정을 드러냄 |
 | EMPATHY detected 등 | `empathyFromChild` / `directResponse` | 공감 반응 |
 | 의견·반박·결정 등 | `disagreement` | 무조건 부정하지 않고 걱정 하나 |
 | CLOSING | `directResponse` | 마무리 톤 (중간 턴 "장면 닫지 말 것"과 충돌 방지) |

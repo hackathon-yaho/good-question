@@ -127,7 +127,7 @@ AI 서버 기본 주소는 끝 슬래시 없이 `AI_SERVER_BASE_URL`에 둔다. 
 {
   "status": "ok",
   "model": "gpt-5-mini",
-  "promptVersions": { "analyze": "analyze_v3", "respond": "respond_v5" }
+  "promptVersions": { "analyze": "analyze_v3", "respond": "respond_v6" }
 }
 ```
 
