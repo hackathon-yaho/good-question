@@ -300,7 +300,7 @@ AI가 반환한 분석 결과를 그대로 신뢰하지 않고 검증한다.
 | 조건 | 결과 |
 | --- | --- |
 | `turnCount >= preferred_turns` AND missing 없음 | `CLOSING` / `GOAL_MET` |
-| missing 있음 + (저정보 2연속 OR 신규요소없음 2연속 OR 남은턴 ≤ 2) | `GUIDED` |
+| missing 있음 + (명백한 0정보 거절·회피·거친 말 OR 저정보 2연속 OR 신규요소없음 2연속 OR 남은턴 ≤ 2) | `GUIDED` |
 | GUIDED 보호 횟수가 장면당 2회 미만 | 해당 GUIDED는 진행·미션 턴을 소모하지 않고 `MAX_TURNS`보다 우선 |
 | `turnCount >= max_turns`이고 GUIDED 보호 없음 | `CLOSING` / `MAX_TURNS` |
 | 첫 발화 / 신규 요소 있음 | `NORMAL` 강제 (단, GUIDED 보호가 우선) |
@@ -318,7 +318,7 @@ AI가 반환한 분석 결과를 그대로 신뢰하지 않고 검증한다.
 
 ```
 1. 목표 충족 종료 확인   (요소 충족+최소턴)
-2. GUIDED 필요성·보호 확인 (missing 있음 + 정체 / 저정보 / 남은턴 부족 / 보호 2회 미만)
+2. GUIDED 필요성·보호 확인 (missing 있음 + 명백한 0정보 발화 / 정체 / 저정보 / 남은턴 부족 / 보호 2회 미만)
 3. 최대 턴 종료 확인     (GUIDED 보호가 없을 때만)
 4. 일반 반응 제한 확인   (첫 발화 / 신규 요소 있음)
 5. 해당 없으면 NORMAL
