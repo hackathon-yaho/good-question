@@ -551,7 +551,7 @@ missingElements = requiredElements − 새 accumulatedElements
 | 조건 | 결과 |
 | --- | --- |
 | `turnCount >= preferred_turns` 이고 missing 없음 | `CLOSING`, `endReason = GOAL_MET` |
-| missing 있고, 저정보 2회 연속 또는 신규 요소 없음 2회 또는 남은 턴 ≤ 2 | `GUIDED` + `guidanceTarget` |
+| missing 있고, 명백한 0정보 거절·회피·거친 말 또는 저정보 2회 연속 또는 신규 요소 없음 2회 또는 남은 턴 ≤ 2 | `GUIDED` + `guidanceTarget` |
 | GUIDED 보호 횟수가 장면당 2회 미만 | 해당 GUIDED 턴은 진행·미션 턴을 소모하지 않고 `CLOSING`보다 우선 |
 | `turnCount >= max_turns`이고 GUIDED 보호 없음 | `CLOSING`, `endReason = MAX_TURNS` |
 | 첫 아이 발화 / 이번 턴 신규 요소 있음 | `NORMAL` 강제 (단, 위 GUIDED 보호 조건이 우선) |
@@ -573,6 +573,7 @@ missingElements = requiredElements − 새 accumulatedElements
 
 2. GUIDED 필요성·보호 확인
    ├─ 필수 요소가 남아 있음
+   ├─ 명백한 0정보 거절·회피·거친 말(첫 발화도 즉시 후보)
    ├─ 짧거나 불명확한 발화가 반복됨
    ├─ 여러 턴 동안 새로운 사고 요소가 확인되지 않음
    ├─ 장면 종료까지 남은 대화 기회가 적음
@@ -589,6 +590,10 @@ missingElements = requiredElements − 새 accumulatedElements
 ```
 
 진행 판단의 핵심은 한 발화의 점수만 보는 것이 아니라, 누적된 사고 요소와 최근 대화 흐름을 함께 보는 것이다.
+
+여기서 명백한 0정보 거절·회피·거친 말은 `싫어`, `몰라`, `모르겠어`, `닥쳐`, STT 오인식 `닥처`처럼
+장면의 사고 요소가 전혀 확인되지 않는 한마디 발화를 말한다. 주최측의 "반복" 기준은 일반적인 짧은
+발화에 적용하고, 이 경우만 팀 운영 정책으로 **첫 발화부터** GUIDED 보호 후보로 처리한다.
 
 진행 판단에 사용하는 상태:
 

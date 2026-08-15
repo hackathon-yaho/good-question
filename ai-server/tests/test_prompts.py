@@ -17,5 +17,6 @@ def test_respond_prompt_contains_child_ux_guards() -> None:
     assert "remainingWorry의 핵심 대상·상황" in RESPOND_DEVELOPER_PROMPT
     assert "장면 질문 하나" in RESPOND_DEVELOPER_PROMPT
     assert "무응답·꾸짖음·욕설 되풀이" in RESPOND_DEVELOPER_PROMPT
+    assert "거친 말" in RESPOND_DEVELOPER_PROMPT
     assert "이장·시아버지의" in RESPOND_DEVELOPER_PROMPT
     assert "characterState" in RESPOND_DEVELOPER_PROMPT
