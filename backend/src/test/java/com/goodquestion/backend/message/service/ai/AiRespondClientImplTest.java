@@ -46,4 +46,41 @@ class AiRespondClientImplTest {
 
         assertThat(receivedToken.get()).isEqualTo("secret-token");
     }
+
+    /** ai-retry-deadline-v2.md 완료조건 — 502(MODEL_UPSTREAM_ERROR)도 실패로 처리되는지 확인. */
+    @Test
+    void respond_호출시_502를_받으면_실패를_반환한다() throws IOException {
+        assertFailureOnStatus(502);
+    }
+
+    /** ai-retry-deadline-v2.md 완료조건 — 504(MODEL_TIMEOUT)도 502와 동일하게 실패로 처리되는지 확인.
+     * AiRespondClientImpl은 상태 코드로 분기하지 않고 모든 예외를 failure()로 묶어, 이 경로가
+     * MessageServiceImpl의 B-12 안전 폴백(character_closing)으로 그대로 이어진다. */
+    @Test
+    void respond_호출시_504를_받으면_실패를_반환한다() throws IOException {
+        assertFailureOnStatus(504);
+    }
+
+    private void assertFailureOnStatus(int status) throws IOException {
+        HttpServer errorServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        errorServer.createContext("/respond", exchange -> {
+            byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        errorServer.start();
+        try {
+            String baseUrl = "http://localhost:" + errorServer.getAddress().getPort();
+            AiRespondClientImpl client = new AiRespondClientImpl(baseUrl, 5, "secret-token");
+
+            RespondAiResult result = client.respond(new RespondAiRequest("며느리", "조심스러운 말투", "장면 맥락",
+                    "직전 대사", "아이 발화", new RespondAnalysisPayload("OPINION", null), "NORMAL",
+                    "directResponse", null, null));
+
+            assertThat(result.success()).isFalse();
+        } finally {
+            errorServer.stop(0);
+        }
+    }
 }
