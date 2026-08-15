@@ -43,8 +43,19 @@ public class AiMockController {
             );
         }
 
+        if (looksLikeProposal) {
+            return Map.of(
+                    "childIntent", "SOLUTION",
+                    "mainPoint", "방귀로 배를 떨어뜨리자는 제안이다",
+                    "detectedElements", List.of(
+                            Map.of("type", "SOLUTION", "evidence", "방귀")
+                    ),
+                    "utteranceValidity", "VALID"
+            );
+        }
+
         return Map.of(
-                "childIntent", looksLikeProposal ? "SOLUTION" : "PERSPECTIVE",
+                "childIntent", "PERSPECTIVE",
                 "mainPoint", "며느리가 창피해서 참았던 것 같다",
                 "detectedElements", List.of(
                         Map.of("type", "PERSPECTIVE", "evidence", "창피해서 계속 참았던 것 같아요")

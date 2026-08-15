@@ -146,8 +146,13 @@ public class MessageServiceImpl implements MessageService {
                 turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission,
                 missionRevealedAtTurn, missionEngagedTurns, explicitZeroInfoRejection, guidedTurnProtectionUsed));
 
-        // 보호 턴이면 currentChildTurnCount·미션 진행 턴을 그대로 둔다 (low-engagement-turn-protection.md).
-        int turnCount = decision.protectedTurn() ? session.getCurrentChildTurnCount() : candidateTurnCount;
+        // 보호 턴이거나 미션이 이미 노출된 상태면 currentChildTurnCount를 그대로 둔다. 미션은
+        // missionEngagedTurns라는 자체 턴 예산을 쓰므로(D-50), 응답의 turnCount는 미션 노출 순간
+        // 값에 고정된다 — 안 그러면 미션 중 NORMAL/예산-소모 GUIDED 턴마다 계속 늘어나 maxTurns를
+        // 훌쩍 넘겨버린다 (원래 장면의 maxTurns와 아무 관계가 없어지는데도 그대로 노출됐던 버그).
+        int turnCount = (decision.protectedTurn() || missionRevealedAtTurn != null)
+                ? session.getCurrentChildTurnCount()
+                : candidateTurnCount;
 
         // ④ 유도 정보 구성 (M-41) + ⑤ 캐릭터 응답. GUIDED 유도 대상과 NORMAL soft-cue 대상(O-13)은
         // 둘 다 reactionKey가 있어야 판단할 수 있어(장난·질문·불명확이면 soft-cue 스킵) resolveCharacterResponse 안에서 함께 계산한다.
@@ -229,14 +234,16 @@ public class MessageServiceImpl implements MessageService {
         MissionDefinition mission = Missions.forSceneOrder(scene.getSceneOrder());
         if (mission == null) return null;
 
-        Optional<Message> systemMessage = messageRepository
-                .findFirstBySessionAndSceneAndSpeakerTypeOrderByTurnOrderDesc(session, scene, SpeakerType.SYSTEM);
-        if (systemMessage.isEmpty()) return null;
+        boolean missionRevealed = messageRepository
+                .existsBySessionAndSceneAndSpeakerType(session, scene, SpeakerType.SYSTEM);
+        if (!missionRevealed) return null;
 
+        // 미션을 노출시킨 그 턴(예: "방귀로 해결하자")이 흔히 체크리스트 요소도 같이 만족시킨다 —
+        // 노출 이후 턴만 보면 accumulatedElements에는 이미 들어간 요소가 체크리스트에는 하나도
+        // 안 채워진 것처럼 보인다. 장면 전체(노출 전 턴 포함)를 순서대로 본다.
         List<List<String>> perTurnDetectedTypes = messageRepository.findAllBySessionOrderByTurnOrderAsc(session).stream()
                 .filter(m -> m.getScene().getId().equals(scene.getId()))
                 .filter(m -> m.getSpeakerType() == SpeakerType.CHILD)
-                .filter(m -> m.getTurnOrder() > systemMessage.get().getTurnOrder())
                 .map(m -> utteranceAnalysisRepository.findByMessage(m)
                         .map(a -> a.getDetectedElements().stream().map(DetectedElement::type).toList())
                         .orElse(List.<String>of()))

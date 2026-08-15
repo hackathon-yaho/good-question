@@ -1466,6 +1466,69 @@ mock AI로 대화3(maxTurns=4)에서 "싫어"를 6회 연속 실제 호출 — 1
 
 ---
 
+### D-53 · 팀원 보고 3건 — 미션 중 turnCount 폭주, missionProgress 노출 전 턴 누락, STOPPED 이어가기 불가
+
+systematic-debugging으로 3건 모두 원인을 먼저 확정한 뒤 고쳤다.
+
+**1) 미션 진행 중 `turnCount`가 `maxTurns`를 넘어 계속 쌓임 (미션1·2 공통)**
+
+`missionRevealedAtTurn`이 채워진 뒤에도 `MessageServiceImpl`은 GUIDED 보호 턴
+(`decision.protectedTurn()`)에서만 `currentChildTurnCount` 증가를 막았다. 그런데 D-50의
+"미션 자체 2회 무료 GUIDED"(`missionFreeGuidedTurnsUsed`)는 `missionEngagedTurns`만 안
+늘릴 뿐 `currentChildTurnCount`는 그대로 늘렸다 — 두 "무료 턴" 장치가 서로 다른 걸 얼렸다.
+그 결과 미션 노출 후 실제 발화가 쌓일수록 `turnCount`가 (노출 시점 값) + (예산 소모 턴) +
+(미션 자체 무료 턴, 최대 2) 만큼 계속 올라가는데 `maxTurns`는 원래 장면 값(4)에 고정돼
+있어 "7/4" 같은 응답이 나갔다.
+
+**수정**: `missionRevealedAtTurn != null`이면(=미션이 이미 노출된 상태) 보호 턴 여부와
+무관하게 무조건 `currentChildTurnCount`를 그대로 둔다. 미션은 자기 턴 예산
+(`missionEngagedTurns`)만으로 종료를 판단하므로(D-50), 응답의 `turnCount`는 미션 노출
+순간 값에 고정하는 게 맞다 — 프론트에 별도 미션 턴 카운터를 내려주지 않으므로(체크리스트로만
+진행 표시) `turnCount`가 미션 중 움직일 이유가 없다.
+
+**검증**: 로컬 mock AI로 미션1(대화3=장면7)까지 실제로 진행 — 노출 후 "방귀를 또 이용하자"를
+7회 반복해도 `turnCount`가 계속 1로 고정되고, 6번째 호출에서 `CLOSING`+`nextSceneId`로
+정상 종료됨을 확인.
+
+**2) `missionProgress.satisfiedIndexes`가 노출 이전 턴의 요소를 누락**
+
+`missionProgress()`가 SYSTEM(미션 노출) 메시지보다 `turnOrder`가 큰 CHILD 턴만
+`perTurnDetectedTypes`에 넣었다. 그런데 미션1의 노출 조건 대부분(`proposedUsingFart`,
+`directionWithoutConcreteMethod` 등, `MissionTrigger.java`)이 "이번 턴 발화가 SOLUTION
+방향"이라는 **바로 그 턴의 내용**으로 발동한다 — 노출을 유발한 턴 자체가 항상 노출 시점보다
+먼저 저장되므로(SYSTEM 메시지는 그 다음에 붙는다) 구조적으로 `perTurnDetectedTypes`에서
+빠진다. `accumulatedElements`에는 이미 SOLUTION이 들어가 있는데 체크리스트는 하나도 안
+채워진 것처럼 보이고, 이후 같은 유형을 다시 말해야 그제서야 슬롯 하나가 채워지는 원인이었다.
+
+**수정**: `turnOrder > systemMessage.turnOrder()` 필터를 없애고 장면 전체의 CHILD 턴을
+순서대로 본다. `accumulatedElements`도 장면 전체 누적이라 기준이 일치한다. SYSTEM 메시지
+존재 여부는 "미션이 노출됐는가"를 판단하는 게이트로만 남긴다(`existsBySessionAndSceneAndSpeakerType`).
+
+**검증**: 미션1 노출 트리거 턴("방귀로 배를 떨어뜨리자")에서 바로 `satisfiedIndexes: [0]`이
+찍히는 것, 같은 유형을 한 번 더 말하면 `[0, 1]`로 두 슬롯이 채워지는 것을 실호출로 확인.
+
+**3) `STOPPED` 세션은 이어가기 대상에서 완전히 빠짐**
+
+D-48이 "완료작을 이어간다는 개념이 없다"는 이유로 `STOPPED`을 `COMPLETED`와 동일하게
+이어가기 불가로 묶었는데, 사용자 확인 결과 `STOPPED`(아이가 "이야기 나가기"로 스스로 나간
+경우)는 `COMPLETED`(끝까지 마친 경우)와 달리 다시 이어갈 수 있어야 한다는 요구가 있었다.
+
+**수정**: `SessionStatus.RESUMABLE`에 `STOPPED` 추가. `StorySession.resume()` 신규 —
+`SessionServiceImpl.createSession()`이 재시작(`restart`)이 아니라 기존 세션을 찾았는데
+그 상태가 `STOPPED`일 때만 `resume()`으로 `IN_PROGRESS`로 되돌린다. `POST_ACTIVITY`는
+건드리지 않는다 — D-48이 만든 "`POST_ACTIVITY`는 `IN_PROGRESS` 전용 가드로 발화 재개를
+막는다"는 설계와 충돌하지 않도록, `STOPPED`일 때만 좁게 되살린다.
+
+**검증**: 세션을 `PATCH .../stopped`로 멈춘 뒤 (a) `GET /stories/{id}`의 `existingSession`,
+(b) `GET /home`의 `inProgress`가 둘 다 값이 채워지는 것, (c) `POST /sessions`(restart:false)
+호출 시 status가 `in_progress`로 되돌아오는 것, (d) 그 세션 ID로 `POST .../scenes/{id}/complete`가
+정상 200으로 진행되는 것까지 실호출로 확인.
+
+**변경 파일**: `MessageServiceImpl.java`(1, 2), `SessionStatus.java`·`StorySession.java`·
+`SessionServiceImpl.java`(3).
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
