@@ -1402,7 +1402,9 @@ NORMAL을 냈어야 할 턴(미션 노출 직후, 필수 요소 미충족)에서
 
 **바꾼 것**: 완전한 해결(D-40 방식 재도입 등)은 AI 파트 스펙 재확인이 필요해 이번엔
 손대지 않고, 재발 빈도를 낮추는 선에서 처리했다.
-- `ai-server`: OpenAI 호출 타임아웃 5→10초, SDK `max_retries` 0→3 (사용자가 직접 적용)
+- `ai-server`: OpenAI 호출 타임아웃 5→10초 (사용자가 직접 적용). SDK `max_retries`는 0을
+  유지하고, 재시도(최대 3회, 전체 10초 예산)는 AI 서버가 자체적으로 제어한다 — 최초 서술
+  ("SDK 0→3")이 틀려 정정한다 ([ai-retry-deadline-v2.md](../../docs/request/backend/ai-retry-deadline-v2.md)).
 - `backend`: `ai.server.timeout-seconds`(`AI_SERVER_TIMEOUT_SECONDS`) 5→10 — AI 서버
   쪽 재시도가 원래 타임아웃(5초) 안에서 다 안 끝날 수 있어 백엔드 쪽도 맞춰 올렸다.
   `AiAnalyzeClientImpl`·`AiRespondClientImpl` 둘 다 이 값을 공유해서 씀.
