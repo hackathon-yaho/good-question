@@ -569,7 +569,7 @@ AI 서버는 **엔드포인트 2개만** 구현한다. DB 접근이 없고 상�
 | `playfulUtterance` | 장난을 실제 사건으로 단정하지 않고 받아친다 |
 | `questionFromChild` | 질문에 먼저 답한다 |
 | `proposalFromChild` | 제안의 좋은 점을 인정하고 걱정을 하나만 제시한다 |
-| `unclearUtterance` | 필요할 때만 짧게 되묻는다 |
+| `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용한다. GUIDED에서는 되묻지 않고 `remainingWorry`의 구체적 걱정을 드러낸다 |
 | `empathyFromChild` | 공감으로 반응한다 |
 | `disagreement` | 무조건 부정하지 않고 걱정을 하나 제시한다 |
 | `directResponse` | 최신 말에 직접 반응한다 |
