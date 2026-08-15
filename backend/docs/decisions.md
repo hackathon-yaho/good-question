@@ -1337,6 +1337,60 @@ $0.0045/분으로 `gpt-4o-transcribe`($0.006/분)보다 싸다. 즉 정확도·�
 
 ---
 
+### D-50 · 미션 턴 예산을 최소1~최대4로, GUIDED 턴은 최대 2회까지만 무료로 재설계
+
+D-49는 미션 노출 후 "고정 2턴"만 보장했다. 사용자(백엔드 담당) 요구: 미션은 대화 세션의
+`max_turns`와 완전히 무관하게 **자체 예산(최소 1 ~ 최대 4턴)**을 가져야 하고, 그 안에서
+캐릭터가 GUIDED(유도)로 응답한 턴은 턴 소모 없이 지나가야 한다 — 아이가 방향을 못 잡고
+있을 때 유도 한 번 했다고 기회가 줄어들면 안 된다는 취지.
+
+**1차 구현**: `ProgressJudge`의 판단 1단계를 미션 활성 여부로 완전히 분기했다.
+- 미션 비활성: 기존 D-29 로직 그대로(장면 `max_turns` 기준).
+- 미션 활성: 장면의 `max_turns`는 더 이상 보지 않고, `StorySession.missionEngagedTurns`
+  (미션 노출 후 GUIDED가 아닌 턴 수)만 본다 — `< 1`이면 GOAL_MET 유예, `>= 4`면
+  MAX_TURNS로 무조건 닫는다. `MessageServiceImpl`이 각 턴 응답의 `effectiveMode`가
+  `NORMAL`일 때만 `session.recordMissionEngagedTurn()`을 호출해 카운트한다.
+
+**문제 발견**: 로컬에서 실제로 돌려보니(필수 요소가 채워지지 않는 발화를 반복 입력)
+`ProgressJudge` 2·3단계(강한 유도 제한 → 정체 시 GUIDED) 특성상 GUIDED 다음 턴은
+`previousWasGuided` 규칙으로 무조건 NORMAL이 되고, NORMAL 다음엔 정체 조건이 다시
+쌓여 GUIDED가 재발동되는 식으로 **NORMAL·GUIDED가 거의 1:1로 번갈아 나왔다**. GUIDED가
+전부 무료면 이 패턴이 무한히 반복돼도 안 닫힌다 — 장면7·9 둘 다 10턴까지 진행되는 것을
+실측으로 확인(사용자가 우려한 "가이드가 반복되면 턴이 무한대로 반복될 수 있겠다"가
+그대로 재현됨).
+
+**2차 구현 (사용자 요청)**: GUIDED 무료 횟수에도 상한을 뒀다.
+`MissionTrigger.FREE_GUIDED_TURNS_AFTER_REVEAL = 2` — 미션 노출 후 GUIDED 응답은
+**2회까지만** 무료로 넘어가고, 3회째부터는 `NORMAL`과 똑같이 `missionEngagedTurns`를
+소모한다. `StorySession`에 `missionFreeGuidedTurnsUsed`(장면 전환·미션 재노출 시 0으로
+초기화)를 추가해 세었다. `ProgressJudge`의 판단 로직 자체는 안 건드렸다 — "이 턴이
+예산을 쓰는가"는 여전히 `MessageServiceImpl`이 `effectiveMode`와 무료 횟수를 보고
+정하고, `ProgressJudge`는 그 결과(`missionEngagedTurns`)만 본다.
+
+- ponytail: 이 상한(2회)도 궁극적으로는 무한 루프를 아예 막는 하드 캡은 아니다 —
+  GUIDED가 아니라 NORMAL/GUIDED가 아닌 다른 사유로 대화가 안 끝나는 경로가 새로
+  생기면 같은 문제가 재발할 수 있다. 지금은 실측으로 확인된 유일한 무한 루프
+  경로(GUIDED 반복)만 막았다. 다른 경로가 보고되면 그때 다시 본다.
+
+**변경 파일**: `MissionTrigger`(`FREE_GUIDED_TURNS_AFTER_REVEAL` 추가),
+`ProgressJudge`(`MISSION_MIN/MAX_TURNS_AFTER_REVEAL`로 D-49의 `MISSION_TURN_BUDGET`
+대체, 판단 1단계를 미션 활성/비활성으로 분기), `ProgressInput`(`missionEngagedTurns`
+추가), `StorySession`(`missionEngagedTurns`·`missionFreeGuidedTurnsUsed` 컬럼 추가),
+`MessageServiceImpl`(카운팅 연동).
+
+**로컬 DB 마이그레이션 주의**: `ddl-auto=update`는 기존 행이 있는 테이블에
+`NOT NULL` 컬럼을 기본값 없이 추가하지 못한다(`contains null values` 에러). 로컬은
+`ALTER TABLE ... ADD COLUMN ... NOT NULL DEFAULT 0`으로 직접 백필했다 — Flyway
+미도입(D-14) 상태라 배포 시에도 기존 세션 행이 있다면 같은 문제가 날 수 있다는 점을
+남겨둔다.
+
+**검증**: 전체 테스트 통과. 로컬 앱으로 장면7·9를 실제로 진행 — GUIDED 응답이 2회까지는
+무료로 넘어가고 3회째부터 예산을 소모해, 예전엔 10턴까지 갔던 반복이 9턴에 종료되는
+것을 DB(`mission_engaged_turns=4`, `mission_free_guided_turns_used=2`)·API 응답
+양쪽에서 확인.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

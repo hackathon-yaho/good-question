@@ -123,6 +123,8 @@ public class MessageServiceImpl implements MessageService {
         ResponseMode previousMode = session.getLastResponseMode();
         ThoughtElement previousGuidanceTarget = session.getLastGuidanceTarget();
         Integer missionRevealedAtTurn = session.getMissionRevealedAtTurn();
+        int missionEngagedTurns = session.getMissionEngagedTurns();
+        int missionFreeGuidedTurnsUsed = session.getMissionFreeGuidedTurnsUsed();
 
         // D-29: 대화3·4는 미션이 항상 나와야 한다 — 진행 판단이 GOAL_MET으로 장면을 먼저
         // 닫아버리지 않도록, 이번 장면에 아직 안 보여준 미션이 있는지 미리 알려준다.
@@ -132,7 +134,8 @@ public class MessageServiceImpl implements MessageService {
         ProgressDecision decision = ProgressJudge.judge(new ProgressInput(
                 turnCount, scene.getPreferredTurns(), scene.getMaxTurns(), missing,
                 !newlyAccumulated.isEmpty(), previousMode,
-                turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission, missionRevealedAtTurn));
+                turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission,
+                missionRevealedAtTurn, missionEngagedTurns));
 
         // ④ 유도 정보 구성 (M-41) + ⑤ 캐릭터 응답. GUIDED 유도 대상과 NORMAL soft-cue 대상(O-13)은
         // 둘 다 reactionKey가 있어야 판단할 수 있어(장난·질문·불명확이면 soft-cue 스킵) resolveCharacterResponse 안에서 함께 계산한다.
@@ -144,6 +147,20 @@ public class MessageServiceImpl implements MessageService {
         session.recordTurnResult(turnCount, accumulated, newlyAccumulated, characterTurn.effectiveMode(),
                 characterTurn.guidanceTarget() == null ? null : ThoughtElement.valueOf(characterTurn.guidanceTarget()),
                 turnsWithoutNewElement, lowInformationTurns, missingEmptyAfterTurn);
+        // D-50: 미션이 이미 노출된 상태에서 GUIDED로 응답한 턴은 최대 FREE_GUIDED_TURNS_AFTER_REVEAL
+        // 회까지만 미션 턴 예산을 소모하지 않는다 — 그 이상 반복되면 일반 턴처럼 예산을 소모해서
+        // 대화가 무한히 늘어지는 것을 막는다.
+        if (missionRevealedAtTurn != null) {
+            if (characterTurn.effectiveMode() == ResponseMode.NORMAL) {
+                session.recordMissionEngagedTurn();
+            } else if (characterTurn.effectiveMode() == ResponseMode.GUIDED) {
+                if (missionFreeGuidedTurnsUsed < MissionTrigger.FREE_GUIDED_TURNS_AFTER_REVEAL) {
+                    session.recordMissionFreeGuidedTurn();
+                } else {
+                    session.recordMissionEngagedTurn();
+                }
+            }
+        }
 
         int nextTurnOrder = childTurnOrder + 1;
         Message characterMessage = messageRepository.save(

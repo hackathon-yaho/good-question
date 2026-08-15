@@ -2,6 +2,7 @@ package com.goodquestion.backend.session.entity;
 
 import com.goodquestion.backend.child.entity.Child;
 import com.goodquestion.backend.common.enums.ThoughtElement;
+import com.goodquestion.backend.session.engine.MissionTrigger;
 import com.goodquestion.backend.session.enums.ResponseMode;
 import com.goodquestion.backend.session.enums.SceneEndReason;
 import com.goodquestion.backend.session.enums.SessionStatus;
@@ -92,6 +93,19 @@ public class StorySession {
     @Column(name = "mission_revealed_at_turn")
     private Integer missionRevealedAtTurn;
 
+    /** 미션 노출 후 소모된 턴 수 — GUIDED로 응답한 턴은 세지 않는다 (D-50). */
+    @Column(name = "mission_engaged_turns", nullable = false)
+    private Integer missionEngagedTurns;
+
+    /**
+     * 미션 노출 후 "공짜로" 넘어간 GUIDED 턴 수 (D-50). 이 값이
+     * {@link MissionTrigger#FREE_GUIDED_TURNS_AFTER_REVEAL}에 도달하면, 그다음부터의
+     * GUIDED 턴은 {@link #missionEngagedTurns}를 소모한다 — 가이드 반복으로 턴이 무한히
+     * 늘어지는 것을 막는다.
+     */
+    @Column(name = "mission_free_guided_turns_used", nullable = false)
+    private Integer missionFreeGuidedTurnsUsed;
+
     @Column(name = "scene_goal_met", nullable = false)
     private Boolean sceneGoalMet;
 
@@ -129,6 +143,8 @@ public class StorySession {
         session.lastDetectedElements = new ArrayList<>();
         session.turnsWithoutNewElement = 0;
         session.consecutiveLowInformationTurns = 0;
+        session.missionEngagedTurns = 0;
+        session.missionFreeGuidedTurnsUsed = 0;
         session.sceneGoalMet = false;
         session.status = SessionStatus.IN_PROGRESS;
         return session;
@@ -150,6 +166,8 @@ public class StorySession {
         this.lastResponseMode = null;
         this.lastGuidanceTarget = null;
         this.missionRevealedAtTurn = null;
+        this.missionEngagedTurns = 0;
+        this.missionFreeGuidedTurnsUsed = 0;
         this.lastActivityAt = Instant.now();
     }
 
@@ -198,5 +216,17 @@ public class StorySession {
     /** 미션이 노출된 턴을 기록한다 (D-49). 이후 진행 판단이 이 턴 기준으로 별도 턴 예산을 준다. */
     public void recordMissionRevealed(int turnCount) {
         this.missionRevealedAtTurn = turnCount;
+        this.missionEngagedTurns = 0;
+        this.missionFreeGuidedTurnsUsed = 0;
+    }
+
+    /** 미션 노출 후 예산을 소모하는 턴이 한 번 더 발생했음을 기록한다 (D-50). */
+    public void recordMissionEngagedTurn() {
+        this.missionEngagedTurns++;
+    }
+
+    /** 미션 노출 후 GUIDED 턴이 "공짜로" 한 번 더 넘어갔음을 기록한다 (D-50). */
+    public void recordMissionFreeGuidedTurn() {
+        this.missionFreeGuidedTurnsUsed++;
     }
 }

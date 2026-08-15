@@ -21,10 +21,16 @@ public final class MissionTrigger {
     private static final int MIN_TURNS_BEFORE_ANY_REVEAL = 1;
     /**
      * 강제 노출을 장면 종료 몇 턴 전에 발동할지 (D-49). 최초값(D-29)은 1이었으나, 노출 뒤
-     * 실제로 대화할 수 있는 턴이 1턴뿐이라 2로 당겼다 — ProgressJudge.MISSION_TURN_BUDGET과
-     * 같은 설계 의도(미션은 대화 세션과 턴을 공유하지 않는다)를 공유하는 상수라 값을 맞춰둔다.
+     * 실제로 대화할 수 있는 턴이 1턴뿐이라 2로 당겼다 — 미션은 대화 세션과 턴을 공유하지
+     * 않는다는 설계 의도를 ProgressJudge.MISSION_MIN/MAX_TURNS_AFTER_REVEAL과 공유한다.
      */
     private static final int FORCE_REVEAL_TURNS_BEFORE_MAX = 2;
+    /**
+     * 미션 노출 후 GUIDED 응답이 턴을 소모하지 않는 최대 횟수 (D-50). 가이드가 무한히
+     * 반복되면 미션 턴 예산(ProgressJudge.MISSION_MAX_TURNS_AFTER_REVEAL)이 실질적으로
+     * 무의미해지므로, 이 횟수를 넘긴 GUIDED 턴부터는 일반 턴처럼 예산을 소모한다.
+     */
+    public static final int FREE_GUIDED_TURNS_AFTER_REVEAL = 2;
 
     private static final String FART_KEYWORD = "방귀";
     private static final String SOLUTION = ThoughtElement.SOLUTION.name();
