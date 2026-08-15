@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * AI 서버 mock 스텁 (B-11, work-items.md 7장). 실제 AI 서버가 없는 동안 백엔드 전체 흐름을
@@ -28,10 +30,25 @@ public class AiMockController {
     /** low-engagement-turn-protection.md가 정의한, AI 서버가 SHORT_RESPONSE+SHORT로 보정하는 키워드. */
     private static final List<String> ZERO_INFO_REJECTION_KEYWORDS = List.of("싫어", "몰라", "모르겠어", "닥쳐", "닥처");
 
+    /**
+     * 장면7(미션1) 요소별 감지 키워드. 한 발화에 여러 키워드가 같이 있으면 그만큼
+     * detectedElements가 여러 개 나온다 — missionProgress.satisfiedIndexes가 한 턴에
+     * 1개만 채워지는 경우와 여러 개가 한꺼번에 채워지는 경우를 둘 다 mock으로 재현하기 위함.
+     */
+    private static final List<ElementKeyword> ELEMENT_KEYWORDS = List.of(
+            new ElementKeyword("SOLUTION", "방귀"),
+            new ElementKeyword("SOLUTION", "장대"),
+            new ElementKeyword("REASON", "세게"),
+            new ElementKeyword("REQUEST", "부탁"),
+            new ElementKeyword("RESULT", "떨어질")
+    );
+
+    private record ElementKeyword(String type, String keyword) {
+    }
+
     @PostMapping("/analyze")
     public Map<String, Object> analyze(@RequestBody(required = false) Map<String, Object> request) {
         String childUtterance = request == null ? "" : String.valueOf(request.getOrDefault("childUtterance", ""));
-        boolean looksLikeProposal = childUtterance.contains("방귀") || childUtterance.contains("장대");
         boolean looksLikeRejection = ZERO_INFO_REJECTION_KEYWORDS.stream().anyMatch(childUtterance::contains);
 
         if (looksLikeRejection) {
@@ -43,13 +60,16 @@ public class AiMockController {
             );
         }
 
-        if (looksLikeProposal) {
+        List<Map<String, Object>> detected = ELEMENT_KEYWORDS.stream()
+                .filter(ek -> childUtterance.contains(ek.keyword()))
+                .map(ek -> Map.<String, Object>of("type", ek.type(), "evidence", ek.keyword()))
+                .toList();
+
+        if (!detected.isEmpty()) {
             return Map.of(
-                    "childIntent", "SOLUTION",
-                    "mainPoint", "방귀로 배를 떨어뜨리자는 제안이다",
-                    "detectedElements", List.of(
-                            Map.of("type", "SOLUTION", "evidence", "방귀")
-                    ),
+                    "childIntent", intentFor(detected),
+                    "mainPoint", "미션 관련 요소가 감지됐다",
+                    "detectedElements", detected,
                     "utteranceValidity", "VALID"
             );
         }
@@ -62,6 +82,14 @@ public class AiMockController {
                 ),
                 "utteranceValidity", "VALID"
         );
+    }
+
+    private String intentFor(List<Map<String, Object>> detected) {
+        Set<Object> types = detected.stream().map(m -> m.get("type")).collect(Collectors.toSet());
+        if (types.contains("SOLUTION")) return "SOLUTION";
+        if (types.contains("REQUEST")) return "REQUEST";
+        if (types.contains("REASON")) return "REASONING";
+        return "OPINION";
     }
 
     @PostMapping("/respond")

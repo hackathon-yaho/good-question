@@ -1557,7 +1557,17 @@ PRD 7.6 미션1 확인 항목 2번("주변에 있는 마을 사람들과 시아�
 `missionTriggered.checklist[1]`이 `{"label":"그 방법이 왜 가능한지","element":"REASON"}`로
 내려오는 것을 실호출로 확인.
 
-**변경 파일**: `Missions.java`, `docs/product/prd.md`, `backend/docs/api-spec.md`.
+**추가 검증 (satisfiedIndexes 채워지는 패턴)**: `AiMockController`에 요소별 키워드
+매칭(방귀→SOLUTION, 세게→REASON, 부탁→REQUEST, 떨어질→RESULT)을 추가해 한 발화에 여러
+키워드가 있으면 detectedElements도 여러 개 나오도록 확장했다. 이걸로 장면7에서 (1) 한 턴에
+1개 요소만 말한 경우 `satisfiedIndexes`가 정확히 1개만 늘어나는 것("부탁을 해야겠어요" →
+`[0]`→`[0,2]`), (2) 한 턴에 REASON+RESULT를 동시에 말한 경우 2개가 한꺼번에 늘어나는 것
+(`[0,2]`→`[0,2,1,3]`)을 실호출로 확인. 같은 턴에 SOLUTION을 다시 언급해도(체크리스트에
+SOLUTION 슬롯이 이제 1개뿐이라) 중복으로 안 채워지는 것도 함께 확인 — D-54 수정이 실제로
+효과가 있음을 보여준다.
+
+**변경 파일**: `Missions.java`, `docs/product/prd.md`, `backend/docs/api-spec.md`,
+`AiMockController.java`(검증용 확장).
 
 ---
 
