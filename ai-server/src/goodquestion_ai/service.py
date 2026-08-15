@@ -47,6 +47,26 @@ LOW_INFORMATION_INTENTS = {
     UtteranceValidity.PLAYFUL: ChildIntent.PLAYFUL,
 }
 
+# Meaningless single-phrase refusal or hostility must never be left to model
+# variance: these messages cannot satisfy a scene criterion and should not
+# consume a meaningful dialogue turn in the backend.
+LOW_ENGAGEMENT_UTTERANCES = frozenset(
+    {
+        "싫어",
+        "싫어요",
+        "말하기싫어",
+        "말하기싫어요",
+        "하기싫어",
+        "하기싫어요",
+        "몰라",
+        "모르겠어",
+        "닥쳐",
+        "닥쳐라",
+        "시끄러워",
+        "꺼져",
+    }
+)
+
 # The product decision is a 10-second deadline, including the initial request,
 # with at most three total attempts.  The SDK must not add hidden retries.
 MAX_MODEL_ATTEMPTS = 3
@@ -70,6 +90,11 @@ class OpenAIService:
         )
 
     async def analyze(self, request: AnalyzeRequest, request_id: str) -> AnalyzeResponse:
+        known_low_engagement = self._known_low_engagement_analysis(request.childUtterance)
+        if known_low_engagement is not None:
+            logger.info("known_low_engagement operation=analyze request_id=%s", request_id)
+            return known_low_engagement
+
         result = await self._parse(
             prompt=ANALYZE_DEVELOPER_PROMPT,
             payload=request.model_dump(mode="json"),
@@ -216,6 +241,18 @@ class OpenAIService:
             seen.add(item.type)
             filtered.append(item)
         return result.model_copy(update={"detectedElements": filtered})
+
+    @staticmethod
+    def _known_low_engagement_analysis(child_utterance: str) -> AnalyzeResponse | None:
+        normalized = re.sub(r"[\s\W_]+", "", child_utterance)
+        if normalized not in LOW_ENGAGEMENT_UTTERANCES:
+            return None
+        return AnalyzeResponse(
+            childIntent=ChildIntent.SHORT_RESPONSE,
+            mainPoint=None,
+            detectedElements=[],
+            utteranceValidity=UtteranceValidity.SHORT,
+        )
 
     @staticmethod
     def _is_safe_character_line(text: str) -> bool:
