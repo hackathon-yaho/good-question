@@ -35,6 +35,27 @@ export function getSceneBackgroundImageByOrder(sceneOrder: number): string | nul
 }
 
 /**
+ * 활동 카드(장면1~4) 이미지. D-2 카드 순서 배열과 D-5 리텔링에서 사용한다.
+ * 장면1=sc_02, 장면2=sc_04, 장면3=sc_06, 장면4=sc_08
+ */
+export const ACTIVITY_CARD_IMAGES = [
+  "/story-assets/banggui/sc_banggui_02.webp",
+  "/story-assets/banggui/sc_banggui_04.webp",
+  "/story-assets/banggui/sc_banggui_06.webp",
+  "/story-assets/banggui/sc_banggui_08.webp",
+] as const;
+
+/**
+ * 활동 카드(card_1~card_4)의 ID를 장면 이미지 URL로 매핑한다.
+ * card_1→장면1(sc_02), card_2→장면2(sc_04), card_3→장면3(sc_06), card_4→장면4(sc_08)
+ */
+export function getActivityCardImage(cardId: string): string {
+  const match = /card_(\d+)/.exec(cardId);
+  const index = match ? Number(match[1]) - 1 : 0;
+  return ACTIVITY_CARD_IMAGES[Math.min(Math.max(index, 0), ACTIVITY_CARD_IMAGES.length - 1)];
+}
+
+/**
  * 캐릭터 이름과 감정을 캐릭터 이미지 URL로 매핑
  */
 export function getCharacterImage(

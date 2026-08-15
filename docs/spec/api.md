@@ -1148,7 +1148,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 | 타임아웃 | ✅ AI 서버 요청 전체 10초 / 백엔드 연결 대기 10초 ([v2 요청](../request/backend/ai-retry-deadline-v2.md)) |
 | 재시도 | ✅ AI 서버 최대 3회(최초 포함), 백엔드 0회 |
 | 실패 시 백엔드 동작 | ✅ `/analyze` → 빈 분석으로 진행 / `/respond` → `character_closing`으로 장면 종료 |
-| 배포 주소 | ⚪ 미정. **mock 스텁으로 선행 진행 중** |
+| 배포 주소 | ✅ `https://goodquestion-ai.goodquestion-kty2253.workers.dev` (Cloudflare Worker). Render 환경변수 반영·통합 확인은 진행 중 |
 
 > 백엔드는 AI 서버 완성을 기다리지 않고 **고정 JSON 스텁**으로 먼저 연결해 전체 흐름을 검증합니다.
 > 주소가 확정되면 환경변수만 교체합니다.
@@ -1212,7 +1212,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 
 | 항목 | 결정 주체 | 상태 |
 | --- | --- | --- |
-| AI 서버 배포 주소 · 경로 · 내부 토큰 | 백엔드·AI | AI 담당 명세 대기. **mock 스텁으로 우회 중** |
+| AI 서버 배포 주소 · 경로 · 내부 토큰 | 백엔드·AI | Worker 주소·경로 확정. Render 환경변수 반영 및 통합 테스트 필요 ([전환 요청](../request/backend/cloudflare-worker-ai-cutover.md)) |
 | 프론트 15초 예산 유지 여부 | 프론트·백엔드 | 배포 후 **실측** 필요 |
 | 이미지 URL 제공 방식 | 3인 | Supabase Storage 우선. **에셋 수령 시 확정.** 컬럼(`cover_image_url`·`background_image_url`)은 미리 추가 |
 | 음성(Whisper·TTS) 비용 상한 | 백엔드 | 문서에 예산 없음 |

@@ -18,12 +18,14 @@
 
 "use client";
 
+import Image from "next/image";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { resetAllMockSessions } from "@/lib/api/mock";
 import { resetMockAccount } from "@/lib/api/mock-account";
 import { resetMockWordbook } from "@/lib/api/mock-content";
+import { STORY_COVER_IMAGE } from "@/lib/story-images";
 import {
   authApi,
   clearMockSession,
@@ -83,27 +85,34 @@ export function LoginScreen() {
 
   return (
     <div className="flex min-h-dvh w-full bg-bg">
-      {/* 좌 55% 일러스트 패널 — 일러스트 미수령이라 색면 + 로고타입으로 대체 */}
-      <aside className="relative hidden w-[55%] shrink-0 flex-col justify-between bg-primary-soft p-12 lg:flex">
-        {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
-        <img
-          src="/logo-wordmark.webp"
-          alt="굿퀘스천"
-          width={200}
-          height={72}
-          className="h-auto w-50"
+      {/* 좌 55% — 커버 이미지 배경 전체 채움 + 로고·텍스트 오버레이 */}
+      <aside className="relative hidden w-[55%] shrink-0 flex-col justify-between overflow-hidden lg:flex">
+        <Image
+          src={STORY_COVER_IMAGE}
+          alt=""
+          fill
+          className="object-cover opacity-40"
+          sizes="50vw"
+          priority
         />
-
-        <p className="max-w-md text-parent-title leading-relaxed font-bold text-text">
-          옛이야기 속 인물과 이야기를 나누며
-          <br />
-          아이가 자기 생각을 말로 꺼냅니다.
-        </p>
-
-        <p className="text-parent-body text-muted">
-          {/* 일러스트가 도착하면 이 패널을 이미지로 교체한다. (assets.md §3-1) */}
-          일러스트 준비 중
-        </p>
+        <div aria-hidden className="absolute inset-0 bg-black/10" />
+        <div className="relative z-10 p-12">
+          {/* eslint-disable-next-line @next/next/no-img-element -- public 정적 파일 */}
+          <img
+            src="/logo-wordmark.webp"
+            alt="굿퀘스천"
+            width={200}
+            height={72}
+            className="h-auto w-50"
+          />
+        </div>
+        <div className="relative z-10 p-12">
+          <p className="max-w-md text-parent-title leading-relaxed font-bold text-text">
+            옛이야기 속 인물과 이야기를 나누며
+            <br />
+            아이가 자기 생각을 말로 꺼냅니다.
+          </p>
+        </div>
       </aside>
 
       {/* 우 45% 폼 */}
@@ -148,21 +157,23 @@ export function LoginScreen() {
             아동 개인정보는 보호자 동의 후에만 처리합니다.
           </p>
 
-          {process.env.NODE_ENV === "development" ? (
-            <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
+          <div className="mt-10 flex flex-col items-start gap-3 border-t border-border pt-6">
+            {process.env.NODE_ENV === "development" ? (
               <p className="text-sm text-muted">
                 개발용 · 연동 모드 <b>{API_MODE}</b>
               </p>
-              {API_MODE === "backend" ? (
-                <button
-                  type="button"
-                  onClick={() => void devLogin()}
-                  disabled={pending}
-                  className="text-sm text-muted underline"
-                >
-                  카카오 없이 로그인 (dev-login)
-                </button>
-              ) : null}
+            ) : null}
+            {API_MODE === "backend" ? (
+              <button
+                type="button"
+                onClick={() => void devLogin()}
+                disabled={pending}
+                className="text-sm text-muted underline"
+              >
+                카카오 없이 로그인 (dev-login)
+              </button>
+            ) : null}
+            {process.env.NODE_ENV === "development" ? (
               <button
                 type="button"
                 onClick={resetDemo}
@@ -170,8 +181,8 @@ export function LoginScreen() {
               >
                 데모 상태 초기화
               </button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </main>
     </div>

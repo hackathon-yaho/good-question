@@ -151,8 +151,8 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
       {/* 프로필 — 상단 1줄 전체. 아바타·이름은 좌측, 별가루는 우측 끝 */}
       <div className="flex items-center gap-4 rounded-card border border-border bg-surface px-6 py-4 shadow-soft">
         <Link
-          href="/profiles"
-          aria-label={`${child.name} — 아이 바꾸기`}
+          href="/mypage"
+          aria-label={`${child.name} — 마이페이지`}
           className="flex min-h-touch min-w-0 flex-1 items-center gap-4 rounded-pill"
         >
           <ChildAvatar name={child.name} avatarId={child.avatarId} size={56} />

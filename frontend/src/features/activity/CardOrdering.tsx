@@ -14,9 +14,11 @@
 
 "use client";
 
+import Image from "next/image";
 import { useCallback, useRef, useState } from "react";
 import { PillButton } from "@/components/ui/PillButton";
 import type { ActivityCard } from "@/lib/api/types";
+import { getActivityCardImage } from "@/lib/story-images";
 
 type Props = {
   tray: readonly ActivityCard[];
@@ -100,7 +102,7 @@ export function CardOrdering({
   };
 
   return (
-    <div className="flex size-full flex-col items-center gap-6 px-10 py-8">
+    <div className="flex size-full flex-col items-center justify-center gap-6 px-10 py-8">
       <header className="flex items-center gap-3">
         <h1 className="text-narration font-bold text-text">
           이야기 순서대로 놓아볼까?
@@ -116,36 +118,26 @@ export function CardOrdering({
       <ol className="flex w-full items-stretch justify-center gap-4">
         {slots.map((card, index) => {
           const active = hoverSlot === index;
-          /**
-           * 이 칸을 오답으로 표시할지.
-           *
-           * 서버가 `slotResults`를 줬으면 **틀린 칸만** 표시한다. 안 줬으면
-           * 배치 전체(`mismatched`)를 표시한다 — 어느 칸이 틀렸는지 알 방법이 없다.
-           * 맞은 칸에는 초록 테두리를 **넣지 않는다.** 그러면 정답 개수를 세는
-           * 화면이 된다. (점수 금지 · PRD 10.3)
-           */
+          const hasResult = slotResults !== null;
           const wrong = Boolean(
             card && (slotResults ? slotResults[index] === false : mismatched)
           );
+          const correct = Boolean(
+            card && hasResult && slotResults?.[index] === true
+          );
 
-          /**
-           * 테두리·배경은 **하나만** 고른다.
-           *
-           * ⚠️ 예전에는 `border-secondary`를 먼저 붙이고 그 뒤에 `border-danger`를
-           *    덧붙였다. 두 유틸리티는 **우선순위가 같아** 클래스 문자열 순서로는
-           *    이기지 못하고, 스타일시트에 늦게 나온 쪽이 이긴다.
-           *    그래서 빨간 테두리가 **실제로는 그려지지 않았다.**
-           *    (data-mismatched는 붙었으므로 검증도 통과하고 있었다)
-           */
+          // slotResults가 없으면(orderMismatched만 있음) 배치 전체 오답이므로
+          // 빨간 테두리를 표시하지 않고 점선 유지 + 피드백 모달로만 알린다.
+          const showWrong = wrong && slotResults !== null;
           const tone = active
-            ? "border-primary bg-primary-soft"
+            ? "ring-2 ring-primary bg-transparent"
             : !card
-              ? "border-dashed border-border bg-surface"
-              : wrong
-                ? // 오답 표시는 테두리만이다. 문구는 아래 안내 한 줄로 끝내고
-                  // "틀렸어요"·"실패" 같은 말은 쓰지 않는다. (계획 D6 · screens.md D-3)
-                  "border-danger bg-surface"
-                : "border-secondary bg-secondary-soft";
+              ? "border-2 border-dashed border-border bg-transparent"
+              : showWrong
+                ? "border-2 border-danger bg-transparent"
+                : correct
+                  ? "border-2 border-secondary bg-transparent"
+                  : "border-2 border-dashed border-border bg-transparent";
           return (
             <li key={index} className="flex flex-col items-center gap-2">
               <span className="flex size-8 items-center justify-center rounded-full bg-primary-soft text-parent-body font-bold text-text">
@@ -156,15 +148,19 @@ export function CardOrdering({
                 data-mismatched={wrong ? "1" : undefined}
                 onClick={() => card && onRemove(index)}
                 className={[
-                  "flex h-[11.25rem] w-[15rem] items-center justify-center rounded-card border-2 p-3 text-center transition-colors",
+                  "relative flex h-[11.25rem] w-[15rem] items-center justify-center overflow-hidden rounded-card p-3 text-center transition-colors",
                   card ? "cursor-pointer" : "",
                   tone,
                 ].join(" ")}
               >
                 {card ? (
-                  <span className="text-parent-body leading-snug font-bold text-text">
-                    {card.text}
-                  </span>
+                  <Image
+                    src={getActivityCardImage(card.id)}
+                    alt=""
+                    fill
+                    className="object-contain p-2"
+                    sizes="15rem"
+                  />
                 ) : (
                   <span className="text-parent-body text-muted">여기에 놓아줘</span>
                 )}
@@ -194,15 +190,19 @@ export function CardOrdering({
               style={{ rotate: `${(i % 2 === 0 ? -1 : 1) * 1.5}deg` }}
               className={[
                 // touch-action:none 이 없으면 터치 드래그가 스크롤로 먹힌다.
-                "flex h-[11.25rem] w-[15rem] touch-none items-center justify-center rounded-card border-2 p-3 text-center transition-shadow select-none",
+                "relative flex h-[11.25rem] w-[15rem] touch-none items-center justify-center overflow-hidden rounded-card p-3 text-center transition-shadow select-none bg-transparent",
                 dragging === card.id
-                  ? "scale-105 border-primary bg-surface shadow-soft"
-                  : "border-border bg-surface",
+                  ? "scale-105 ring-2 ring-primary shadow-soft"
+                  : "",
               ].join(" ")}
             >
-              <span className="text-parent-body leading-snug font-bold text-text">
-                {card.text}
-              </span>
+              <Image
+                src={getActivityCardImage(card.id)}
+                alt=""
+                fill
+                className="object-contain p-2"
+                sizes="15rem"
+              />
             </button>
           ))
         )}

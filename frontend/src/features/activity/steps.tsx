@@ -13,7 +13,7 @@ import { PillButton } from "@/components/ui/PillButton";
 import { StarDustIcon } from "@/components/ui/StarDust";
 import { StarDustRain } from "@/components/ui/StarDustRain";
 import type { ActivityCard, RetellingResult } from "@/lib/api/types";
-import { STORY_COVER_IMAGE } from "@/lib/story-images";
+import { STORY_COVER_IMAGE, getActivityCardImage } from "@/lib/story-images";
 
 /** D-1 활동 인트로 */
 export function ActivityIntro({ onStart }: { onStart: () => void }) {
@@ -139,15 +139,25 @@ export function KeywordReveal({
           <li key={card?.id ?? index} className="flex items-center gap-3">
             <div
               className={[
-                "flex h-[10rem] w-[13.75rem] items-center justify-center rounded-card border-2 p-3 text-center",
+                "relative flex h-[10rem] w-[13.75rem] items-center justify-center overflow-hidden rounded-card p-3 bg-transparent",
                 revealed
-                  ? "border-accent bg-accent-soft"
-                  : "border-secondary bg-secondary-soft",
+                  ? "ring-2 ring-accent"
+                  : "",
               ].join(" ")}
             >
-              <span className="text-parent-body leading-snug font-bold text-text">
-                {card?.text}
-              </span>
+              {card ? (
+                <Image
+                  src={getActivityCardImage(card.id)}
+                  alt=""
+                  fill
+                  className="object-contain p-1"
+                  sizes="13.75rem"
+                />
+              ) : (
+                <span className="text-parent-body leading-snug font-bold text-text">
+                  빈 칸
+                </span>
+              )}
             </div>
             {index < slots.length - 1 ? (
               <span aria-hidden className="text-2xl text-muted">
@@ -231,14 +241,24 @@ export function Retelling({
         이야기를 처음부터 들려줘
       </h1>
 
-      {/* 참고용 카드 스트립 */}
+      {/* 참고용 카드 스트립 — 장면 이미지로 표시 */}
       <ol className="flex gap-3">
         {cards.map((card, index) => (
           <li
             key={card?.id ?? index}
-            className="flex h-[8.125rem] w-[11.25rem] items-center justify-center rounded-card border border-border bg-surface p-2 text-center"
+            className="relative flex h-[10.5rem] w-[14.5rem] items-center justify-center overflow-hidden rounded-card bg-transparent p-2"
           >
-            <span className="text-sm leading-snug text-muted">{card?.text}</span>
+            {card ? (
+              <Image
+                src={getActivityCardImage(card.id)}
+                alt=""
+                fill
+                className="object-contain p-1"
+                sizes="14.5rem"
+              />
+            ) : (
+              <span className="text-sm leading-snug text-muted">빈 칸</span>
+            )}
           </li>
         ))}
       </ol>

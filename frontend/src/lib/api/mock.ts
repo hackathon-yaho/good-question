@@ -708,13 +708,7 @@ export const mockActivityApi: ActivityApi = {
       .map((c) => c.id);
     const isCorrect = submittedOrder.join() === correct.join();
 
-    /**
-     * 3회째 오답이면 정답 순서를 함께 내려보내 다음 단계로 넘긴다. (D-10)
-     *
-     * 기록은 사실대로 `is_order_correct = false`로 남는다 — 통과시킨 것은
-     * 화면 흐름이고, 맞혔다고 기록하는 게 아니다. 이 목에는 리포트가 읽는
-     * 필드가 없어 저장까지는 재현하지 않는다.
-     */
+    // 3회째 오답이면 정답 순서를 함께 내려보내 다음 단계로 넘긴다. (D-10)
     const revealAnswer = !isCorrect && session.attemptCount >= ORDER_ATTEMPT_LIMIT;
 
     /**

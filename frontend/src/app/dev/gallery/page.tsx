@@ -11,6 +11,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { ChildAvatar, AVATAR_IDS } from "@/components/ui/ChildAvatar";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
@@ -44,10 +45,26 @@ const COLORS: readonly { token: string; className: string }[] = [
 const MIC_STATES: MicState[] = ["idle", "recording", "busy", "disabled"];
 
 export default function GalleryPage() {
+  const router = useRouter();
   const [modal, setModal] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [topic, setTopic] = useState("");
   const toast = useToast();
+
+  /** 개발용 — "이야기 순서대로 놓아볼까" 활동으로 바로 진입 */
+  const goActivity = async () => {
+    try {
+      const { mockPlayApi } = await import("@/lib/api/mock");
+      const { STORY_ID } = await import("@/mocks/story-banggui");
+      const snapshot = await mockPlayApi.createSession({
+        childId: "c_mock_1",
+        storyId: STORY_ID,
+      });
+      router.push(`/activity/${snapshot.sessionId}`);
+    } catch {
+      toast.show("활동 진입 실패", "danger");
+    }
+  };
 
   return (
     <CenteredShell width="full">
@@ -57,6 +74,11 @@ export default function GalleryPage() {
           <p className="text-muted">
             docs/spec/screens.md §1 기준. 시안 수령 후 대조용.
           </p>
+          <div className="mt-4 flex gap-3">
+            <PillButton onClick={() => void goActivity()}>
+              이야기 순서대로 놓아볼까 (개발용)
+            </PillButton>
+          </div>
         </header>
 
         <Section title="Color — §1-2">

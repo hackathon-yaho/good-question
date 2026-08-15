@@ -124,7 +124,7 @@ export function ChildrenManageScreen({
 
   return (
     <CenteredShell width="column">
-      <BackButton href="/parent/settings" label="설정" />
+      <BackButton label="뒤로 가기" />
       <h1 className="mt-4 text-parent-title font-bold text-text">
         아이 프로필 관리
       </h1>
