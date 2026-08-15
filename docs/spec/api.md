@@ -1104,7 +1104,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 | 모드 | 동작 |
 | --- | --- |
 | `NORMAL` | 아이 말에 자연스럽게 반응한다. **장면을 닫지 않는다** |
-| `GUIDED` | `remainingWorry`를 대사에 녹여 부족한 요소를 유도한다 |
+| `GUIDED` | `remainingWorry`를 대사에 녹여 부족한 요소를 유도한다. 저정보 반복이면 장면 질문 하나로 대화를 다시 잇는다 |
 
 **reactionKey별 반응 원칙**
 
@@ -1113,7 +1113,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 | `playfulUtterance` | 장난을 실제 사건으로 단정하지 않고 받아친다 |
 | `questionFromChild` | 질문에 먼저 답한다 |
 | `proposalFromChild` | 제안의 좋은 점을 인정하고 걱정을 하나만 제시한다 |
-| `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용한다. GUIDED에서는 질문으로 재촉하지 않고 `remainingWorry`의 구체적 걱정을 드러낸다 |
+| `unclearUtterance` | 첫 반응은 비판하지 않고 짧게 수용한다. GUIDED에서는 `remainingWorry`의 구체적 걱정과 장면 질문 하나로 대화를 다시 잇는다 |
 | `empathyFromChild` | 공감으로 반응한다 |
 | `disagreement` | 무조건 부정하지 않고 걱정을 하나 제시한다 |
 | `directResponse` | 최신 말에 직접 반응한다 |

@@ -213,7 +213,7 @@ async def test_returns_timeout_only_after_three_total_attempts() -> None:
     assert len(client.responses.calls) == 3
 
 
-@pytest.mark.parametrize("utterance", ["싫어", "닥쳐!!!", "말하기 싫어요."])
+@pytest.mark.parametrize("utterance", ["싫어", "닥쳐!!!", "닥처", "말하기 싫어요."])
 async def test_known_low_engagement_utterance_skips_the_model_and_is_short(utterance: str) -> None:
     client = FakeOpenAI("{}")
     service = OpenAIService(settings(), client=client)
