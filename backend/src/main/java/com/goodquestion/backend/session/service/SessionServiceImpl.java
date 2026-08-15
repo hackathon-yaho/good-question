@@ -61,7 +61,13 @@ public class SessionServiceImpl implements SessionService {
         if (request.isRestart()) {
             existing.ifPresent(StorySession::stop);
         } else if (existing.isPresent()) {
-            return toResponse(existing.get());
+            StorySession found = existing.get();
+            // D-53: STOPPED로 이어가기를 선택한 경우만 다시 IN_PROGRESS로 되돌린다.
+            // POST_ACTIVITY는 대화가 이미 끝난 상태라 건드리지 않는다 (D-48 가드와 충돌 방지).
+            if (found.getStatus() == SessionStatus.STOPPED) {
+                found.resume();
+            }
+            return toResponse(found);
         }
 
         StoryScene introScene = storySceneRepository.findAllByStoryOrderBySceneOrderAsc(story).stream()

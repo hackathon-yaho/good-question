@@ -186,6 +186,12 @@ public class StorySession {
         this.lastActivityAt = Instant.now();
     }
 
+    /** STOPPED 세션을 이어가기 대상으로 다시 활성화한다 (D-53). 진행 상태는 그대로 둔다. */
+    public void resume() {
+        this.status = SessionStatus.IN_PROGRESS;
+        this.lastActivityAt = Instant.now();
+    }
+
     public void startPostActivity() {
         this.status = SessionStatus.POST_ACTIVITY;
         this.lastActivityAt = Instant.now();
