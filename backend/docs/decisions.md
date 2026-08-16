@@ -1710,6 +1710,56 @@ report-timeout-seconds(60초, 세션 완료 후 비동기 리포트 생성용)�
 
 ---
 
+### D-59 · 아바타 상점 — 구매 이력 테이블, 가격·id 서버 미검증, PATCH 장착 미검증 (front/store, avatar-shop-purchase.md)
+
+**배경**: 별가루(`starDust`)는 이야기 완료 시 +100 적립되지만 지금까지 사용처가 없었다
+(O-18). 프론트가 `front/store` 브랜치에서 상점 화면·클라이언트 계약을 먼저 구현하고
+[request/backend/avatar-shop-purchase.md](request/backend/avatar-shop-purchase.md)로 백엔드 계약을
+확정해 요청했다 — 그릴링(질문·결정 하나씩 확정)으로 4가지를 정했다.
+
+1. **저장은 별도 테이블로, `text[]` 컬럼이 아니라.** `children.owned_avatar_ids text[]`
+   (기존 `topics`·`required_elements`와 같은 배열 컬럼 패턴)로도 충분했지만, 사용자가
+   "어떤 아이가 어떤 프로필을 보유 중인지" 조회 가능성을 위해 신규 `avatar_purchases`
+   테이블(`child_id`, `avatar_id`, `price`, `purchased_at`)을 선택했다. `ownedAvatarIds`는
+   이 테이블에서 아이별로 조회해 만든다.
+2. **`price`는 요청 값을 그대로 신뢰한다.** 요청 문서 자체가 이 방식의 가격 조작 가능성을
+   명시했지만(테스트 단계 한정 트레이드오프), 사용자가 그대로 채택했다.
+3. **`avatarId` 존재 여부도 검증하지 않는다 — 카탈로그를 아예 안 만든다.** 상점 아바타
+   (`shop1`~`shop4`)는 아직 실제 일러스트가 없어(프론트가 이니셜+색상 폴백으로 대체 중)
+   id 자체가 유동적일 수 있다는 사용자 판단에 따라, `avatarId`를 검증하지 않는 기존
+   정책(D-08)을 그대로 확장했다. 무료 6종(`color1`~`color6`)이거나 이미 보유 중이면
+   `INVALID_REQUEST`, 그 외에는 값 검증 없이 다 구매 허용한다 — 따라서 문서가 정의한
+   "존재하지 않는 avatarId → `NOT_FOUND`" 케이스는 이 구현에서는 발생하지 않는다.
+4. **`PATCH /children/{childId}` 장착은 그대로 둔다.** 요청 문서가 "이미 구현돼 있고
+   `avatarId`를 검증하지 않으므로 새로 할 일이 없다"고 한 것을 그대로 따랐다 — 구매
+   안 한 유료 아바타를 직접 `PATCH`로 장착하는 것도 서버가 막지 않는다(프론트 화면만
+   보유 목록으로 제한). 하카톤 데모 범위에서 악용 실익이 없다는 판단.
+5. **동시 중복 구매 방어**: `avatar_purchases(child_id, avatar_id)`에 DB 유니크 제약을
+   걸어 앱 레벨 중복 체크를 놓친 경쟁 조건만 막는다(`DataIntegrityViolationException` →
+   `INVALID_REQUEST`). 사용자 요청대로 "간단하게 막는 수준"까지만 — 낙관적/비관적
+   락 등 추가 장치는 없다.
+
+**신규**: `shop/{entity,repository,service,controller,dto}` — `AvatarPurchase` 엔티티,
+`POST /children/{childId}/avatar-purchases`(요청 `{avatarId, price}`, 응답
+`{starDust, ownedAvatarIds}`). `Child.deductStarDust()` 추가 (`addStarDust`와 대칭).
+`ErrorCode.INSUFFICIENT_STAR_DUST`(409) 신규 — api.md 2.3에 먼저 추가한 뒤 코드에 반영.
+`GET /api/mypage` 응답(`MypageChildResponse`)에 `ownedAvatarIds` 필드 추가.
+
+**검증**: 로컬 서버(docker-compose Postgres)에 실제 curl로 확인 — 무료 6종 구매 시도
+→ 400 `INVALID_REQUEST`, 잔액(100) 대비 더 비싼 가격(150) 구매 시도 → 409
+`INSUFFICIENT_STAR_DUST`, 정상 구매(가격 80) → 201 `{"starDust":20,"ownedAvatarIds":["shop1"]}`,
+같은 아바타 재구매 시도 → 400 `INVALID_REQUEST`, `GET /api/mypage`에 반영된 `starDust`·
+`ownedAvatarIds` 확인, 구매한 아바타로 `PATCH` 장착 → 200, 존재하지 않는 `childId` → 404
+`NOT_FOUND`. `\d avatar_purchases`로 유니크 제약·FK cascade 실제 생성 확인. 소유권 검증
+(403 `FORBIDDEN`)은 `dev-login`이 고정 단일 계정만 발급해 실제 재현은 못 했지만,
+`WordbookServiceImpl`·`MypageServiceImpl`과 동일한 `getOwnedChild()` 패턴을 그대로 재사용한
+코드라 별도 검증 없이도 신뢰 가능하다고 판단했다.
+
+**변경 파일**: `shop/*`(신규), `Child.java`(`deductStarDust`), `ErrorCode.java`,
+`MypageChildResponse.java`, `MypageServiceImpl.java`.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

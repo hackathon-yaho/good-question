@@ -473,6 +473,11 @@ A-5는 아이가 0명이면 다시 A-4로 보냅니다. 무한 왕복입니다.
 > ⚠️ **확정 (2026-08-10, 프론트 구현)**: 이 결정 이전에 프론트는 B-1에 별가루 칩을 넣지
 > 않았습니다 ("화면에만 있는 숫자는 근거가 없다"는 판단). 백엔드 값은 위 표대로 쌓이므로,
 > 프론트는 원하면 이후에 표시만 붙이면 됩니다.
+>
+> ✅ **2026-08-16 — "차감·사용처 없음" 뒤집힘** ([D-59](../backend/docs/decisions.md)).
+> 아바타 상점이 생기면서 별가루로 아바타를 구매할 수 있게 됐다. `POST
+> /api/children/{childId}/avatar-purchases`가 차감을 처리하고, 구매 이력은 새
+> `avatar_purchases` 테이블(위 결정 당시엔 없던 것)에 남긴다 — [request/backend/avatar-shop-purchase.md](request/backend/avatar-shop-purchase.md).
 
 ### Q-05 · 힌트 기능 (C-8) ⛔ 미구현 확정 (2026-08-10)
 

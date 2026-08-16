@@ -16,6 +16,8 @@ import com.goodquestion.backend.mypage.dto.response.RetellingItemResponse;
 import com.goodquestion.backend.session.entity.StorySession;
 import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
+import com.goodquestion.backend.shop.entity.AvatarPurchase;
+import com.goodquestion.backend.shop.repository.AvatarPurchaseRepository;
 import com.goodquestion.backend.wordbook.repository.WordbookRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ public class MypageServiceImpl implements MypageService {
     private final MessageRepository messageRepository;
     private final WordbookRepository wordbookRepository;
     private final PostActivityResultRepository postActivityResultRepository;
+    private final AvatarPurchaseRepository avatarPurchaseRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -70,8 +73,12 @@ public class MypageServiceImpl implements MypageService {
                         .map(result -> toRetellingItem(s, result)))
                 .toList();
 
+        List<String> ownedAvatarIds = avatarPurchaseRepository.findAllByChild(child).stream()
+                .map(AvatarPurchase::getAvatarId)
+                .toList();
+
         return new MypageResponse(
-                MypageChildResponse.of(child),
+                MypageChildResponse.of(child, ownedAvatarIds),
                 new MypageStatsResponse(completed.size(), savedWords, activityDates.size()),
                 completedStories,
                 retellings);

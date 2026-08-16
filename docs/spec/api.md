@@ -169,6 +169,7 @@ X-Internal-Token: <shared-secret>
 | 404 | `NOT_FOUND` | 대상 없음 | |
 | 409 | `CHILD_LIMIT_EXCEEDED` | 계정당 아이 3명 초과 | A-4 토스트 |
 | 409 | `SCENE_ALREADY_CLOSED` | 종료된 장면에 발화 제출 | |
+| 409 | `INSUFFICIENT_STAR_DUST` | 상점 구매 시 별가루 부족 | 토스트 "별가루가 부족해요." |
 | 422 | `STT_EMPTY` | 확정 텍스트 없음 (메시지 생성하지 않음) | I-2 |
 | 5xx / 타임아웃 | — | 서버 오류 | I-3 |
 
@@ -338,6 +339,28 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 #### `DELETE /api/children/{childId}` ✅ · H-6
 
 연관 `story_sessions`, `messages`, `wordbook` 캐스케이드 삭제.
+
+#### `POST /api/children/{childId}/avatar-purchases` ✅ · 상점 (신규, [D-59](../../backend/docs/decisions.md))
+
+아바타 **구매 전용**입니다. 장착(현재 아바타 변경)은 위 `PATCH /api/children/{childId}`를 그대로 씁니다.
+
+```json
+{ "avatarId": "shop1", "price": 150 }
+```
+
+**Response 201**
+
+```json
+{ "starDust": 150, "ownedAvatarIds": ["shop1"] }
+```
+
+| 상황 | 에러 |
+| --- | --- |
+| 잔액 부족 (`starDust < price`) | 409 `INSUFFICIENT_STAR_DUST` |
+| 무료 6종(`color1`~`color6`)이거나 이미 보유 | 400 `INVALID_REQUEST` |
+
+`avatarId`·`price`는 검증하지 않고 요청 값을 그대로 신뢰합니다 — `avatarId`를 검증하지 않는
+기존 정책(D-08)과 같은 이유입니다 (D-59, 트레이드오프 명시).
 
 ### 3.3 홈·탐색
 
@@ -842,7 +865,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 
 ```json
 {
-  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "age": 8, "starDust": 200 },
+  "child": { "id": "uuid", "name": "민준", "avatarId": "fox", "age": 8, "starDust": 200, "ownedAvatarIds": ["shop1"] },
   "stats": { "completedStories": 1, "savedWords": 3, "activeDays": 2 },
   "completedStories": [
     { "sessionId": "uuid", "storyId": "uuid", "title": "방귀 뀌는 며느리", "coverImageUrl": "...", "completedAt": "..." }
@@ -856,6 +879,9 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 - `retellings[].text`는 `post_activity_results.retelling_text`입니다. **오디오가 아닙니다.**
   F-1 "내 이야기 들어보기"는 이 텍스트를 TTS로 읽습니다 → [Q-07](../open-questions.md)
 - `stats`에 점수·등급을 넣지 않습니다. 활동량만입니다 ([PRD 10.1](../product/prd.md))
+- `child.ownedAvatarIds`는 **신규(D-59)** — 이 아이가 상점에서 구매한 아바타 id 목록.
+  F-1 아바타 변경 모달이 무료 6종 + 이 목록만 골라서 보여줍니다. 필드가 없으면 프론트는
+  상점 아바타 전부를 미구매로 취급합니다.
 - `child.starDust`(누적 별가루 잔액)는 **신규(D-33)** — 프론트가 화면(B-20)을 이미 구현해뒀는데
   읽을 응답이 없어서 요청받아 추가했습니다. Q-12가 "별가루 필드는 만들지 않는다"고 했던 건
   MVP 제외 권고였을 뿐 지금은 B-20·D-09로 별가루 자체가 채택된 상태라 낡은 문장입니다

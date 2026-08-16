@@ -20,6 +20,7 @@ public enum ErrorCode {
     CHILD_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "CHILD_LIMIT_EXCEEDED", "계정당 등록 가능한 아이는 최대 3명입니다."),
     SCENE_ALREADY_CLOSED(HttpStatus.CONFLICT, "SCENE_ALREADY_CLOSED", "이미 종료된 장면입니다."),
     STT_EMPTY(HttpStatus.UNPROCESSABLE_ENTITY, "STT_EMPTY", "변환된 텍스트가 없습니다."),
+    INSUFFICIENT_STAR_DUST(HttpStatus.CONFLICT, "INSUFFICIENT_STAR_DUST", "별가루가 부족합니다."),
 
     // api.md 2.3에 명시된 5xx는 상태 코드만 정의되어 있고 code 값은 없다.
     // 팀 추가: GlobalExceptionHandler의 예외되지 않은 오류를 위한 fallback.

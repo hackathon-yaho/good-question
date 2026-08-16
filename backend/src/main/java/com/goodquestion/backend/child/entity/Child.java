@@ -76,6 +76,11 @@ public class Child {
         this.starDust += amount;
     }
 
+    /** 상점 구매(shop). 잔액 확인은 호출 측(AvatarPurchaseServiceImpl)의 책임이다. */
+    public void deductStarDust(int amount) {
+        this.starDust -= amount;
+    }
+
     /** PATCH /api/children/{childId} — 전달된 필드만 바꾼다 (api.md 3.2). */
     public void updateProfile(String name, String avatarId) {
         if (name != null) this.name = name;

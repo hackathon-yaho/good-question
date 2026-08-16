@@ -527,3 +527,26 @@ api.md 3.9에 스펙까지 있었는데 어느 Phase 표에도 걸리지 않아 
 **검증**: 완료 세션 2건·저장 단어 1건이 있는 아이로 조회 → `completedStories:2`,
 `savedWords:1`, `activeDays:1`, 목록 2건 전부 확인. 활동이 전혀 없는 아이로 조회 →
 전부 0/빈 배열로 에러 없이 응답. 다른 보호자 접근 → 403, 없는 `childId` → 404.
+
+---
+
+## 14. 아바타 상점
+
+| ID | 항목 | 등급 | 엔드포인트 |
+| --- | --- | --- | --- |
+| — | ~~아바타 구매~~ | 선택(프론트 요청) | `POST /api/children/{childId}/avatar-purchases` — **완료.** [request/backend/avatar-shop-purchase.md](request/backend/avatar-shop-purchase.md), D-59 |
+| — | ~~보유 아바타 노출~~ | 선택(프론트 요청) | `GET /api/mypage`의 `child.ownedAvatarIds` 추가 — **완료** |
+| — | 아바타 장착(변경) | — | 기존 `PATCH /api/children/{childId}` 재사용. **백엔드 변경 없음** |
+
+`shop/{entity,repository,service,controller,dto}` 신규 — `AvatarPurchase` 엔티티(`child_id`,
+`avatar_id`, `price`, `purchased_at`, `(child_id, avatar_id)` 유니크 제약). `avatarId`·`price`
+둘 다 서버가 검증하지 않는다 — 무료 6종(`color1`~`color6`)이거나 이미 보유 중이면
+`INVALID_REQUEST`, 잔액 부족이면 `INSUFFICIENT_STAR_DUST`(신규 에러코드, 409)로만 거절한다.
+
+### 검증 (2026-08-16)
+
+로컬 서버에 curl로 확인: 무료 아바타 구매 시도 → 400 `INVALID_REQUEST`, 잔액(100)보다 비싼
+가격(150) 구매 시도 → 409 `INSUFFICIENT_STAR_DUST`, 정상 구매(가격 80) → 201
+`{"starDust":20,"ownedAvatarIds":["shop1"]}`, 같은 아바타 재구매 → 400 `INVALID_REQUEST`,
+`GET /api/mypage`에 반영 확인, 구매한 아바타로 `PATCH` 장착 → 200, 없는 `childId` → 404
+`NOT_FOUND`. `\d avatar_purchases`로 유니크 제약·FK cascade 실제 생성 확인.
