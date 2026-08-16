@@ -18,13 +18,18 @@
  *     → 빨간색·X 마크를 쓰지 않는 이유가 이것이다
  */
 
-import { KID_GROUPS, toKidGroupFlags, type KidGroup } from "@/lib/thinking-elements";
+import { requiredElementsOf } from "@/lib/scene-elements";
+import {
+  KID_ELEMENT_LABEL,
+  hasElement,
+  type ThinkingElement,
+} from "@/lib/thinking-elements";
 
 /**
- * 그룹별 아이콘. 뜻이 바로 읽히는 것으로 골랐다 (계획 D7).
- *   마음 = 하트 · 이유 = 물음표 · 생각 = 전구 · 방법 = 열쇠
+ * 이름별 아이콘. 뜻이 바로 읽히는 것으로 골랐다 (계획 D7).
+ *   마음 = 하트 · 이유 = 물음표 · 생각 = 전구 · 방법 = 열쇠 · 부탁 = 말풍선 · 결과 = 깃발
  */
-const ICON: Record<KidGroup, React.ReactNode> = {
+const ICON: Record<string, React.ReactNode> = {
   마음: (
     <path d="M12 20.5l-1.4-1.3C6 15.1 3 12.4 3 9a4.5 4.5 0 018.99-.6h.02A4.5 4.5 0 0121 9c0 3.4-3 6.1-7.6 10.2z" />
   ),
@@ -46,38 +51,59 @@ const ICON: Record<KidGroup, React.ReactNode> = {
       <path d="M11.4 11.4L20 20M16.5 15.5l-2 2M19 18l-2 2" />
     </>
   ),
+  // 부탁 = 말풍선. "내가 대신 말해 줄게"가 읽힌다
+  부탁: <path d="M4.5 5h15v10.5h-9L5.5 20v-4.5h-1z" />,
+  // 결과 = 깃발. "그래서 이렇게 됐어"가 읽힌다
+  결과: (
+    <>
+      <path d="M6.5 21V3.5" />
+      <path d="M6.5 4.5h11l-2.4 3.6 2.4 3.6h-11" />
+    </>
+  ),
 };
 
-/** 채운 아이콘(마음)과 선 아이콘(나머지)이 섞여 있어 stroke/fill을 그룹별로 나눈다. */
-const FILLED: Record<KidGroup, boolean> = {
+/** 채운 아이콘(마음)과 선 아이콘(나머지)이 섞여 있어 stroke/fill을 이름별로 나눈다. */
+const FILLED: Record<string, boolean> = {
   마음: true,
   이유: false,
   생각: false,
   방법: false,
+  부탁: false,
+  결과: false,
 };
 
 type Props = {
   /** 서버가 내려준 accumulatedElements. 영문 코드 배열 */
   accumulatedElements: readonly string[];
+  /**
+   * 아이가 보는 장면 번호(1~4). 이 장면이 요구하는 요소만 그린다.
+   *
+   * ⚠️ 없으면 4그룹 기본값으로 그린다 — 장면 3·4에서는 **틀린 화면**이다.
+   *    그 장면이 요구한 적 없는 `마음`·`이유`가 빈 채로 남는다.
+   *    (`scene-elements.ts`)
+   */
+  screenIndex?: number | null;
   title?: string;
 };
 
 export function ThinkingElementStars({
   accumulatedElements,
+  screenIndex = null,
   title = "오늘 모은 생각",
 }: Props) {
-  const flags = toKidGroupFlags(accumulatedElements);
+  const required = requiredElementsOf(screenIndex);
 
   return (
     <div className="flex flex-col items-center gap-3">
       <p className="text-kid-body font-bold text-muted">{title}</p>
 
       <ul className="flex items-start gap-6">
-        {KID_GROUPS.map((group) => {
-          const earned = flags[group];
+        {required.map((element: ThinkingElement) => {
+          const group = KID_ELEMENT_LABEL[element];
+          const earned = hasElement(accumulatedElements, element);
           const filled = FILLED[group];
           return (
-            <li key={group} className="flex flex-col items-center gap-1.5">
+            <li key={element} className="flex flex-col items-center gap-1.5">
               <span
                 aria-hidden
                 className={[

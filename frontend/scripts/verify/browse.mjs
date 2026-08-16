@@ -264,7 +264,9 @@ if (found) {
     (await page.getByRole("button", { name: "담김 ✓" }).count()) === 1,
     "이미 담긴 단어면 '담김 ✓'"
   );
-  await page.getByRole("button", { name: "닫기" }).click();
+  // 페이지 다른 곳의 "사이드바 닫기" 버튼도 "닫기"를 부분 일치로 포함해 strict mode
+  // violation이 난다. 모달(dialog) 안으로 스코프를 좁힌다.
+  await page.getByRole("dialog").getByRole("button", { name: "닫기" }).click();
 }
 
 // ── E-1 / E-2 단어장 ─────────────────────────────────────────────────
@@ -305,7 +307,9 @@ ok(
   (await page.getByRole("button", { name: "다음 단어" }).count()) === 0,
   "단어가 1개면 '다음 단어' 없음"
 );
-await page.getByRole("button", { name: "닫기" }).click();
+// 페이지 다른 곳의 "사이드바 닫기" 버튼도 "닫기"를 부분 일치로 포함해 strict mode
+// violation이 난다. 모달(dialog) 안으로 스코프를 좁힌다.
+await page.getByRole("dialog").getByRole("button", { name: "닫기" }).click();
 
 // 빈 상태
 await page.evaluate(() => window.localStorage.removeItem("gq.mock.wordbook"));

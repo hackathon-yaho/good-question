@@ -144,7 +144,7 @@ if (!path().startsWith("/activity/")) {
 await page.getByRole("button", { name: "시작하기" }).click({ timeout: 8000 });
 await page.getByText("이야기 순서대로 놓아볼까?").waitFor({ timeout: 8000 });
 for (const text of CARD_ORDER) {
-  await page.locator("button.touch-none", { hasText: text }).first().click();
+  await page.getByRole("button", { name: text }).first().click();
   await page.waitForTimeout(100);
 }
 await page.getByRole("button", { name: "확인하기" }).click();
@@ -361,7 +361,10 @@ await page.getByRole("heading", { name: "공지사항" }).waitFor({ timeout: 800
 ok((await page.getByRole("listitem").count()) === 2, "공지 2건");
 ok(await page.getByText("안내", { exact: true }).isVisible(), "분류 칩 '안내'");
 ok(await page.getByText("업데이트", { exact: true }).isVisible(), "분류 칩 '업데이트'");
-const firstNotice = page.getByRole("button").first();
+// ⚠️ page.getByRole("button").first()는 페이지 맨 위 "뒤로 가기" 버튼을 집는다
+// (NoticesScreen이 BackButton을 href 없이 써서 <a>가 아니라 실제 <button>이다).
+// 첫 공지 항목 안으로 스코프를 좁혀야 한다.
+const firstNotice = page.getByRole("listitem").first().getByRole("button");
 ok((await page.getByLabel("읽지 않음").count()) === 1, "미읽음 점");
 await firstNotice.click();
 await page.waitForTimeout(400);

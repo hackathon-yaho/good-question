@@ -28,7 +28,7 @@
 
 import { chromium } from "playwright-core";
 
-import { BASE, SHOT, chromeExecutable, passMissionBrief } from "./_browser.mjs";
+import { BASE, SHOT, chromeExecutable, passMissionBrief, skipIntro } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 const browser = await chromium.launch({ executablePath: EXE, headless: true });
@@ -300,19 +300,6 @@ const MISSION_PROBE = () => {
   );
   const micRect = mic?.getBoundingClientRect();
 
-  /**
-   * 발화 중 남겨두는 "지금 말할 항목" 한 줄. [미션] 칩 옆의 문구다.
-   * 어느 항목이 현재인지는 진행 상황에 따라 다르므로 **특정 문구를 기대하지 않는다.**
-   * 칩이 있고 그 옆에 글자가 있는지만 본다.
-   */
-  let nowItem = null;
-  for (const el of panel.querySelectorAll("span")) {
-    if ((el.textContent ?? "").trim() !== "미션") continue;
-    const sibling = el.nextElementSibling;
-    const text = (sibling?.textContent ?? "").trim();
-    if (text.length > 0) { nowItem = text; break; }
-  }
-
   /* ── 눈에 보이는 블록끼리 실제로 겹치는지 ────────────────────────── */
   const blocks = [];
   const push = (el, name) => {
@@ -370,7 +357,6 @@ const MISSION_PROBE = () => {
     dismissFound: Boolean(dismiss),
     dismissInsideCard,
     dismissVisible,
-    nowItem,
     pauseOverlap,
     overlaps,
     outside,
@@ -419,14 +405,15 @@ async function driveToMission(page, id) {
 /** /play를 원하는 상태까지 몰고 간다. */
 async function drivePlay(page, id, target) {
   await page.goto(`${BASE}/play/${id}`, { waitUntil: "networkidle" });
-  await page.getByText("탭하면 이야기가 시작돼요").click({ timeout: 8000 }).catch(() => {});
-  for (let i = 0; i < 6; i += 1) {
-    const next = page.getByRole("button", { name: /다음|이야기 시작하기/ });
-    if (await next.count()) {
-      await next.first().click().catch(() => {});
-      await page.waitForTimeout(160);
-    }
-  }
+  /**
+   * ⚠️ 예전엔 여기서 6회 × 160ms(약 1초) 고정 루프로 인트로를 넘겼다. 인트로는
+   *    문장마다 TTS + 0.5초 뒤 자동으로 넘어가고 **마지막 문장에서만** "이야기
+   *    시작하기" 버튼이 뜨는데, 문장이 몇 개만 있어도 1초 안에 마지막 문장까지
+   *    자동 진행이 끝나지 않는다. 그러면 버튼이 아직 없어 루프가 그냥 끝나고,
+   *    이후 C-4·C-5·I-2 대기가 전부 인트로 도중에 타임아웃났다. 시간 마감
+   *    기반인 공용 `skipIntro()`(다른 스위트가 다 쓰는 것)로 바꾼다.
+   */
+  await skipIntro(page);
   await page.getByText("이제 말해 볼까?").waitFor({ timeout: 12000 }).catch(() => {});
   if (target === "C4") return true;
 
@@ -631,10 +618,6 @@ for (const vp of VIEWPORTS) {
       if (m.mic.w < 72) {
         problems.push(`${label}: 마이크 ${m.mic.w}px < 72px (§1-4)`);
       }
-    }
-    // 카드는 감추되 지금 말할 항목은 남긴다 (계획 D17)
-    if (!m.nowItem) {
-      problems.push(`${label}: 지금 말할 미션 항목이 화면에 없다`);
     }
   };
 

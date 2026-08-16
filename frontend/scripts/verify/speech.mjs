@@ -12,7 +12,9 @@
  * 가짜는 **응답뿐**이다 — 녹음·업로드·재생은 브라우저가 실제로 한다.
  *
  * 마이크는 Chromium의 가짜 오디오 장치를 쓴다(`--use-fake-device-for-media-stream`).
- * 계속 소리가 나는 장치라 무음 자동 종료가 걸리지 않으므로 [보내기]로 끝낸다.
+ * ⚠️ **계속 소리가 나는 장치라 무음 2초 자동 종료가 영원히 걸리지 않는다.**
+ *    사람은 기다리면 끝나지만 이 장치로는 안 끝나므로, 검사는 마이크를 다시 눌러
+ *    녹음을 멈춘다(`stopRecording`). 실제 아이가 쓰는 동선과 같은 조작이다.
  */
 
 import { chromium } from "playwright-core";
@@ -132,17 +134,38 @@ console.log("\n=== ① 녹음 → POST /api/stt ===");
 await page.getByText("이제 말해 볼까?").waitFor({ timeout: 20000 });
 ok(true, "C-4 도달");
 
-// 녹음이 실제로 시작될 시간을 준다. getUserMedia가 비동기다.
-await page.waitForTimeout(1200);
-const submitButton = page.getByRole("button", { name: "보내기" });
-ok(await submitButton.isEnabled(), "녹음 중이면 [보내기] 활성");
+/**
+ * ⚠️ C-4에 **[보내기] 버튼이 없다.** 아이가 누를 것은 마이크 하나뿐이다.
+ *    말이 끝나면 무음 2초로 스스로 멈추고, 그전에 멈추고 싶으면 마이크를 다시
+ *    누른다. 가짜 오디오 장치는 무음이 되지 않으므로 검사는 후자를 쓴다.
+ */
+ok(
+  (await page.getByRole("button", { name: "보내기" }).count()) === 0,
+  "C-4에 [보내기]가 없다 (마이크 재탭 또는 무음 감지로 제출)"
+);
 
-await submitButton.click();
+/**
+ * 녹음을 멈춘다 — 마이크를 다시 누른다. (PlayScreen `onMicClick` 토글)
+ * 버튼 이름은 `MicButton`의 `LABEL.recording`이다.
+ *
+ * ⚠️ 시작하자마자 멈추면 안 된다. `recorder.start()`에 timeslice를 안 줘서
+ *    데이터는 `stop()` 시점에 **그때까지 녹음된 만큼 한 덩어리**로 나온다.
+ *    너무 빨리 멈추면 그 덩어리가 `MIN_AUDIO_BYTES`(1024B) 밑으로 나와
+ *    "말한 게 없다"로 처리되고(`backend-stt.ts`) ①이 아예 시작되지 않는다.
+ */
+async function stopRecording() {
+  const mic = page.getByRole("button", { name: "말하는 중" });
+  await mic.waitFor({ timeout: 10000 });
+  await page.waitForTimeout(600);
+  await mic.click();
+}
 
-// 변환 중 문구. 업로드가 끝나기 전에 잡아야 하므로 대기 없이 바로 본다.
+await stopRecording();
+
+// 업로드. 넉넉히 기다린다.
 const transcribing = page.getByText("네 말을 글로 옮기고 있어…");
 const sawTranscribing = await transcribing
-  .waitFor({ timeout: 4000 })
+  .waitFor({ timeout: 15000 })
   .then(() => true)
   .catch(() => false);
 ok(sawTranscribing, "① 변환 중 문구가 뜬다 (응답 대기와 구분)");
@@ -225,12 +248,12 @@ await page.route("**/api/sessions/**/messages", async (route) => {
 });
 
 await page.getByText("이제 말해 볼까?").waitFor({ timeout: 20000 });
-await page.waitForTimeout(1200);
-await page.getByRole("button", { name: "보내기" }).click();
+// C-4에는 [보내기]가 없다. 마이크를 다시 눌러 끝낸다. (위 주석 참조)
+await stopRecording();
 await page
   .getByText(/잘 안 들렸어|다시 말해/)
   .first()
-  .waitFor({ timeout: 15000 })
+  .waitFor({ timeout: 20000 })
   .catch(() => {});
 ok(
   await page.getByText(/잘 안 들렸어|다시 말해/).first().isVisible(),

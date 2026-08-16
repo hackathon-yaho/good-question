@@ -179,6 +179,22 @@ export function useBackendTts(
           audio.src = url;
           return audio.play();
         })
+        .then(() => {
+          /**
+           * 재생이 실제로 시작됐으면 **예산 타이머를 끈다.**
+           *
+           * ⚠️ 이걸 빼먹으면 12초가 지나는 순간 아직 말하는 중인데도 `onDone`이
+           *    불려 **아이 마이크가 켜진다.** 그러면 캐릭터 음성이 그대로 녹음된다
+           *    (작업 분장 2.3 "캐릭터 발화가 끝난 뒤 활성화"를 어긴다).
+           *    예산은 **받아오는 데** 걸리는 시간을 위한 것이지 낭독 길이가 아니다.
+           *    긴 대사에서만 재현되므로 "종종"으로 보인다.
+           *
+           * 재생이 시작된 뒤에는 `ended`·`error`가 끝을 알려준다.
+           */
+          if (genRef.current !== gen) return;
+          if (budgetTimer.current) clearTimeout(budgetTimer.current);
+          budgetTimer.current = null;
+        })
         .catch(() => {
           // 받지 못했거나 자동 재생이 막혔다. 텍스트는 보이므로 넘어간다.
           settleThis();

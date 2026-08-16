@@ -47,7 +47,8 @@ const ok = (c, l) => console.log(`  ${c ? "OK  " : "FAIL"} ${l}`);
 
   console.log("=== 마우스 드래그 (Pointer Events) ===");
   const card = page.locator("button.touch-none").first();
-  const cardText = (await card.innerText()).trim();
+  // 카드가 **그림만** 있어 innerText가 비어 있다. 접근성 이름으로 비교한다.
+  const cardText = ((await card.getAttribute("aria-label")) ?? "").trim();
   const from = await card.boundingBox();
   const to = await page.locator('[data-slot-index="2"]').boundingBox();
 
@@ -57,7 +58,7 @@ const ok = (c, l) => console.log(`  ${c ? "OK  " : "FAIL"} ${l}`);
   await page.mouse.up();
   await page.waitForTimeout(250);
 
-  const slot2 = (await page.locator('[data-slot-index="2"]').innerText()).trim();
+  const slot2 = ((await page.locator('[data-slot-index="2"]').getAttribute("aria-label")) ?? "").trim();
   ok(slot2 === cardText, `3번 칸에 드롭됨 — "${slot2.slice(0, 18)}…"`);
   ok((await page.locator("button.touch-none").count()) === 3, "트레이에서 제거됨");
 
@@ -85,7 +86,8 @@ const ok = (c, l) => console.log(`  ${c ? "OK  " : "FAIL"} ${l}`);
 
   console.log("\n=== 터치 드래그 (태블릿 1180×820) ===");
   const card = page.locator("button.touch-none").first();
-  const cardText = (await card.innerText()).trim();
+  // 카드가 **그림만** 있어 innerText가 비어 있다. 접근성 이름으로 비교한다.
+  const cardText = ((await card.getAttribute("aria-label")) ?? "").trim();
   const from = await card.boundingBox();
   const to = await page.locator('[data-slot-index="0"]').boundingBox();
 
@@ -102,7 +104,7 @@ const ok = (c, l) => console.log(`  ${c ? "OK  " : "FAIL"} ${l}`);
   await touch("touchEnd", to.x + to.width / 2, to.y + to.height / 2);
   await page.waitForTimeout(300);
 
-  const slot0 = (await page.locator('[data-slot-index="0"]').innerText()).trim();
+  const slot0 = ((await page.locator('[data-slot-index="0"]').getAttribute("aria-label")) ?? "").trim();
   ok(slot0 === cardText, `1번 칸에 드롭됨 — "${slot0.slice(0, 18)}…"`);
   await page.close();
 }

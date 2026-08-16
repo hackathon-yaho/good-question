@@ -197,6 +197,9 @@ export function StoryDetailScreen({
     childRole: story.childRole,
   };
 
+  // 조건과 src에서 같은 함수를 두 번 부르지 않도록 한 번만 구한다.
+  const cover = getStoryCoverImage(story.id, story.title, story.coverImageUrl);
+
   return (
     <div className="flex min-h-dvh w-full flex-col bg-bg lg:flex-row">
       {/* 좌 45% 표지 — 여백을 두고 라운드 처리한다. 화면 끝에 붙은 사각형은
@@ -210,9 +213,9 @@ export function StoryDetailScreen({
             (28,28)에서 11.3px이고 반지름 28px보다 작다. */}
         <div className="relative flex size-full items-center justify-center overflow-hidden rounded-card bg-primary-soft">
           <BackButton className="absolute top-5 left-5 z-10" />
-          {getStoryCoverImage(story.id, story.title, story.coverImageUrl) ? (
+          {cover ? (
             // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
-            <img src={getStoryCoverImage(story.id, story.title, story.coverImageUrl) ?? undefined} alt="" className="size-full object-cover" />
+            <img src={cover} alt="" className="size-full object-cover" />
           ) : (
             /* 표지 미수령 (assets.md §3-1). 규격 자리를 지켜 레이아웃이 흔들리지 않게 한다. */
             <span className="text-parent-body font-bold text-muted">표지 준비 중</span>

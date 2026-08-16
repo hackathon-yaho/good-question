@@ -89,16 +89,32 @@ export function SHOT(name) {
  *
  * 자동재생 게이트("탭하면 이야기가 시작돼요")도 함께 처리한다.
  */
-export async function skipIntro(page, { max = 40 } = {}) {
+export async function skipIntro(page, { timeoutMs = 60_000 } = {}) {
   await page
     .getByText("탭하면 이야기가 시작돼요")
     .click({ timeout: 8000 })
     .catch(() => {});
 
-  for (let i = 0; i < max; i += 1) {
-    const next = page.getByRole("button", { name: /다음|이야기 시작하기/ });
-    if ((await next.count()) === 0) return true;
-    await next.first().click().catch(() => {});
+  /**
+   * ⚠️ 도입부는 **자동으로 넘어간다.** 문장 낭독이 끝나면 0.5초 뒤 다음 문장으로
+   *    가고, 마지막 문장에서만 "이야기 시작하기" 버튼이 뜬다.
+   *
+   *    예전에는 "다음" 버튼을 반복해서 눌렀는데, 지금은 중간 문장에 버튼이 없어
+   *    **첫 판단에서 바로 반환**했다. 그러면 도입부가 재생 중인데 스위트가 다음
+   *    단계로 넘어가 대화 화면을 찾다가 죽는다. (turn·speech·activity·browse·parent)
+   *
+   *    그래서 "버튼이 없다"를 끝으로 보지 않고, **도입부를 벗어났는지**로 판단한다.
+   */
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const start = page.getByRole("button", { name: /이야기 시작하기|다음/ });
+    if (await start.count()) {
+      await start.first().click().catch(() => {});
+      await page.waitForTimeout(250);
+      continue;
+    }
+    // 도입 자막이 사라졌으면 다음 장면으로 넘어간 것이다.
+    if ((await page.locator("p.text-intro").count()) === 0) return true;
     await page.waitForTimeout(250);
   }
   return false;

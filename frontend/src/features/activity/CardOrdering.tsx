@@ -145,6 +145,7 @@ export function CardOrdering({
               </span>
               <div
                 data-slot-index={index}
+                aria-label={card ? card.text : `${index + 1}번 자리 (비어 있음)`}
                 data-mismatched={wrong ? "1" : undefined}
                 onClick={() => card && onRemove(index)}
                 className={[
@@ -158,6 +159,7 @@ export function CardOrdering({
                     src={getActivityCardImage(card.id)}
                     alt=""
                     fill
+                    draggable={false}
                     className="object-contain p-2"
                     sizes="15rem"
                   />
@@ -188,6 +190,9 @@ export function CardOrdering({
                 setHoverSlot(null);
               }}
               style={{ rotate: `${(i % 2 === 0 ? -1 : 1) * 1.5}deg` }}
+              /* 그림만 있는 버튼이라 이름이 없으면 스크린리더에 "버튼"으로만 읽힌다.
+                 카드 문구를 이름으로 준다 — 화면에는 아무 변화도 없다. */
+              aria-label={card.text}
               className={[
                 // touch-action:none 이 없으면 터치 드래그가 스크롤로 먹힌다.
                 "relative flex h-[11.25rem] w-[15rem] touch-none items-center justify-center overflow-hidden rounded-card p-3 text-center transition-shadow select-none bg-transparent",
@@ -196,10 +201,15 @@ export function CardOrdering({
                   : "",
               ].join(" ")}
             >
+              {/* ⚠️ `draggable={false}`가 없으면 **마우스 드래그가 통째로 죽는다.**
+                  <img>는 기본이 draggable이라 끌기 시작하면 브라우저의 기본 이미지
+                  드래그가 걸리고, 그 순간 pointercancel이 날아와 앱의 배치 로직이
+                  취소된다. 터치에서는 안 나므로 태블릿만 보면 놓친다. */}
               <Image
                 src={getActivityCardImage(card.id)}
                 alt=""
                 fill
+                draggable={false}
                 className="object-contain p-2"
                 sizes="15rem"
               />

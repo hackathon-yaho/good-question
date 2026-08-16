@@ -8,7 +8,6 @@
 
 import { PillButton } from "@/components/ui/PillButton";
 import { MicButton } from "@/components/ui/MicButton";
-import { SpeechBubble } from "@/components/ui/SpeechBubble";
 import { ThinkingElementStars } from "@/components/ui/ThinkingElementStars";
 import { ConversationHistory } from "@/features/play/ConversationHistory";
 import type { Message } from "@/lib/api/types";
@@ -65,6 +64,7 @@ export function ConversationPanel({
   messages,
   currentSceneId,
   accumulatedElements,
+  screenIndex,
   guided,
 }: {
   displayName: string;
@@ -72,6 +72,8 @@ export function ConversationPanel({
   /** 지금 장면 id — 지난 장면 대화 앞에 구분선을 넣는 데 쓴다 */
   currentSceneId?: string;
   accumulatedElements: readonly string[];
+  /** 아이가 보는 장면 번호(1~4). 장면마다 모으는 요소가 다르다 */
+  screenIndex?: number | null;
   guided: boolean;
 }) {
   return (
@@ -99,7 +101,10 @@ export function ConversationPanel({
 
       {guided ? (
         <div className="shrink-0 bg-accent-soft/50 py-4">
-          <ThinkingElementStars accumulatedElements={accumulatedElements} />
+          <ThinkingElementStars
+            accumulatedElements={accumulatedElements}
+            screenIndex={screenIndex}
+          />
         </div>
       ) : null}
 
@@ -129,114 +134,10 @@ export function ConversationPanel({
  *
  * "응답 대기"(②)는 캐릭터가 생각하는 구간이라 화면이 완전히 다르다.
  * → `ThinkingPanel`
- */
-// export function ChildTurnPanel({
-//   missionItem = null,
-//   recording,
-//   transcribing = false,
-//   interimText,
-//   micLevel,
-//   onMicClick,
-//   onSubmit,
-//   submitDisabled,
-// }: {
-//   /**
-//    * 미션 진행 중이면 **지금 말할 항목**. 미션 카드는 감추지만(계획 D17) 방금 읽은
-//    * 항목을 잊지 않게 한 줄로 남긴다. 카드가 아니라 라벨이다.
-//    */
-//   missionItem?: string | null;
-//   recording: boolean;
-//   /** ① 변환 중. 마이크를 끄고 문구를 바꾼다. */
-//   transcribing?: boolean;
-//   interimText: string;
-//   micLevel: number;
-//   onMicClick: () => void;
-//   onSubmit: () => void;
-//   submitDisabled: boolean;
-// }) {
-//   const micState = transcribing
-//     ? "disabled"
-//     : recording
-//       ? "recording"
-//       : "idle";
-
-//   return (
-//     <div className="flex size-full min-h-0 flex-col">
-//       {/* NPC 프로필과 지난 대사를 뺐다. 좌측(`CharacterStage`)이 얼굴·이름·대사를
-//           이미 보여주므로 같은 정보를 우측에 또 두면 마이크 자리를 잡아먹는다.
-//           이 패널은 **말하는 일**에만 쓴다. */}
-
-//       {/* overflow-hidden이 없으면 좁아졌을 때 마이크가 위아래로 삐져나와
-//           말풍선과 푸터를 덮는다.
-//           ⚠️ `pt-20`이 없으면 "이제 말해 볼까?"의 위쪽이 **잘린다.** 아래 마이크 칸이
-//              `flex-1`로 남은 높이를 다 가져가 열이 꽉 차고, 그러면 `justify-center`가
-//              할 일이 없어져 문구가 y=0에 앉는다. text-turn은 32px이라 그대로 잘린다.
-//           ⚠️ 80px인 이유: 셸의 "잠시 멈춤" 버튼이 y=24~68을 쓴다. 그 아래에서 시작하면
-//              **세로로 겹치지 않으므로 가로 위치와 무관하게 안전하다.**
-//              예전에는 `pr-28`(112px)로 오른쪽을 비워 피했는데, 그 버튼은 우상단
-//              모서리에만 있는데도 열 전체에 여백이 걸려 **마이크까지 43px 왼쪽으로
-//              밀렸다.** 좌우 여백을 대칭으로 두면 모든 요소가 패널 진짜 중심에 온다. */}
-//       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-6 pt-20">
-//         {missionItem ? (
-//           <p className="flex shrink-0 items-center gap-2 self-start">
-//             <span className="rounded-pill bg-primary px-2.5 py-0.5 text-xs font-bold text-white">
-//               미션
-//             </span>
-//             <span className="text-parent-body font-bold text-text">
-//               {missionItem}
-//             </span>
-//           </p>
-//         ) : null}
-
-//         <p className="shrink-0 text-center text-turn leading-tight font-bold text-primary">
-//           {transcribing ? "잘 들었어!" : "이제 말해 볼까?"}
-//         </p>
-
-//         {/* 남은 높이를 마이크가 받는다. 이 칸은 flex-1로 높이가 확정되므로
-//             adaptive를 켜도 안전하다. MicButton 주석의 경고 참조. */}
-//         <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-//           <MicButton
-//             state={micState}
-//             size={180}
-//             level={micLevel}
-//             onClick={onMicClick}
-//             adaptive
-//           />
-//         </div>
-
-//         {/* "변환 중"은 아이에게 기술 용어다. 무슨 일이 일어나는지로 쓴다. */}
-//         {transcribing ? (
-//           <p
-//             aria-live="polite"
-//             className="flex shrink-0 items-center gap-2 text-center text-parent-body text-muted"
-//           >
-//             <span aria-hidden className="flex gap-1">
-//               {[0, 1, 2].map((i) => (
-//                 <span
-//                   key={i}
-//                   style={{ animationDelay: `${i * 0.15}s` }}
-//                   className="size-1.5 animate-bounce rounded-full bg-muted"
-//                 />
-//               ))}
-//             </span>
-//             네 말을 글로 옮기고 있어…
-//           </p>
-//         ) : (
-//           <></>
-//         )}
-
-//         {interimText ? (
-//           <p className="max-w-full shrink-0 truncate rounded-bubble bg-secondary-soft px-4 py-2 text-center text-kid-body text-text">
-//             {interimText}
-//           </p>
-//         ) : null}
-//       </div>
-//     </div>
-//   );
-// }
-
-/**
- * C-4 — 내 차례. 이 화면의 시각 신호가 약하면 서비스 전체가 작동하지 않는다.
+ *
+ * ── 보내기 버튼이 없다 ──────────────────────────────────────────────
+ * 말이 끝나면 **자동으로 제출된다.** 아이가 누를 것은 마이크 하나뿐이다.
+ * 그래서 안내 문구("아래 보내기를 눌러줘")도 함께 없앴다.
  */
 export function ChildTurnPanel({
   recording,
@@ -368,13 +269,7 @@ export function ConfirmPanel({
  * 내 말이 말풍선으로 올라간 뒤 캐릭터가 생각하는 구간이다. 요청 문서가 두 구간을
  * 구분해 달라고 요구한다. 예산은 10초. (docs/request/frontend/stt-tts-integration.md)
  */
-export function ThinkingPanel({
-  childText,
-  elapsedMs,
-}: {
-  childText: string;
-  elapsedMs: number;
-}) {
+export function ThinkingPanel({ elapsedMs }: { elapsedMs: number }) {
   // 예산이 10초이므로 6초에서 문구를 바꾼다. 8초에 바꾸면 남은 2초에만 보인다.
   const hint = elapsedMs > 6000 ? "조금만 더 기다려줘" : "음… 생각 중이야";
 

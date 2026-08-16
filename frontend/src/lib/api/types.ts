@@ -15,6 +15,16 @@ export type Message = {
   speakerType: SpeakerType;
   turnOrder: number;
   text: string;
+  /**
+   * 이 메시지가 속한 **장면의 캐릭터** 표시명 (D-31).
+   *
+   * `child` 발화에도 채워지며 그때는 "이 발화의 대화 상대"를 뜻한다. 같은 캐릭터가
+   * 여러 장면에 재등장해도 각 메시지가 실제 속한 장면 기준으로 채워진다.
+   * (backend/docs/api-spec.md 5.2 · 6.1)
+   *
+   * 선택 필드로 둔다 — 프론트가 직접 만든 메시지에는 없을 수 있다.
+   */
+  characterDisplayName?: string | null;
   createdAt: string;
 };
 

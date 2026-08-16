@@ -19,8 +19,8 @@
  * 카드를 거치면 아이가 도입·상황·등장인물을 보고 고를 수 있다.
  *
  * ── 별가루 ──────────────────────────────────────────────────────────
- * 서버가 값을 줄 때만 칩을 그린다. 아직 어떤 응답에도 `starDust`가 없어서
- * 실서버에서는 자동으로 숨는다. "별가루 0"을 보여주지 않는다. (계획 D4)
+ * 서버가 값을 줄 때만 칩을 그린다. 백엔드가 `starDust`를 실어 주므로(D-33)
+ * 실서버에서도 뜬다. 필드가 없는 응답에서는 칩을 그리지 않는다. (계획 D4)
  */
 
 "use client";
@@ -146,6 +146,15 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
           (_, i) => home.recommended[i % home.recommended.length]
         );
 
+  // 조건과 src에서 같은 함수를 두 번 부르지 않도록 한 번만 구한다.
+  const inProgressCover = inProgress
+    ? getStoryCoverImage(
+        inProgress.storyId,
+        inProgress.storyTitle,
+        inProgress.coverImageUrl
+      )
+    : null;
+
   return (
     <SidebarShell>
       {/* 프로필 — 상단 1줄 전체. 아바타·이름은 좌측, 별가루는 우측 끝 */}
@@ -180,10 +189,10 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
           <section className="min-w-0">
             <article className="flex flex-col overflow-hidden rounded-card border border-border bg-surface shadow-soft">
               <div className="relative flex aspect-[16/9] w-full items-center justify-center bg-primary-soft">
-                {getStoryCoverImage(inProgress.storyId, inProgress.storyTitle, inProgress.coverImageUrl) ? (
+                {inProgressCover ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 이미지 도메인 미확정
                   <img
-                    src={getStoryCoverImage(inProgress.storyId, inProgress.storyTitle, inProgress.coverImageUrl) ?? undefined}
+                    src={inProgressCover}
                     alt=""
                     className="size-full object-cover"
                   />

@@ -145,16 +145,14 @@ console.log(`  ${glow ? "OK  " : "FAIL"} turn-glow 테두리 ${glow}개`);
           "button[aria-label='말하기 시작'], button[aria-label='말하는 중']"
         )
       ),
-      hint: off(byText("말이 끝나면 아래 보내기를 눌러줘")),
     };
   });
   if (!align) console.log("  FAIL 우측 패널을 찾지 못했다");
   else {
-    // 보내기 버튼은 하단 우측 정렬이 의도다. 여기서 보지 않는다.
+    // 안내문과 보내기 버튼은 제거됐다(자동 제출). 남은 두 요소만 본다.
     for (const [name, label] of [
       ["turn", "'이제 말해 볼까?'"],
       ["mic", "마이크"],
-      ["hint", "안내문"],
     ]) {
       const v = align[name];
       const ok2 = v !== null && Math.abs(v) <= 2;

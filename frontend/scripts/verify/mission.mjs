@@ -5,7 +5,7 @@
  *
  *   ① 브리프  카드만. 마이크 없음. "말해볼래요"는 카드 밖
  *   ② 말해볼래요  아이가 읽고 스스로 시작
- *   ③ 발화  카드를 감추고 마이크만. 현재 항목은 한 줄로 남는다
+ *   ③ 발화  카드를 통째로 감춘다. 아이는 마이크만 본다
  *   ④ 서버 응답  남은 항목이 있으면 다음 항목으로 ①로 돌아간다
  *
  * 이 스위트가 없으면 "카드가 다시 열리는지"를 아무도 안 본다. 예전 구현은
@@ -94,33 +94,32 @@ await page.addInitScript(() => {
 const LONG =
   "며느리가 창피해서 계속 참았던 것 같아요. 가족들에게 솔직하게 말하면 좋겠어요.";
 
-/** 미션 카드의 상태를 읽는다. */
+/**
+ * 미션 카드의 상태를 읽는다.
+ *
+ * ⚠️ "현재 항목" 링과 "지금 말해볼 것" 키워드 칩은 더 이상 없다
+ *    (`MissionCard.tsx` 주석 — 4항목을 한눈에 보고 스스로 생각하게 두는 쪽으로
+ *    정리한 결과). 완료 표시는 배지 문자열이 "✓"인지로 읽는다 — 서버가
+ *    `satisfiedIndexes`로 확정해 준 항목만 ✓가 된다. 목은 이 값을 안 보내므로
+ *    목으로는 ✓가 뜨는 걸 확인할 수 없다(README 참조: verify-drift-report.md).
+ */
 const CARD = () =>
   page.evaluate(() => {
     const card = document.querySelector("section.border-accent");
     if (!card) return null;
     const items = [...(card.querySelector("ul")?.children ?? [])].map((li) => {
-      const cls = li.className;
       const badge = li.querySelector("span");
+      const badgeText = (badge?.textContent ?? "").trim();
       return {
         text: (li.textContent ?? "").replace(/말했어요|지금 말할 차례예요|아직이에요/g, "").trim(),
-        badge: (badge?.textContent ?? "").trim(),
-        // 현재 항목만 링을 갖는다 (계획 D18)
-        current: cls.includes("ring-primary"),
-        done: cls.includes("bg-secondary-soft"),
+        badge: badgeText,
+        done: badgeText === "✓",
         left: Math.round(li.getBoundingClientRect().left),
       };
     });
-    const label = [...card.querySelectorAll("p")].find(
-      (el) => (el.textContent ?? "").trim() === "지금 말해볼 것"
-    );
-    const chip = label?.nextElementSibling;
     return {
       title: (card.querySelector("h3")?.textContent ?? "").trim(),
       items,
-      keywordLabelTop: label ? Math.round(label.getBoundingClientRect().top) : null,
-      keywordChipTop: chip ? Math.round(chip.getBoundingClientRect().top) : null,
-      keyword: (chip?.textContent ?? "").trim(),
       // "말해볼래요"가 카드 안에 있으면 안 된다 (계획 D23)
       dismissInside: [...card.querySelectorAll("button")].some((b) =>
         (b.textContent ?? "").includes("말해볼래요")
@@ -177,30 +176,6 @@ ok(first?.items.length === 4, "체크리스트 4개", `${first?.items.length}개
   const lefts = new Set(first.items.map((i) => i.left));
   ok(lefts.size === 1, "체크리스트가 1열 4행", `${lefts.size}열`);
 }
-
-// 현재 항목이 정확히 1개
-{
-  const current = first.items.filter((i) => i.current);
-  ok(current.length === 1, "현재 항목이 정확히 1개", `${current.length}개`);
-  ok(
-    current[0]?.text.includes("무엇을 사용할까?"),
-    "첫 현재 항목 = 1번",
-    current[0]?.text
-  );
-}
-
-// "지금 말해볼 것"과 칩이 다른 행 (요구 9-2)
-ok(
-  first.keywordLabelTop !== null &&
-    first.keywordChipTop !== null &&
-    first.keywordChipTop > first.keywordLabelTop,
-  "'지금 말해볼 것'과 선택지가 다른 행"
-);
-ok(
-  ["마음", "이유", "생각", "방법"].includes(first.keyword),
-  "선택지가 4그룹 한글 이름 (영문 코드 노출 금지)",
-  first.keyword
-);
 
 // 브리프에는 마이크가 없다
 ok(
@@ -264,19 +239,6 @@ ok(
   });
   ok(mic !== null && mic.w >= 72, "마이크가 원래 크기로 돌아왔다", `${mic?.w}px`);
 }
-// 카드는 감추되 지금 말할 항목은 한 줄로 남긴다 (계획 D17)
-{
-  const nowItem = await page.evaluate(() => {
-    for (const el of document.querySelectorAll("span")) {
-      if ((el.textContent ?? "").trim() !== "미션") continue;
-      const t = (el.nextElementSibling?.textContent ?? "").trim();
-      if (t) return t;
-    }
-    return null;
-  });
-  ok(Boolean(nowItem), "지금 말할 항목이 한 줄로 남는다", nowItem ?? "없음");
-}
-
 console.log("\n=== ④ 서버 응답 → 브리프 복귀 ===");
 await page.evaluate((t) => window.__say(t), LONG);
 await page
@@ -292,28 +254,13 @@ const returned = await page
   .catch(() => false);
 ok(returned, "다음 항목에서 미션 카드가 다시 열린다");
 
-if (returned) {
-  const second = await CARD();
-  const doneCount = second.items.filter((i) => i.done).length;
-  ok(doneCount >= 1, "말한 항목이 완료로 표시된다", `${doneCount}개`);
-  ok(
-    second.items[0]?.badge === "✓",
-    "완료 항목의 번호가 체크로 바뀐다",
-    second.items[0]?.badge
-  );
-  const current = second.items.filter((i) => i.current);
-  ok(current.length === 1, "현재 항목이 여전히 1개", `${current.length}개`);
-  ok(
-    !current[0]?.text.includes("무엇을 사용할까?"),
-    "현재 항목이 다음으로 넘어갔다",
-    current[0]?.text
-  );
-  // 완료는 되돌리지 않는다 — 채웠던 표시가 사라지면 아이가 혼란스럽다
-  ok(
-    second.items.filter((i) => i.done).length >= doneCount,
-    "완료 표시가 줄어들지 않는다"
-  );
-}
+/**
+ * ⚠️ 여기서 항목별 ✓ 표시는 확인하지 않는다. `satisfiedIndexes`(서버가 확정한
+ * 인덱스)만이 ✓의 근거인데, 목은 `missionProgress`를 아예 안 보낸다. 턴 수로
+ * 추측해 ✓를 붙이면 서버가 확정하지 않은 걸 프론트가 채점하는 셈이라(§0-2)
+ * 일부러 안 그런다 — 그러니 목으로는 이 항목을 검증할 방법이 없다.
+ * (frontend/docs/verify-drift-report.md 참조)
+ */
 
 await page.screenshot({ path: SHOT("mission-brief") });
 

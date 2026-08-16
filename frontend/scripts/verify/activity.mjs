@@ -87,7 +87,7 @@ console.log("\n=== 탭 배치 → 오답 제출 ===");
  *    확인할 수가 없다. 3·4번만 바꿔 넣어 1·2번은 정답 자리에 둔다.
  */
 for (const text of [STORY_ORDER[0], STORY_ORDER[1], STORY_ORDER[3], STORY_ORDER[2]]) {
-  await page.locator("button.touch-none", { hasText: text }).first().click();
+  await page.getByRole("button", { name: text }).first().click();
   await page.waitForTimeout(120);
 }
 ok(await submitBtn.isEnabled(), "4칸 채우면 확인하기 활성");
@@ -148,7 +148,9 @@ console.log("\n=== 정답 순서로 재배치 ===");
 // 슬롯을 모두 비우고 card_1..4 순으로 넣는다.
 for (let i = 3; i >= 0; i--) {
   const slot = page.locator(`[data-slot-index="${i}"]`);
-  if ((await slot.innerText()).trim() !== "여기에 놓아줘") await slot.click();
+  // 그림 카드라 innerText가 비어 있다. 빈 칸인지는 접근성 이름으로 본다.
+  const label = (await slot.getAttribute("aria-label")) ?? "";
+  if (!label.includes("비어 있음")) await slot.click();
   await page.waitForTimeout(80);
 }
 const ORDER = [
@@ -158,7 +160,7 @@ const ORDER = [
   "시아버지가 며느리에게 미안하다고 말했어요.",
 ];
 for (const text of ORDER) {
-  await page.locator("button.touch-none", { hasText: text }).first().click();
+  await page.getByRole("button", { name: text }).first().click();
   await page.waitForTimeout(120);
 }
 await page.getByRole("button", { name: "확인하기" }).click();
@@ -242,11 +244,13 @@ await page.getByText("이야기 순서대로 놓아볼까?").waitFor({ timeout: 
 async function fillWrong() {
   for (let i = 3; i >= 0; i -= 1) {
     const slot = page.locator(`[data-slot-index="${i}"]`);
-    if ((await slot.innerText()).trim() !== "여기에 놓아줘") await slot.click();
+    // 그림 카드라 innerText가 비어 있다. 빈 칸인지는 접근성 이름으로 본다.
+  const label = (await slot.getAttribute("aria-label")) ?? "";
+  if (!label.includes("비어 있음")) await slot.click();
     await page.waitForTimeout(80);
   }
   for (const text of [...ORDER].reverse()) {
-    await page.locator("button.touch-none", { hasText: text }).first().click();
+    await page.getByRole("button", { name: text }).first().click();
     await page.waitForTimeout(100);
   }
   await page.getByRole("button", { name: "확인하기" }).click();
@@ -292,8 +296,15 @@ for (let attempt = 1; attempt <= 3; attempt += 1) {
     (await page.getByRole("button", { name: "이야기 말하기" }).count()) === 1,
     "다음 단계로 나갈 길 있음 (활동에 갇히지 않음)"
   );
-  // 정답 순서로 카드가 다시 그려졌는지. 1번 칸이 정답 1번이어야 한다.
-  const firstCard = (await page.locator("ol li").first().innerText()).trim();
+  /**
+   * 정답 순서로 카드가 다시 그려졌는지. 1번 칸이 정답 1번이어야 한다.
+   * ⚠️ 카드가 **그림만** 있어 텍스트로는 읽을 수 없다. 접근성 이름으로 확인한다.
+   */
+  const firstCard =
+    (await page
+      .locator("ol li [data-slot-index]")
+      .first()
+      .getAttribute("aria-label")) ?? "";
   ok(
     firstCard.startsWith("며느리는 방귀를 꾹 참고"),
     "카드가 정답 순서로 다시 배치됨"

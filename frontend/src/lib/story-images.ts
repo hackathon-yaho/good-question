@@ -4,20 +4,6 @@
  */
 
 /**
- * 장면 ID를 배경 이미지 URL로 매핑
- */
-export function getSceneBackgroundImage(sceneId: string): string | null {
-  const mapping: Record<string, string> = {
-    "sc_banggui_01": "/story-assets/banggui/sc_banggui_01.webp",
-    "sc_banggui_02": "/story-assets/banggui/sc_banggui_02.webp",
-    "sc_banggui_04": "/story-assets/banggui/sc_banggui_04.webp",
-    "sc_banggui_06": "/story-assets/banggui/sc_banggui_06.webp",
-    "sc_banggui_08": "/story-assets/banggui/sc_banggui_08.webp",
-  };
-  return mapping[sceneId] || null;
-}
-
-/**
  * 장면 순서(sceneOrder)로 배경 이미지 URL을 찾는다.
  * 백엔드는 sceneId로 UUID를 사용하므로, 순서 기반 매핑이 더 안정적이다.
  *
@@ -62,17 +48,14 @@ export function getCharacterImage(
   characterName: string,
   emotion: string = "NEUTRAL"
 ): string | null {
-  // 감정을 이미지 파일명에 맞게 변환
-  const emotionMap: Record<string, string> = {
-    "HAPPY": "HAPPY",
-    "MOVED": "MOVED", 
-    "NEUTRAL": "NEUTRAL",
-    "SURPRISED": "SURPRISED",
-    "WORRIED": "WORRIED",
-  };
-  
-  const emotionKey = emotionMap[emotion.toUpperCase()] || "NEUTRAL";
-  
+  /**
+   * 파일이 있는 표정만 통과시킨다. 그 외에는 NEUTRAL로 떨어뜨린다 —
+   * 서버가 새 값을 보내도 깨진 이미지가 뜨지 않는다. (api-spec 6.1 `characterState`)
+   */
+  const EMOTIONS = ["NEUTRAL", "HAPPY", "WORRIED", "SURPRISED", "MOVED"];
+  const upper = emotion.toUpperCase();
+  const emotionKey = EMOTIONS.includes(upper) ? upper : "NEUTRAL";
+
   const mapping: Record<string, string> = {
     "ch_banggui_daughter_in_law": `/story-assets/banggui/ch_banggui_daughter_in_law_${emotionKey}.png`,
     "ch_banggui_father_in_law": `/story-assets/banggui/ch_banggui_father_in_law_${emotionKey}.png`,
