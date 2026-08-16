@@ -5,6 +5,7 @@ import com.goodquestion.backend.child.repository.ChildRepository;
 import com.goodquestion.backend.common.global.ErrorCode;
 import com.goodquestion.backend.common.global.exception.BusinessException;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
+import com.goodquestion.backend.story.constant.ComingSoonCharacters;
 import com.goodquestion.backend.story.constant.DialogueContents;
 import com.goodquestion.backend.story.dto.response.CharacterResponse;
 import com.goodquestion.backend.story.dto.response.ExistingSessionResponse;
@@ -69,7 +70,9 @@ public class StoryServiceImpl implements StoryService {
                 .map(StoryScene::getSceneDescription)
                 .orElse(null);
 
-        List<CharacterResponse> characters = distinctCharacters(scenes);
+        List<CharacterResponse> characters = scenes.isEmpty()
+                ? ComingSoonCharacters.forTitle(story.getTitle())
+                : distinctCharacters(scenes);
 
         ExistingSessionResponse existingSession = storySessionRepository
                 .findFirstByChildAndStoryOrderByLastActivityAtDesc(child, story)

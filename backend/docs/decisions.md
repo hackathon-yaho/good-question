@@ -1879,6 +1879,32 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 
 ---
 
+### D-63 · 준비 중 이야기 3편에 등장인물 이미지 추가 — 대화 장면 없이도 characters[] 채움
+
+**배경**: D-61에서 3편(해님과 달님·콩쥐와 팥쥐·흥부와 놀부)을 표지 이미지만 넣고 시드했다.
+사용자가 "등장인물 이미지는 안 넣었냐"고 확인 — `catalog-only-stories.md`가 "characters[].imageUrl은
+지금처럼 null로 줘도 된다, 새로 할 일 없음"이라고 했던 걸 그대로 따랐던 것인데, 실제로는
+프론트 상세 화면(`StoryDetailScreen.tsx`)이 `story.characters.length > 0`일 때만 "함께 만날
+친구들" 캐릭터 초상 섹션을 그리고, 캐릭터 목록은 백엔드가 대화 장면(`story_scenes`)에서
+뽑아내는 게 유일한 경로였다 — 이 3편은 장면이 아예 없어(comingSoon 설계) `characters`가
+항상 빈 배열이었고, 그래서 AI 파트가 이미 넘긴 인물 카드 이미지(`ch-heungbu-neutral.png` 등)가
+어디에도 안 쓰이고 있었다.
+
+**구현**: `story/constant/ComingSoonCharacters.java`(신규) — 제목 → `List<CharacterResponse>`
+고정 매핑. 이름·표시명은 프론트 목 카탈로그(`story-catalog.ts`)의 `characters`와 동일하게
+맞췄고(`sister`/`brother`, `kongjwi`/`patjwi`, `heungbu`/`nolbu`), `imageUrl`은 AI 파트가
+넘긴 `generated/folktales-v1/ch-*-neutral.png` 경로를 그대로 채웠다. `StoryServiceImpl
+.getStoryDetail()`에서 `scenes.isEmpty()`면 이 매핑을, 아니면 기존 `distinctCharacters(scenes)`를
+쓰도록 분기했다 — 장면 기반 이야기(방귀 뀌는 며느리)는 로직 변경 없음.
+
+**검증**: 로컬 서버 재기동 후 curl로 3편 전부 `characters` 2건씩(이름·표시명·이미지 경로)
+확인, 기존 방귀 뀌는 며느리는 `characters` 3건(이미지는 여전히 null, 회귀 없음) 그대로임을
+확인. 전체 단위 테스트 130/130 통과.
+
+**변경 파일**: `story/constant/ComingSoonCharacters.java`(신규), `story/service/StoryServiceImpl.java`.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

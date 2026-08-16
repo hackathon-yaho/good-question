@@ -57,7 +57,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | — | ~~`post_activity_config`~~ | 필수-기반 | **완료** |
 | M-19 | ~~`remainingWorries` · `guidanceStyle` **코드 상수**~~ | 필수-기반 | **완료.** `story/constant/DialogueContents.java`, scene_order 키. 단위 테스트 포함 |
 | B-08 | ~~캐릭터 **표시명** 매핑 코드 상수~~ | 필수-기반 | **완료.** `DialogueContents`에 함께 둠 (scene_order 단위라 별도 클래스로 안 나눔) |
-| — | ~~준비 중(comingSoon) 이야기 3건 — 해님과 달님·콩쥐와 팥쥐·흥부와 놀부~~ | 선택 | **완료 (D-61).** `ContentSeeder.seedComingSoonStory()`. 장면 없이 표지·소개만. `story-catalog.ts`(프론트 목) 문구 그대로, 표지는 `generated/folktales-v1/` |
+| — | ~~준비 중(comingSoon) 이야기 3건 — 해님과 달님·콩쥐와 팥쥐·흥부와 놀부~~ | 선택 | **완료 (D-61).** `ContentSeeder.seedComingSoonStory()`. 장면 없이 표지·소개만. `story-catalog.ts`(프론트 목) 문구 그대로, 표지는 `generated/folktales-v1/`. 등장인물 이미지도 추가 (D-63, `ComingSoonCharacters`) |
 
 ### 주의
 
