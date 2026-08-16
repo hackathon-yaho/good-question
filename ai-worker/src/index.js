@@ -32,9 +32,13 @@ function requestIdFor(request) {
   return incoming ? incoming.slice(0, 128) : crypto.randomUUID();
 }
 
-function logFailure(operation, code, requestId) {
+function logFailure(operation, code, requestId, reason) {
   // Keep operational logs useful without retaining children’s utterances or any secret.
-  console.warn(JSON.stringify({ event: "ai_worker_failure", operation, code, requestId }));
+  const event = { event: "ai_worker_failure", operation, code, requestId };
+  if (reason) {
+    event.reason = reason;
+  }
+  console.warn(JSON.stringify(event));
 }
 
 function constantTimeEqual(left, right) {
@@ -183,7 +187,8 @@ export async function handleRequest(request, env, dependencies = {}) {
       return invalidRequest(error, requestId);
     }
     if (error instanceof ModelTimeoutError || error instanceof ModelUpstreamError) {
-      logFailure(operation, error instanceof ModelTimeoutError ? "MODEL_TIMEOUT" : "MODEL_UPSTREAM_ERROR", requestId);
+      const reason = Array.isArray(error.attemptReasons) ? error.attemptReasons.join("|") : error.reason;
+      logFailure(operation, error instanceof ModelTimeoutError ? "MODEL_TIMEOUT" : "MODEL_UPSTREAM_ERROR", requestId, reason);
       return modelFailure(error, requestId);
     }
     logFailure(operation, "MODEL_UNEXPECTED_ERROR", requestId);
