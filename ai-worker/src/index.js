@@ -1,6 +1,8 @@
 import {
   ANALYZE_DEVELOPER_PROMPT,
   ANALYZE_PROMPT_VERSION,
+  REPORT_DEVELOPER_PROMPT,
+  REPORT_PROMPT_VERSION,
   RESPOND_DEVELOPER_PROMPT,
   RESPOND_PROMPT_VERSION,
 } from "./constants.js";
@@ -11,6 +13,8 @@ import {
   knownLowEngagementAnalysis,
   validateAnalyzeRequest,
   validateAnalyzeResponse,
+  validateReportRequest,
+  validateReportResponse,
   validateRespondRequest,
   validateRespondResponse,
 } from "./validation.js";
@@ -96,13 +100,17 @@ export async function handleRequest(request, env, dependencies = {}) {
       {
         status: "ok",
         model: env.OPENAI_MODEL || "gpt-5-mini",
-        promptVersions: { analyze: ANALYZE_PROMPT_VERSION, respond: RESPOND_PROMPT_VERSION },
+        promptVersions: {
+          analyze: ANALYZE_PROMPT_VERSION,
+          respond: RESPOND_PROMPT_VERSION,
+          report: REPORT_PROMPT_VERSION,
+        },
       },
       200,
       requestId,
     );
   }
-  if (request.method !== "POST" || !["/analyze", "/respond"].includes(url.pathname)) {
+  if (request.method !== "POST" || !["/analyze", "/respond", "/report"].includes(url.pathname)) {
     return json({ code: "NOT_FOUND", message: "요청 경로를 찾을 수 없습니다.", requestId }, 404, requestId);
   }
   if (!constantTimeEqual(request.headers.get("X-Internal-Token"), env.AI_INTERNAL_TOKEN)) {
@@ -131,14 +139,32 @@ export async function handleRequest(request, env, dependencies = {}) {
       return json(filterAnalysis(result, body), 200, requestId);
     }
 
-    const body = validateRespondRequest(raw);
+    if (url.pathname === "/respond") {
+      const body = validateRespondRequest(raw);
+      const result = await requestStructuredOutput({
+        env,
+        operation: "respond",
+        prompt: RESPOND_DEVELOPER_PROMPT,
+        payload: body,
+        maxOutputTokens: 80,
+        validate: validateRespondResponse,
+        fetcher: dependencies.openaiFetch ?? fetch,
+        now: dependencies.now,
+        sleep: dependencies.sleep,
+      });
+      return json(result, 200, requestId);
+    }
+
+    const body = validateReportRequest(raw);
     const result = await requestStructuredOutput({
       env,
-      operation: "respond",
-      prompt: RESPOND_DEVELOPER_PROMPT,
+      operation: "report",
+      prompt: REPORT_DEVELOPER_PROMPT,
       payload: body,
-      maxOutputTokens: 80,
-      validate: validateRespondResponse,
+      maxOutputTokens: 900,
+      totalTimeoutMs: 60_000,
+      attemptTimeoutMs: 19_000,
+      validate: (output) => validateReportResponse(output, body),
       fetcher: dependencies.openaiFetch ?? fetch,
       now: dependencies.now,
       sleep: dependencies.sleep,
