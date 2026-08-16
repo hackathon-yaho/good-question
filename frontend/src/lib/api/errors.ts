@@ -40,6 +40,8 @@ export type ApiErrorCode =
   | "INTERNAL_ERROR"
   /** 오프라인·5xx — I-3 전체화면으로 올린다 */
   | "NETWORK"
+  /** POST /children/{id}/avatar-purchases — 별가루 잔액이 가격보다 적다 */
+  | "INSUFFICIENT_STAR_DUST"
   /**
    * 구간 예산을 넘겼다 — 변환 8초 / 응답 10초
    * (docs/request/frontend/stt-tts-integration.md)

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { BackButton } from "@/components/ui/BackButton";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { parentApi } from "@/lib/api";
 import type { NoticeItem, ParentApi } from "@/lib/api/types";
 
@@ -57,7 +58,7 @@ export function NoticesScreen({ api = parentApi }: { api?: ParentApi }) {
       <h1 className="mt-4 text-parent-title font-bold text-text">공지사항</h1>
 
       {notices === null ? (
-        <p className="mt-6 text-parent-body text-muted">불러오고 있어요…</p>
+        <KidLoadingScreen className="mt-6" />
       ) : notices.length === 0 ? (
         // 실서버 모드에서는 공지 엔드포인트가 없어 빈 배열이 온다.
         // 빈 <ul>을 그리면 테두리만 남은 상자가 보인다. (client-parent.ts)

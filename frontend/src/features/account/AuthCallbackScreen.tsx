@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { PillButton } from "@/components/ui/PillButton";
 import { authApi } from "@/lib/api/auth";
 
@@ -84,18 +85,7 @@ export function AuthCallbackScreen() {
 
   return (
     <CenteredShell width="narrow" centerY>
-      <div className="flex flex-col items-center gap-5 text-center">
-        <div aria-label="불러오는 중" className="flex gap-2">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              style={{ animationDelay: `${i * 0.15}s` }}
-              className="size-2.5 animate-bounce rounded-full bg-primary"
-            />
-          ))}
-        </div>
-        <p className="text-parent-body text-muted">로그인하고 있어요…</p>
-      </div>
+      <KidLoadingScreen label="로그인하고 있어요" />
     </CenteredShell>
   );
 }

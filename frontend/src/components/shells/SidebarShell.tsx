@@ -18,6 +18,7 @@ const NAV = [
   { href: "/home", label: "홈" },
   { href: "/stories", label: "이야기" },
   { href: "/wordbook", label: "단어장" },
+  { href: "/shop", label: "상점" },
   { href: "/mypage", label: "마이페이지" },
 ] as const;
 
@@ -55,6 +56,13 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`${s} ${c}`}>
           <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
           <circle cx="12" cy="7" r="4" />
+        </svg>
+      );
+    case "/shop":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`${s} ${c}`}>
+          <path d="M3 7h18l-1.5 11a2 2 0 01-2 1.7H6.5a2 2 0 01-2-1.7L3 7z" />
+          <path d="M8 7V6a4 4 0 018 0v1" />
         </svg>
       );
     default:

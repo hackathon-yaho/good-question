@@ -21,6 +21,7 @@
 import { useState } from "react";
 
 import { rem } from "@/lib/rem";
+import { SHOP_AVATARS } from "@/lib/shop-catalog";
 
 /** avatarId 허용 값. A-4 그리드가 이 순서로 6종을 보여준다. */
 export const AVATAR_IDS = [
@@ -35,36 +36,63 @@ export const AVATAR_IDS = [
 export type AvatarId = (typeof AVATAR_IDS)[number];
 
 /**
+ * 무료 6종 + 상점에서 구매하는 아바타 전체. 상점 아바타는 아직 일러스트가 없어
+ * `AVATAR_IMAGE`가 존재하지 않는 경로를 가리키고, 아래 실패 폴백(이니셜+색상 원)이
+ * 그대로 그려준다.
+ */
+export const ALL_AVATAR_IDS: readonly string[] = [
+  ...AVATAR_IDS,
+  ...SHOP_AVATARS.map((a) => a.id),
+];
+
+/**
  * 파일은 `public/avatars/`에 256×256 WebP로 있다.
  * 원본 1024px은 `public/characters/`에 두고 커밋하지 않는다.
  */
-const AVATAR_IMAGE: Record<AvatarId, string> = {
+const AVATAR_IMAGE: Record<string, string> = {
   color1: "/avatars/chick.webp",
   color2: "/avatars/fox.webp",
   color3: "/avatars/bear.webp",
   color4: "/avatars/rabbit.webp",
   color5: "/avatars/turtle.webp",
   color6: "/avatars/cat.webp",
+  // 상점 아바타 — 실제 일러스트가 준비되기 전까지는 존재하지 않는 경로를 가리켜
+  // 아래 실패 폴백(이니셜+색상 원)으로 대체한다.
+  ...Object.fromEntries(SHOP_AVATARS.map((a) => [a.id, `/avatars/${a.id}.webp`])),
 };
 
 /** 아이가 고를 때 읽어 줄 이름. 스크린리더와 A-4 라벨에 쓴다. */
-export const AVATAR_LABEL: Record<AvatarId, string> = {
+export const AVATAR_LABEL: Record<string, string> = {
   color1: "병아리",
   color2: "여우",
   color3: "곰",
   color4: "토끼",
   color5: "거북이",
   color6: "고양이",
+  ...Object.fromEntries(SHOP_AVATARS.map((a) => [a.id, a.label])),
 };
 
+const PALETTE_CYCLE = [
+  "bg-primary text-white",
+  "bg-secondary text-white",
+  "bg-info text-white",
+  "bg-accent text-text",
+  "bg-primary-soft text-text",
+  "bg-secondary-soft text-text",
+];
+
 /** 이미지 로드 실패 시 폴백 */
-const PALETTE: Record<AvatarId, string> = {
-  color1: "bg-primary text-white",
-  color2: "bg-secondary text-white",
-  color3: "bg-info text-white",
-  color4: "bg-accent text-text",
-  color5: "bg-primary-soft text-text",
-  color6: "bg-secondary-soft text-text",
+const PALETTE: Record<string, string> = {
+  color1: PALETTE_CYCLE[0],
+  color2: PALETTE_CYCLE[1],
+  color3: PALETTE_CYCLE[2],
+  color4: PALETTE_CYCLE[3],
+  color5: PALETTE_CYCLE[4],
+  color6: PALETTE_CYCLE[5],
+  // 상점 아바타 — 실제 배색이 정해지기 전까지 6색을 순서대로 재사용한다.
+  ...Object.fromEntries(
+    SHOP_AVATARS.map((a, i) => [a.id, PALETTE_CYCLE[i % PALETTE_CYCLE.length]])
+  ),
 };
 
 type Props = {
@@ -82,11 +110,15 @@ export function ChildAvatar({
   size = 96,
   selected = false,
 }: Props) {
-  const [failed, setFailed] = useState(false);
+  const key = ALL_AVATAR_IDS.includes(avatarId ?? "") ? (avatarId as string) : "color1";
 
-  const key = (AVATAR_IDS as readonly string[]).includes(avatarId ?? "")
-    ? (avatarId as AvatarId)
-    : "color1";
+  /**
+   * 실패 여부를 어떤 key에서 실패했는지로 기억한다 — 단순 boolean이면 아바타를
+   * 바꿔도(같은 컴포넌트 인스턴스가 재사용되므로) 이전 실패가 그대로 남아
+   * 배경색만 바뀌고 새 이미지는 영영 안 뜨는 버그가 생긴다.
+   */
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const failed = failedKey === key;
 
   const frame = [
     "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold select-none",
@@ -118,7 +150,7 @@ export function ChildAvatar({
         width={size}
         height={size}
         loading="lazy"
-        onError={() => setFailed(true)}
+        onError={() => setFailedKey(key)}
         className="size-full object-cover"
       />
     </span>

@@ -66,6 +66,7 @@ const SUITES = [
   ["system", "I-1 · I-3 · I-4 예외"],
   ["browse", "B-2·B-3·B-4 · C-9 · E · F-1"],
   ["parent", "A-6 · G · H"],
+  ["shop", "아바타 상점 — 구매·장착·잔액"],
   // ?api=backend로 실 HTTP 클라이언트 경로·본문을 명세와 대조한다.
   ["wiring", "실서버 배선 — 경로·메서드·본문"],
   ["layout", "태블릿 5종 — 버튼 줄바꿈·넘침"],

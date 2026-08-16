@@ -444,7 +444,10 @@ export type WordbookResult = {
 /* ── 마이페이지 (F-1) ────────────────────────────────────────────── */
 
 export type MypageSnapshot = {
-  child: { id: string; name: string; avatarId: string; age: number } & WithStarDust;
+  child: { id: string; name: string; avatarId: string; age: number } & WithStarDust & {
+      /** 상점에서 구매한 아바타 id 목록. 없으면 상점 전체를 미구매로 취급한다. */
+      ownedAvatarIds?: string[];
+    };
   /** 점수·등급이 아니라 활동량이다. (PRD 10.1) */
   stats: {
     completedStories: number;
@@ -496,6 +499,22 @@ export type ContentApi = {
     liked: boolean
   ): Promise<WordEntry>;
   getMypage(childId: string): Promise<MypageSnapshot>;
+  /**
+   * 상점에서 아바타를 **구매만** 한다. 장착은 바꾸지 않는다 — 상점은 잠금 해제만
+   * 하고, 실제로 바꿔 쓰는 것은 F-1 프로필의 아바타 변경 모달이 담당한다.
+   * 가격만큼 별가루를 차감하고 보유 목록에 추가한다. 잔액이 부족하거나 이미
+   * 보유한 아바타면 `ApiError`를 던진다.
+   */
+  purchaseAvatar(
+    childId: string,
+    avatarId: string
+  ): Promise<{ starDust: number; ownedAvatarIds: string[] }>;
+  /**
+   * F-1 프로필 아바타 변경 모달 — 보유한 아바타로만 바꾼다 (화면이 이미
+   * 보유 목록으로 골라서 부르므로, 여기서는 서버가 avatarId를 검증하지 않는
+   * 기존 정책을 그대로 따른다).
+   */
+  equipAvatar(childId: string, avatarId: string): Promise<{ avatarId: string }>;
 };
 
 /* ── 보호자 (선택) — api.md 3.8 ──────────────────────────────────── */

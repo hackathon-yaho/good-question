@@ -10,19 +10,22 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { SidebarShell } from "@/components/shells/SidebarShell";
-import { ChildAvatar } from "@/components/ui/ChildAvatar";
+import { AVATAR_IDS, AVATAR_LABEL, ChildAvatar } from "@/components/ui/ChildAvatar";
 import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
+import { Modal } from "@/components/ui/Modal";
 import { StarDustChip } from "@/components/ui/StarDust";
 import { PillButton } from "@/components/ui/PillButton";
+import { useToast } from "@/components/ui/Toast";
 import { contentApi } from "@/lib/api";
 import type { ContentApi, MypageSnapshot } from "@/lib/api/types";
 import { useSelectedChildId } from "@/lib/client-store";
 import { useCharacterVoice } from "@/lib/speech";
 import { getStoryCoverImage } from "@/lib/story-images";
+import { SHOP_AVATARS } from "@/lib/shop-catalog";
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
@@ -36,8 +39,11 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
   const router = useRouter();
   const childId = useSelectedChildId();
   const { speak, cancel, speaking } = useCharacterVoice();
+  const toast = useToast();
 
   const [data, setData] = useState<MypageSnapshot | null>(null);
+  const [changingAvatar, setChangingAvatar] = useState(false);
+  const [equipping, setEquipping] = useState(false);
 
   useEffect(() => {
     if (childId === null) router.replace("/profiles");
@@ -62,6 +68,25 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
   // 화면을 벗어날 때 읽던 것을 멈춘다.
   useEffect(() => cancel, [cancel]);
 
+  const changeAvatar = useCallback(
+    async (avatarId: string) => {
+      if (!childId || equipping) return;
+      setEquipping(true);
+      try {
+        await api.equipAvatar(childId, avatarId);
+        setData((prev) =>
+          prev ? { ...prev, child: { ...prev.child, avatarId } } : prev
+        );
+        setChangingAvatar(false);
+      } catch {
+        toast.show("바꾸지 못했어요. 다시 시도해 주세요.", "danger");
+      } finally {
+        setEquipping(false);
+      }
+    },
+    [api, childId, equipping, toast]
+  );
+
   if (!data) {
     return (
       <SidebarShell>
@@ -71,6 +96,13 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
   }
 
   const { child, stats, completedStories, retellings } = data;
+  /** 보유한 아바타만 — 무료 6종 + 상점에서 산 것. 여기서 못 바꾸면 상점으로 안내한다. */
+  const ownedAvatars = [
+    ...AVATAR_IDS.map((id) => ({ id, label: AVATAR_LABEL[id] })),
+    ...SHOP_AVATARS.filter((a) =>
+      (child.ownedAvatarIds ?? []).includes(a.id)
+    ).map((a) => ({ id: a.id, label: a.label })),
+  ];
 
   const STATS = [
     { label: "완료한 이야기", value: `${stats.completedStories}편` },
@@ -81,7 +113,21 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
   return (
     <SidebarShell>
       <section className="flex items-center gap-5 rounded-card border border-border bg-surface p-6 shadow-soft">
-        <ChildAvatar name={child.name} avatarId={child.avatarId} size={120} />
+        <button
+          type="button"
+          aria-label="아바타 바꾸기"
+          onClick={() => setChangingAvatar(true)}
+          className="relative shrink-0 rounded-full"
+        >
+          <ChildAvatar name={child.name} avatarId={child.avatarId} size={120} />
+          {/* 변경 가능 표시 — 눌러서 보유한 아바타 중 하나로 바꾼다. */}
+          <span
+            aria-hidden
+            className="absolute bottom-0 right-0 flex size-9 items-center justify-center rounded-full border-2 border-surface bg-primary text-base text-white shadow-soft"
+          >
+            ✏️
+          </span>
+        </button>
         <div className="min-w-0 flex-1">
           <h1 className="text-parent-title font-bold text-text">{child.name}</h1>
           <p className="mt-1 text-parent-body text-muted">{child.age}세</p>
@@ -199,6 +245,55 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
           </ul>
         )}
       </section>
+
+      <Modal
+        open={changingAvatar}
+        label="아바타 바꾸기"
+        onClose={() => setChangingAvatar(false)}
+      >
+        <div className="flex flex-col gap-5">
+          <h2 className="text-parent-title font-bold text-text">
+            아바타 바꾸기
+          </h2>
+          <p className="text-parent-body text-muted">
+            갖고 있는 아바타 중에서 골라 주세요.
+          </p>
+
+          <ul className="grid grid-cols-4 gap-3">
+            {ownedAvatars.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  aria-label={`아바타 ${item.label}`}
+                  aria-pressed={child.avatarId === item.id}
+                  disabled={equipping}
+                  onClick={() => void changeAvatar(item.id)}
+                  className="flex min-h-touch w-full items-center justify-center rounded-bubble p-1 disabled:opacity-60"
+                >
+                  <ChildAvatar
+                    name={child.name}
+                    avatarId={item.id}
+                    size={64}
+                    selected={child.avatarId === item.id}
+                  />
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <p className="text-sm text-muted">
+            새 아바타는 상점에서 별가루로 구매할 수 있어요.
+          </p>
+
+          <PillButton
+            variant="outlined"
+            fullWidth
+            onClick={() => setChangingAvatar(false)}
+          >
+            닫기
+          </PillButton>
+        </div>
+      </Modal>
     </SidebarShell>
   );
 }

@@ -63,6 +63,11 @@ export const API_MODE: "mock" | "backend" =
  * 백엔드가 쓰는 코드 9종은 그대로 통과시킨다
  * (backend/docs/api-spec.md 0.4 · `common/global/ErrorCode.java`).
  * 문구가 아니라 코드로 분기하기 때문에 이름이 같으면 그대로 쓰는 게 맞다.
+ *
+ * `INSUFFICIENT_STAR_DUST`는 그 9종에 없는 팀 추가 코드다 — 아바타 상점 구매
+ * 요청(docs/request/backend/avatar-shop-purchase.md)에서 백엔드가 이 문자열을
+ * 그대로 내려주기로 했으므로 여기도 허용 목록에 추가해 둔다. 안 넣으면
+ * ShopScreen의 "별가루가 부족해요" 분기가 실서버에서는 절대 타지 않는다.
  */
 const BACKEND_CODES = new Set<ApiErrorCode>([
   "INVALID_REQUEST",
@@ -74,6 +79,7 @@ const BACKEND_CODES = new Set<ApiErrorCode>([
   "SCENE_ALREADY_CLOSED",
   "STT_EMPTY",
   "INTERNAL_ERROR",
+  "INSUFFICIENT_STAR_DUST",
 ]);
 
 function toErrorCode(status: number, code?: string): ApiErrorCode {

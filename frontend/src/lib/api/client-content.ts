@@ -12,6 +12,7 @@ import type {
   WordEntry,
   WordbookResult,
 } from "@/lib/api/types";
+import { SHOP_AVATARS } from "@/lib/shop-catalog";
 
 export const contentApiClient: ContentApi = {
   /**
@@ -72,5 +73,30 @@ export const contentApiClient: ContentApi = {
     return request<MypageSnapshot>(
       `/mypage?${new URLSearchParams({ childId }).toString()}`
     );
+  },
+
+  /**
+   * 아바타 상점 구매 — docs/request/backend/avatar-shop-purchase.md.
+   * 장착은 바꾸지 않는다 — `price`를 함께 보낸다. 서버가 `avatarId`를 검증하지
+   * 않는 것과 같은 이유로, 가격 검증도 서버 카탈로그가 아니라 프론트가 보낸
+   * 값을 신뢰한다(테스트 단계 한정).
+   */
+  purchaseAvatar(childId, avatarId) {
+    const price = SHOP_AVATARS.find((a) => a.id === avatarId)?.price ?? 0;
+    return request<{ starDust: number; ownedAvatarIds: string[] }>(
+      `/children/${childId}/avatar-purchases`,
+      { method: "POST", body: { avatarId, price } }
+    );
+  },
+
+  /**
+   * F-1 아바타 변경 — 새 엔드포인트가 아니다. 아이 등록·H-2 인라인 편집과 같은
+   * `PATCH /children/{childId}`를 그대로 쓴다 (api-spec 2.1, avatarId 미검증).
+   */
+  equipAvatar(childId, avatarId) {
+    return request<{ avatarId: string }>(`/children/${childId}`, {
+      method: "PATCH",
+      body: { avatarId },
+    });
   },
 };

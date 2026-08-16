@@ -84,13 +84,13 @@ console.log("=== B-2 이야기 목록 ===");
 await page.goto(`${BASE}/stories`, { waitUntil: "networkidle" });
 await page.getByText("방귀 뀌는 며느리").first().waitFor({ timeout: 8000 }).catch(() => {});
 ok(await page.getByRole("heading", { name: "이야기" }).isVisible(), "제목");
-// 목 카탈로그가 3편이다(재생 가능 1 + 준비 중 2). 주제는 세 편의 합집합이라
-// 다름·자기이해·장점 발견·용기·지혜·가족 6개 + "전체" = 7개.
+// 목 카탈로그가 5편이다(재생 가능 1 + 준비 중 5 = 6편). 주제는 여섯 편의 합집합이라
+// 다름·자기이해·장점 발견·용기·지혜·가족·배려·입장 바꿔 생각하기·정직 9개 + "전체" = 10개.
 // 카탈로그 편이 없으면 카드가 1장이라 **태블릿 3열을 확인할 방법이 없다.**
-ok((await page.getByRole("tab").count()) === 7, "필터 칩 = 전체 + 주제 6개", `${await page.getByRole("tab").count()}개`);
+ok((await page.getByRole("tab").count()) === 10, "필터 칩 = 전체 + 주제 9개", `${await page.getByRole("tab").count()}개`);
 {
   const cards = await page.locator('a[href^="/stories/"]').count();
-  ok(cards === 3, "카드 3장 (재생 가능 1 + 준비 중 2)", `${cards}장`);
+  ok(cards === 6, "카드 6장 (재생 가능 1 + 준비 중 5)", `${cards}장`);
 }
 // 태블릿 1133px에서도 한 행에 3개다. 1열당 (813−48)÷3 = 255px.
 {
@@ -101,7 +101,12 @@ ok((await page.getByRole("tab").count()) === 7, "필터 칩 = 전체 + 주제 6�
       Math.round((a.parentElement ?? a).getBoundingClientRect().top)
     )
   );
-  ok(new Set(tops).size === 1, "카드 3장이 한 행 (태블릿 3열)", `y=${[...new Set(tops)].join(",")}`);
+  // 카드가 6장이라 2행이 된다 — 첫 3장(1행)만 같은 y인지 본다.
+  ok(
+    new Set(tops.slice(0, 3)).size === 1,
+    "첫 3장이 한 행 (태블릿 3열)",
+    `y=${[...new Set(tops)].join(",")}`
+  );
 }
 ok((await page.getByText("진행 중").count()) === 0, "세션 없으면 배지 없음");
 
