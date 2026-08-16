@@ -26,23 +26,23 @@
 
 백엔드 구현·통합 테스트 전까지는 **미해결** 상태다.
 
-### 2026-08-15 — AI 재시도·시간 예산 재확정
+### 2026-08-16 — AI 재시도·시간 예산 v4 재확정
 
 실제 모델 응답 실패가 즉시 502로 끝나는 것을 확인해, 팀 합의로 기존 D-03의 **5초·재시도 0회**를
 대체했다. 새 정본은 [API 명세 2.5](spec/api.md)와
-[AI 호출 재시도·시간 예산 v3 요청](request/backend/ai-retry-deadline-v3.md)이다.
+[AI 호출 재시도·시간 예산 v4 요청](request/backend/ai-retry-deadline-v4.md)이다.
 
 | 항목 | 현재 결정 |
 | --- | --- |
-| AI 서버 `/analyze`, `/respond` | Worker 내부 9초, 최초 요청 포함 최대 10회 |
+| AI 서버 `/analyze`, `/respond` | Worker 전체 102초, 각 시도 최대 10초, 최초 요청 포함 최대 10회 |
 | 재시도 소유자 | AI 서버만. OpenAI SDK와 백엔드는 0회 |
-| 백엔드 연결 대기 | 10초 (`AI_SERVER_TIMEOUT_SECONDS`, D-51) |
+| 백엔드 연결 대기 | 105초 (`AI_SERVER_TIMEOUT_SECONDS`, D-51) |
 | 최종 오류 | 시간 초과는 504, 모델/구조화 출력 실패는 502 |
 | 백엔드 폴백 | 분석 실패는 빈 분석, 응답 실패는 `character_closing`; 프론트 500 금지 |
 
-한 `POST /messages`가 AI 두 호출을 모두 수행하면 최악 20초가 될 수 있어, 기존의 프론트 15초
+한 `POST /messages`가 AI 두 호출을 모두 수행하면 최악 약 204초가 될 수 있어, 기존의 프론트 15초
 보장은 철회한다. 프론트 중단 로직과 실측은
-[별도 검증 요청](request/frontend/message-response-time-budget-v2.md)으로 남겼다.
+[별도 검증 요청](request/frontend/message-response-time-budget-v3.md)으로 남겼다.
 
 ### 2026-08-13 — 백엔드 API 41개 구현 완료 → 프론트 계약 정합
 
@@ -101,11 +101,11 @@ H-7 회원 탈퇴. 별가루도 지급은 되지만(`children.star_dust`) 어떤
 | --- | --- |
 | **Q-16 (=B-1)** STT/TTS | **2안 확정** — Whisper + OpenAI TTS, 둘 다 백엔드 (D-01) |
 | **Q-01 (=B-3)** 인증 | 자체 JWT 확정. Supabase Auth 미사용 (D-06) |
-| **Q-14 (=B-4)** 응답 시간 | AI는 Worker 내부 9초·최대 10회, 안전 폴백 확정. 프론트 15초는 실측 대기 (v3) |
+| **Q-14 (=B-4)** 응답 시간 | AI는 Worker 전체 102초·각 시도 10초·최대 10회, 안전 폴백 확정. 프론트 짧은 중단은 금지 (v4) |
 | **Q-09** 빈 발화 | STT 분리로 자동 해소. 빈 발화 전송 경로 자체가 없어짐 (D-02) |
 | Q-02 소셜 로그인 | 카카오 단독 (D-06) |
 | Q-03 B-3 정보 블록 | `stories.situation`·`child_role` 컬럼 추가 (D-07) |
-| Q-06 단어장 범위 | `wordbook` 완료. 장면별 추천 단어는 `recommendedWord` 카드로 분리하고, 대사 `highlightWords`는 표시하지 않음 ([v2 요청](request/frontend/scene-vocabulary-card-v2.md)) |
+| Q-06 단어장 범위 | `wordbook` 완료. 이번 캐릭터 대사에 실제 나온 8세 이하 후보만 `recommendedWord` 카드로 표시하고, 대사 `highlightWords`는 표시하지 않음 ([v3 요청](request/frontend/scene-vocabulary-card-v3.md)) |
 | Q-10 장면 수 4 vs 9 | `currentSceneOrder` + `sceneProgress` 분리 (D-12) |
 | Q-11 `avatar_id` | 컬럼 추가, 값 검증 없음 (D-08) |
 | Q-12 별가루 | **제외 권고를 뒤집어 채택.** 요건 외 팀 추가 · 후순위 (D-09) |
@@ -134,9 +134,9 @@ H-7 회원 탈퇴. 별가루도 지급은 되지만(`children.star_dust`) 어떤
 | ~~**B-1**~~ | ~~STT/TTS 방식~~ | ✅ **2026-08-12 재확정.** 2안(OpenAI, 백엔드) 확정 → Q-16. 프론트가 08-10 결정(1안 Web Speech API) 기준으로 이미 만든 부분은 재작업 필요 |
 | ~~**B-2**~~ | ~~프론트엔드 스택~~ | ✅ **해소.** Next.js (2026-08-10). 배포가 Vercel로 확정되어 있어 Thymeleaf는 배제 |
 | ~~**B-3**~~ | ~~인증 방식 (Q-01)~~ | ✅ **해소.** 자체 JWT + 카카오 단독 |
-| ~~**B-4**~~ | ~~AI 타임아웃·실패 처리 (Q-14)~~ | ✅ **2026-08-16 재확정.** Worker 내부 9초 / 최대 10회 / 안전 폴백 |
+| ~~**B-4**~~ | ~~AI 타임아웃·실패 처리 (Q-14)~~ | ✅ **2026-08-16 재확정.** Worker 전체 102초 / 각 시도 10초 / 최대 10회 / 안전 폴백 |
 | **B-6** | 반복 저정보 발화의 강제 장면 종료 | 🔴 백엔드 구현 요청 전달. 장면당 GUIDED 2회가 진행·미션 턴과 종료를 보호 |
-| **B-7** | 8세 이하 학습 단어 노출 | 🟡 [백엔드](request/backend/scene-vocabulary-recommendation.md)·[프론트](request/frontend/scene-vocabulary-card-v2.md) 요청 전달. 개별 아이의 "모름" 판정은 하지 않음 |
+| **B-7** | 8세 이하 학습 단어 노출 | 🟡 [백엔드](request/backend/character-utterance-vocabulary-v2.md)·[프론트](request/frontend/scene-vocabulary-card-v3.md) 요청 전달. 개별 아이의 "모름" 판정은 하지 않음 |
 | **B-5** | **구현 범위 합의** | 🔴 **미해소.** 화면 명세 48개 vs [작업 분장 2.1](team/roles.md) 필수 11개. 아래 §4 참조 |
 
 **B-5(프론트 범위), B-6(반복 저정보 발화), B-7(학습 단어 노출)이 남아 있습니다.** B-6·B-7은
@@ -337,7 +337,7 @@ PRD 값을 쓰는 게 맞고, `stories`에 컬럼 2개를 추가하거나 상수
 | 문서 | 내용 |
 | --- | --- |
 | [화면 명세 C-6](spec/screens.md) | 15초 초과 → I-3 네트워크 오류 |
-| [작업 분장 5장](team/roles.md) | AI 서버 요청은 각각 Worker 내부 9초·최대 10회이며, 한 턴에 두 번 발생할 수 있음 |
+| [작업 분장 5장](team/roles.md) | AI 서버 요청은 각각 Worker 전체 102초·각 시도 10초·최대 10회이며, 한 턴에 두 번 발생할 수 있음 |
 | [작업 분장 3.11](team/roles.md) | Render 무료 티어, 15분 무활동 시 슬립, 콜드 스타트 **수십 초**. AI 서버도 무료 티어면 홉이 두 개 |
 
 ```
@@ -368,7 +368,7 @@ AI 분석 최대 10초 + AI 응답 최대 10초 = 최대 20초
 > ③ GET  /api/tts     캐시 히트 시 즉시
 > ```
 >
-> **② 현재 타임아웃·재시도**: `/analyze`·`/respond`는 각각 Worker 내부 9초(백엔드 연결 10초), AI 서버만
+> **② 현재 타임아웃·재시도**: `/analyze`·`/respond`는 각각 Worker 전체 102초(백엔드 연결 105초), AI 서버만
 > 최초 포함 최대 10회 재시도합니다. Whisper 8초와 백엔드 재시도 0회는 유지합니다.
 >
 > **③ 실패 폴백 확정**: `/analyze` 실패 → 빈 분석으로 정상 진행 /
@@ -377,7 +377,7 @@ AI 분석 최대 10초 + AI 응답 최대 10초 = 최대 20초
 > **④ 슬립 방지**: 외부 크론 10분 핑 + 헬스체크에 `SELECT 1`.
 > Render 콜드 스타트와 Supabase 일시정지를 동시에 막습니다.
 >
-> ⚠️ **남은 것: 실측.** [프론트 검증 요청](request/frontend/message-response-time-budget-v2.md)을
+> ⚠️ **남은 것: 실측.** [프론트 검증 요청](request/frontend/message-response-time-budget-v3.md)을
 > 수행해 실제 중단 시간과 사용자 체감 시간을 공유합니다.
 
 ### Q-18 · soft-cue와 `/respond` 입력 ✅ 구현 완료 (2026-08-12)

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { handleRequest } from "../src/index.js";
-import { ModelUpstreamError, requestStructuredOutput } from "../src/openai.js";
+import { DIALOGUE_RETRY_POLICY, ModelUpstreamError, requestStructuredOutput } from "../src/openai.js";
 
 const env = {
   OPENAI_API_KEY: "test-openai-key",
@@ -99,6 +99,14 @@ test("health is public and exposes the deployed prompt versions", async () => {
     status: "ok",
     model: "gpt-5-mini",
     promptVersions: { analyze: "analyze_v3", respond: "respond_v9", report: "report_v1" },
+  });
+});
+
+test("dialogue retry policy gives each of ten attempts ten seconds", () => {
+  assert.deepEqual(DIALOGUE_RETRY_POLICY, {
+    maxAttempts: 10,
+    totalTimeoutMs: 102_000,
+    attemptTimeoutMs: 10_000,
   });
 });
 

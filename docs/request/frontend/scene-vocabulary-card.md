@@ -1,6 +1,6 @@
 # 오늘의 단어 카드 표시 요청
 
-> **대체됨**: [v2](scene-vocabulary-card-v2.md)를 정본으로 사용한다. v1의 대사 본문
+> **대체됨**: [v3](scene-vocabulary-card-v3.md)를 정본으로 사용한다. v1의 대사 본문
 > `highlightWords` 표시 유지 결정은 적용하지 않는다.
 
 - **요청자**: AI 파트
@@ -26,7 +26,7 @@ AI 대사 안에 학습 단어를 강제로 넣으면 어린이 대화가 어색
 
 ## API 계약
 
-백엔드 요청서: [장면별 학습 단어 추천](../backend/scene-vocabulary-recommendation.md)
+백엔드 요청서: [실제 캐릭터 대사 기반 추천 단어 v2](../backend/character-utterance-vocabulary-v2.md)
 
 ```json
 {
