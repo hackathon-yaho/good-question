@@ -44,6 +44,8 @@ type StoredChild = {
   name: string;
   birthYear: number;
   avatarId: string;
+  /** 상점에서 구매한 아바타 id 목록. 실제 읽기/쓰기는 mock-content.ts가 담당한다 (순환 참조 회피, L362 주석 참조). */
+  ownedAvatarIds?: string[];
   consents: ConsentValues;
   registeredAt: string;
 };

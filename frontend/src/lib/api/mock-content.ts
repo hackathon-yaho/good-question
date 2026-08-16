@@ -16,6 +16,8 @@ import type {
   WordEntry,
   WordbookResult,
 } from "@/lib/api/types";
+import { AVATAR_IDS } from "@/components/ui/ChildAvatar";
+import { SHOP_AVATARS } from "@/lib/shop-catalog";
 import {
   MOCK_SCENES,
   STORY_META,
@@ -28,6 +30,9 @@ import { CATALOG_STORIES, findCatalogStory } from "@/mocks/story-catalog";
 const WORDBOOK_KEY = "gq.mock.wordbook";
 /** 담은 뒤 이 시간 안이면 E-1에서 "새 단어" 칩을 붙인다. */
 const NEW_WORD_WINDOW_MS = 24 * 60 * 60 * 1000;
+const ACCOUNT_KEY = "gq.mock.account";
+/** 이야기 1편 완료당 별가루. mock-account.ts의 같은 상수와 값을 맞춘다 (B-20). */
+const STAR_DUST_PER_STORY = 100;
 
 /**
  * B-3 정보 블록 3개 — PRD F-03에 확정된 이야기 단위 고정 문구다.
@@ -327,12 +332,13 @@ export const mockContentApi: ContentApi = {
       for (const date of session.activityDates) days.add(date);
     }
 
+    const child = readChild(childId);
     const snapshot: MypageSnapshot = {
       // 아이 정보는 계정 목이 가지고 있다. 화면이 두 번 부르지 않게 여기서 채운다.
       child: {
-        ...readChild(childId),
+        ...child,
         // 백엔드 B-20: 이야기 완료 1편당 +100. 실서버는 이 필드를 아직 안 준다.
-        starDust: completed.length * 100,
+        starDust: starDustBalance(completed.length, child.ownedAvatarIds ?? []),
       },
       stats: {
         completedStories: completed.length,
@@ -357,6 +363,46 @@ export const mockContentApi: ContentApi = {
     };
     return snapshot;
   },
+
+  async purchaseAvatar(childId, avatarId) {
+    await delay(250);
+    assertOnline();
+
+    const child = readChild(childId);
+    const owned = child.ownedAvatarIds ?? [];
+    const isFree = (AVATAR_IDS as readonly string[]).includes(avatarId);
+    if (isFree || owned.includes(avatarId)) {
+      throw new ApiError("INVALID_REQUEST", "이미 갖고 있는 아바타입니다");
+    }
+
+    const item = SHOP_AVATARS.find((a) => a.id === avatarId);
+    if (!item) throw new ApiError("NOT_FOUND", "존재하지 않는 아바타입니다");
+
+    const completedCount = mockSessionsOf(childId).filter(
+      (s) => s.status === "completed"
+    ).length;
+    const balance = starDustBalance(completedCount, owned);
+    if (balance < item.price) {
+      throw new ApiError("INSUFFICIENT_STAR_DUST", "별가루가 부족해요");
+    }
+
+    const nextOwned = [...owned, avatarId];
+    writeChildAvatarState(childId, child.avatarId, nextOwned);
+
+    return {
+      starDust: starDustBalance(completedCount, nextOwned),
+      ownedAvatarIds: nextOwned,
+    };
+  },
+
+  async equipAvatar(childId, avatarId) {
+    await delay(200);
+    assertOnline();
+
+    const child = readChild(childId);
+    writeChildAvatarState(childId, avatarId, child.ownedAvatarIds ?? []);
+    return { avatarId };
+  },
 };
 
 /**
@@ -366,13 +412,19 @@ export const mockContentApi: ContentApi = {
  * 실제 서버에서는 `GET /api/mypage`가 조인해서 한 번에 내려줄 값이다.
  */
 function readChild(childId: string): MypageSnapshot["child"] {
-  const fallback = { id: childId, name: "아이", avatarId: "color1", age: 0 };
+  const fallback = { id: childId, name: "아이", avatarId: "color1", age: 0, ownedAvatarIds: [] };
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem("gq.mock.account");
+    const raw = window.localStorage.getItem(ACCOUNT_KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as {
-      children?: { id: string; name: string; avatarId: string; birthYear: number }[];
+      children?: {
+        id: string;
+        name: string;
+        avatarId: string;
+        birthYear: number;
+        ownedAvatarIds?: string[];
+      }[];
     };
     const found = parsed.children?.find((c) => c.id === childId);
     if (!found) return fallback;
@@ -381,9 +433,46 @@ function readChild(childId: string): MypageSnapshot["child"] {
       name: found.name,
       avatarId: found.avatarId,
       age: new Date().getFullYear() - found.birthYear,
+      ownedAvatarIds: found.ownedAvatarIds ?? [],
     };
   } catch {
     return fallback;
+  }
+}
+
+/** 완료한 이야기 수와 상점에서 산 아바타 목록으로 별가루 잔액을 계산한다. */
+function starDustBalance(completedCount: number, ownedAvatarIds: string[]): number {
+  const earned = completedCount * STAR_DUST_PER_STORY;
+  const spent = ownedAvatarIds.reduce((sum, id) => {
+    const item = SHOP_AVATARS.find((a) => a.id === id);
+    return sum + (item?.price ?? 0);
+  }, 0);
+  return earned - spent;
+}
+
+/**
+ * 계정 목 저장소에 아바타 장착·구매 결과를 반영한다. `readChild`와 같은 이유로
+ * mock-account를 직접 import하지 않고 localStorage를 그대로 다룬다.
+ */
+function writeChildAvatarState(
+  childId: string,
+  avatarId: string,
+  ownedAvatarIds: string[]
+) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(ACCOUNT_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as {
+      children?: Record<string, unknown>[];
+    };
+    const found = parsed.children?.find((c) => c.id === childId);
+    if (!found) return;
+    found.avatarId = avatarId;
+    found.ownedAvatarIds = ownedAvatarIds;
+    window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify(parsed));
+  } catch {
+    // 저장 실패해도 이번 세션 동안은 동작해야 한다.
   }
 }
 

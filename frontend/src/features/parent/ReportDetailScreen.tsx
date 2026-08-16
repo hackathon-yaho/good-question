@@ -25,6 +25,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { BackButton } from "@/components/ui/BackButton";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
 import { parentApi } from "@/lib/api";
@@ -82,8 +83,8 @@ export function ReportDetailScreen({
 
   if (!report) {
     return (
-      <CenteredShell width="wide">
-        <p className="text-parent-body text-muted">불러오고 있어요…</p>
+      <CenteredShell width="wide" centerY>
+        <KidLoadingScreen />
       </CenteredShell>
     );
   }

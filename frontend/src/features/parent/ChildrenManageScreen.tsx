@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { BackButton } from "@/components/ui/BackButton";
 import { AVATAR_IDS, AVATAR_LABEL, ChildAvatar } from "@/components/ui/ChildAvatar";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
@@ -130,7 +131,7 @@ export function ChildrenManageScreen({
       </h1>
 
       {children === null ? (
-        <p className="mt-6 text-parent-body text-muted">불러오고 있어요…</p>
+        <KidLoadingScreen className="mt-6" />
       ) : (
         <ul className="mt-6 flex flex-col gap-3">
           {children.map((child) => (

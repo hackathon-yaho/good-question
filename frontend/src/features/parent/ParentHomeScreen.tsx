@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { PillButton } from "@/components/ui/PillButton";
 import { parentApi } from "@/lib/api";
 import type { ParentApi, ParentSummary } from "@/lib/api/types";
@@ -52,8 +53,8 @@ export function ParentHomeScreen({ api = parentApi }: { api?: ParentApi }) {
 
   if (!summary) {
     return (
-      <CenteredShell width="wide">
-        <p className="text-parent-body text-muted">불러오고 있어요…</p>
+      <CenteredShell width="wide" centerY>
+        <KidLoadingScreen />
       </CenteredShell>
     );
   }

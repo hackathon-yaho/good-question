@@ -122,7 +122,7 @@ console.log("\n=== B-1 홈 ===");
 await page.waitForTimeout(600);
 ok(await page.getByRole("navigation").count() === 1, "좌측 사이드바 (하단 탭바 아님)");
 const navLabels = await page.getByRole("navigation").getByRole("link").allInnerTexts();
-ok(navLabels.length === 5, "사이드바 로고 + 메뉴 4개", navLabels.join("/"));
+ok(navLabels.length === 6, "사이드바 로고 + 메뉴 5개 (상점 포함)", navLabels.join("/"));
 // 프로필은 우상단이 아니라 상단 1줄 전체다. 이름이 h1이다.
 ok(
   await page.getByRole("heading", { level: 1, name: "민준" }).isVisible(),

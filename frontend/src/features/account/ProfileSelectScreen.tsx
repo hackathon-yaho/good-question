@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { PillButton } from "@/components/ui/PillButton";
 import { accountApi } from "@/lib/api";
 import type { AccountApi, Child } from "@/lib/api/types";
@@ -77,9 +78,7 @@ export function ProfileSelectScreen({
   if (!children) {
     return (
       <CenteredShell width="wide" centerY>
-        <p className="text-center text-parent-body text-muted">
-          불러오고 있어요…
-        </p>
+        <KidLoadingScreen />
       </CenteredShell>
     );
   }

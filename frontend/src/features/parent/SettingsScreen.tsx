@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { BackButton } from "@/components/ui/BackButton";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { parentApi } from "@/lib/api";
@@ -38,6 +39,11 @@ const WITHDRAW_PHRASE = "탈퇴합니다";
 export function SettingsScreen({ api = parentApi }: { api?: ParentApi }) {
   const router = useRouter();
   const [parent, setParent] = useState<ParentAccount | null>(null);
+  /**
+   * `parent`만으로는 "로딩 중"과 "불러오기 실패"를 구분할 수 없다 — 실패해도
+   * `null`을 넣고 화면은 "—"로 버틴다(아래 `Row` 참고). 그래서 게이트는 따로 둔다.
+   */
+  const [loaded, setLoaded] = useState(false);
   const [notify, setNotify] = useState(true);
   const [openTerm, setOpenTerm] = useState<number | null>(null);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -49,10 +55,14 @@ export function SettingsScreen({ api = parentApi }: { api?: ParentApi }) {
     api
       .getParent()
       .then((result) => {
-        if (alive) setParent(result);
+        if (!alive) return;
+        setParent(result);
+        setLoaded(true);
       })
       .catch(() => {
-        if (alive) setParent(null);
+        if (!alive) return;
+        setParent(null);
+        setLoaded(true);
       });
     return () => {
       alive = false;
@@ -85,6 +95,14 @@ export function SettingsScreen({ api = parentApi }: { api?: ParentApi }) {
       setBusy(false);
     }
   }, [api, busy, phrase, router]);
+
+  if (!loaded) {
+    return (
+      <CenteredShell width="column" centerY>
+        <KidLoadingScreen />
+      </CenteredShell>
+    );
+  }
 
   return (
     <CenteredShell width="column">

@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { BackButton } from "@/components/ui/BackButton";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { parentApi } from "@/lib/api";
 import type { ParentApi, ReportListResult } from "@/lib/api/types";
 import { setSelectedChildId, useSelectedChildId } from "@/lib/client-store";
@@ -55,8 +56,8 @@ export function ReportListScreen({ api = parentApi }: { api?: ParentApi }) {
 
   if (!data) {
     return (
-      <CenteredShell width="wide">
-        <p className="text-parent-body text-muted">불러오고 있어요…</p>
+      <CenteredShell width="wide" centerY>
+        <KidLoadingScreen />
       </CenteredShell>
     );
   }
