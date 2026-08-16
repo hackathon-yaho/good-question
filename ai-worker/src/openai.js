@@ -5,7 +5,6 @@ export class ModelUpstreamError extends Error {}
 class NonRetryableModelError extends Error {}
 
 const MAX_ATTEMPTS = 3;
-const ATTEMPT_TIMEOUT_MS = 3_000;
 const RETRY_BACKOFF_MS = [100, 200];
 
 const analyzeSchema = {
@@ -41,11 +40,40 @@ const respondSchema = {
   required: ["text", "characterState"],
 };
 
+const reportCardSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    name: { type: "string" },
+    feature: { type: "string" },
+    evidenceIndex: { anyOf: [{ type: "integer" }, { type: "null" }] },
+    strength: { type: "string" },
+    next: { type: "string" },
+  },
+  required: ["name", "feature", "evidenceIndex", "strength", "next"],
+};
+
+const reportSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    competencies: { type: "array", items: reportCardSchema },
+    representativeIndex: { type: "integer" },
+    representativeReason: { type: "string" },
+    storyQuestions: { type: "array", items: { type: "string" } },
+    dailyQuestions: { type: "array", items: { type: "string" } },
+  },
+  required: ["competencies", "representativeIndex", "representativeReason", "storyQuestions", "dailyQuestions"],
+};
+
 export function outputSchema(operation) {
   if (operation === "analyze") {
     return { type: "json_schema", name: "goodquestion_analyze", schema: analyzeSchema, strict: true };
   }
-  return { type: "json_schema", name: "goodquestion_respond", schema: respondSchema, strict: true };
+  if (operation === "respond") {
+    return { type: "json_schema", name: "goodquestion_respond", schema: respondSchema, strict: true };
+  }
+  return { type: "json_schema", name: "goodquestion_report", schema: reportSchema, strict: true };
 }
 
 function delay(milliseconds) {
@@ -77,8 +105,8 @@ function isRetryableStatus(status) {
 }
 
 /**
- * Calls the Responses API without SDK retries.  The three attempts, backoff,
- * and ten-second deadline are owned here so the backend never multiplies cost.
+ * Calls the Responses API without SDK retries. The caller owns the total
+ * deadline; this function keeps all three attempts and their backoff inside it.
  */
 export async function requestStructuredOutput({
   env,
@@ -90,8 +118,10 @@ export async function requestStructuredOutput({
   fetcher = fetch,
   now = Date.now,
   sleep = delay,
+  totalTimeoutMs = 10_000,
+  attemptTimeoutMs = 3_000,
 }) {
-  const deadline = now() + 10_000;
+  const deadline = now() + totalTimeoutMs;
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -100,7 +130,7 @@ export async function requestStructuredOutput({
       throw new ModelTimeoutError();
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), Math.min(ATTEMPT_TIMEOUT_MS, remaining));
+    const timeout = setTimeout(() => controller.abort(), Math.min(attemptTimeoutMs, remaining));
     try {
       const response = await fetcher("https://api.openai.com/v1/responses", {
         method: "POST",

@@ -1136,24 +1136,84 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 > `NORMAL` 항목이 `remainingWorry` 사용을 언급하지 않으므로, 구현 시 프롬프트에서
 > "NORMAL + remainingWorry가 있으면 약하게만 드러낸다"를 명시해야 합니다.
 
-### 4.3 계약 확정 시 정해야 할 것
+### 4.3 `POST /report` — 보호자 리포트 고도화 ✅
+
+보호자 화면은 Worker를 직접 호출하지 않는다. 세션 완료 후 백엔드가 규칙 기반 리포트를 즉시 저장하고,
+별도 비동기 작업에서만 이 엔드포인트를 호출한다. 성공하면 저장 행을 AI 결과로 덮어쓰고, 502·504이면
+기존 리포트를 그대로 유지한다.
+
+**Request**
+
+```json
+{
+  "storyTitle": "방귀 뀌는 며느리",
+  "utterances": [
+    {
+      "index": 0,
+      "text": "며느리가 창피해서 그랬을 것 같아요.",
+      "sceneLabel": "장면 2",
+      "detectedTypes": ["PERSPECTIVE"]
+    }
+  ],
+  "competencyHints": [
+    { "name": "관점과 공감", "matched": true },
+    { "name": "감정 표현", "matched": false },
+    { "name": "상호작용", "matched": false },
+    { "name": "생각과 이유", "matched": false },
+    { "name": "결과와 해결", "matched": false }
+  ]
+}
+```
+
+**Response 200**
+
+```json
+{
+  "competencies": [
+    {
+      "name": "관점과 공감",
+      "feature": "이번 활동에서 나타난 특징",
+      "evidenceIndex": 0,
+      "strength": "강점을 먼저 전하는 문장",
+      "next": "보호자가 이어 볼 대화 제안"
+    }
+  ],
+  "representativeIndex": 0,
+  "representativeReason": "선정 이유 한 문장",
+  "storyQuestions": ["이야기 질문 1?", "이야기 질문 2?"],
+  "dailyQuestions": ["일상 질문 1?", "일상 질문 2?"]
+}
+```
+
+**계약·품질 규칙**
+
+- `competencies`는 입력과 같은 5개 이름·순서다. `matched=true`면 해당 역량의 실제 발화 `evidenceIndex`가 필요하고, `matched=false`면 반드시 `null`이다.
+- AI는 발화 원문을 쓰지 않고 index만 고른다. 백엔드가 index로 원문을 채운다.
+- 대표 발화도 index 한 개와 선정 이유 한 문장만 반환한다. 긴 문장보다 이야기 핵심과 생각 연결을 우선한다.
+- 질문은 이야기·일상 각 정확히 2개이며, 서로 다른 자연스러운 질문으로 물음표로 끝낸다.
+- 내부 코드·점수·등급·결핍 단정 표현을 보호자 문구에 노출하지 않는다. 강점을 먼저 말하고 다음 대화 방향을 제안한다.
+- Worker가 전체 60초 안에서 최초 포함 최대 3회 시도한다. 백엔드는 재시도하지 않는다.
+
+상세 책임·입출력·검증 범위는 [보호자 리포트 AI 생성 요청](../request/ai/parent-report-ai-generation.md)을 따른다.
+
+### 4.4 계약 확정 시 정해야 할 것
 
 [작업 분장 5장](../team/roles.md)이 지정한 항목입니다. **백엔드 담당이 주도하고 코딩 착수 전에 합의합니다.**
 
 | 항목 | 상태 |
 | --- | --- |
 | 프로토콜 | ✅ REST / JSON |
-| 엔드포인트 경로 | 🟡 `POST /analyze`, `POST /respond` 가정. **AI 담당 명세 수령 후 확정** |
-| 인증 | 🟡 `X-Internal-Token` 고정 토큰. 값 미정 |
-| 타임아웃 | ✅ AI 서버 요청 전체 10초 / 백엔드 연결 대기 10초 ([v2 요청](../request/backend/ai-retry-deadline-v2.md)) |
+| 엔드포인트 경로 | ✅ `POST /analyze`, `POST /respond`, 선택 기능 `POST /report` |
+| 인증 | ✅ `X-Internal-Token` 고정 토큰. 값은 환경변수로만 공유·관리 |
+| 타임아웃 | ✅ 대화 요청 전체 10초 / 백엔드 연결 대기 10초. 선택 리포트 요청 전체·백엔드 연결 대기 60초 |
 | 재시도 | ✅ AI 서버 최대 3회(최초 포함), 백엔드 0회 |
-| 실패 시 백엔드 동작 | ✅ `/analyze` → 빈 분석으로 진행 / `/respond` → `character_closing`으로 장면 종료 |
+| 실패 시 백엔드 동작 | ✅ `/analyze` → 빈 분석 / `/respond` → `character_closing` / `/report` → 규칙 기반 리포트 유지 |
 | 배포 주소 | ✅ `https://goodquestion-ai.goodquestion-kty2253.workers.dev` (Cloudflare Worker). Render 환경변수 반영·통합 확인은 진행 중 |
 
 > 백엔드는 AI 서버 완성을 기다리지 않고 **고정 JSON 스텁**으로 먼저 연결해 전체 흐름을 검증합니다.
 > 주소가 확정되면 환경변수만 교체합니다.
 
-### 4.4 비용·성능 제약
+### 4.5 비용·성능 제약
 
 [PRD 10.4](../product/prd.md) · [작업 분장 4.3](../team/roles.md) — 세션 8턴 기준 약 **1.5만~2만 토큰**을 넘기지 않습니다. 시스템 프롬프트를 간결하게 유지하는 것이 예산 관리의 핵심입니다.
 
@@ -1183,7 +1243,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 
 위 1.5만~2만 토큰 상한은 **AI 담당 쪽에만** 걸립니다. 음성 비용 상한은 아직 정해지지 않았습니다.
 
-### 4.5 계약 확정 전에도 진행 가능한 작업
+### 4.6 계약 확정 전에도 진행 가능한 작업
 
 | 담당 | 작업 |
 | --- | --- |
