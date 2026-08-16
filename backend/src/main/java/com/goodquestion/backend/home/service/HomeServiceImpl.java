@@ -10,7 +10,6 @@ import com.goodquestion.backend.home.dto.response.InProgressResponse;
 import com.goodquestion.backend.home.dto.response.RecommendedStoryResponse;
 import com.goodquestion.backend.home.dto.response.SceneProgressResponse;
 import com.goodquestion.backend.session.entity.StorySession;
-import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
 import com.goodquestion.backend.story.entity.Story;
 import com.goodquestion.backend.story.enums.SceneType;
@@ -38,8 +37,13 @@ public class HomeServiceImpl implements HomeService {
     public HomeResponse getHome(UUID parentId, UUID childId) {
         Child child = getOwnedChild(parentId, childId);
 
+        // D-58: 상태로 먼저 거르면(status-first) COMPLETED된 세션보다 오래된 STOPPED 세션이
+        // "가장 최근 resumable"로 잡힌다 (새로하기로 새 세션을 만들고 완료해도 예전 STOPPED가 남아
+        // 이어하기에 뜸). StoryServiceImpl.getStoryDetail()의 D-48 패턴대로 최근 활동순으로 먼저
+        // 정렬한 뒤 resumable 여부를 거른다.
         InProgressResponse inProgress = storySessionRepository
-                .findFirstByChildAndStatusInOrderByLastActivityAtDesc(child, SessionStatus.resumableStatuses())
+                .findFirstByChildOrderByLastActivityAtDesc(child)
+                .filter(session -> session.getStatus().isResumable())
                 .map(this::toInProgressResponse)
                 .orElse(null);
 

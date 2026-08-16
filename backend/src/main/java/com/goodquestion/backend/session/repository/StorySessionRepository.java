@@ -18,7 +18,5 @@ public interface StorySessionRepository extends JpaRepository<StorySession, UUID
 
     Optional<StorySession> findFirstByChildAndStoryOrderByLastActivityAtDesc(Child child, Story story);
 
-    Optional<StorySession> findFirstByChildAndStatusInOrderByLastActivityAtDesc(Child child, List<SessionStatus> statuses);
-
     List<StorySession> findAllByChild(Child child);
 }

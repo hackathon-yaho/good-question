@@ -107,7 +107,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
-| M-08 | ~~진행 중 이야기 · 이어하기~~ | 필수 | `GET /api/home?childId=` — **완료.** `child.starDust` 추가 (선택, 프론트 요청 — D-33) |
+| M-08 | ~~진행 중 이야기 · 이어하기~~ | 필수 | `GET /api/home?childId=` — **완료.** `child.starDust` 추가 (선택, 프론트 요청 — D-33) · 이미 완료한 이야기인데도 이어하기가 뜨던 status-first 쿼리 버그 수정 (D-58) |
 | M-10 | ~~이야기 목록~~ | 필수 | `GET /api/stories?childId=&topic=` — **완료** |
 | M-11 | ~~주제별 필터링~~ | 필수 | 〃 (`stories.topics` 기준) — **완료** |
 | — | ~~이야기 상세~~ | 필수 | `GET /api/stories/{storyId}?childId=` — **완료** |

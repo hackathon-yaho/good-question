@@ -1685,6 +1685,37 @@ report-timeout-seconds(60초, 세션 완료 후 비동기 리포트 생성용)�
 
 ---
 
+### D-58 · 홈 "이어하기"가 이미 끝낸 이야기인데도 뜨던 문제 — status-first 쿼리가 원인
+
+사용자 보고: 이야기를 끝까지 하고 별가루(`activity/retelling`)까지 받았는데 홈 화면에
+"이어하기"가 계속 떠 있었다.
+
+**원인**: `HomeServiceImpl.getHome()`은 `findFirstByChildAndStatusInOrderByLastActivityAtDesc`로
+"resumable 상태인 것들 중 가장 최근"을 찾았다. `COMPLETED`는 이 쿼리 대상에서 아예 빠지므로,
+같은 아이가 다른 시점에 남긴 오래된 `STOPPED` 세션(예: "새로하기"로 재시작하면서 예전
+세션은 `stop()`만 되고 그대로 DB에 남는다 — `SessionServiceImpl.createSession()`의
+`restart` 분기)이 실제로는 더 예전 활동인데도 "가장 최근 resumable"로 걸려 이어하기에
+떴다. `StoryServiceImpl.getStoryDetail()`은 이미 D-48에서 "최근 활동순으로 먼저 정렬 →
+resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는데, 홈만 반대 순서
+(filter-then-order 격인 status-first)를 쓰고 있었다.
+
+**수정**: 홈도 D-48과 같은 패턴으로 통일 — `findFirstByChildOrderByLastActivityAtDesc(child)`로
+아이의 가장 최근 세션을 먼저 찾고, `isResumable()`로 필터링. 세션 삭제나 새 종료 상태
+추가 없이 쿼리 순서만 바꿔서 해결했다 — "새로하기"가 남기는 orphan `STOPPED` 행 자체는
+그대로 두되(메시지·리포트 FK 때문에 삭제하려면 별도 cascade 작업이 필요), 홈이 그 행을
+"가장 최근"으로 잘못 집어내는 것만 막는다.
+
+`StorySessionRepository.findFirstByChildAndStatusInOrderByLastActivityAtDesc(...)`와
+`SessionStatus.resumableStatuses()`는 이 변경으로 호출처가 없어져 같이 제거했다.
+
+**검증**: 로컬 DB에서 실제 IN_PROGRESS 세션 하나를 COMPLETED로 바꾼 뒤(더 오래된 STOPPED
+세션들은 그대로 둔 채) `GET /api/home` 호출 → `inProgress: null` 확인. 원상복구 후 다시
+호출해 원래 IN_PROGRESS가 정상적으로 잡히는 것도 확인.
+
+**변경 파일**: `HomeServiceImpl.java`, `StorySessionRepository.java`, `SessionStatus.java`.
+
+---
+
 ### D-58 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
 
 **배경**: v1(`scene-vocabulary-recommendation.md`)은 `recommendedWord`를 장면 번호만 보고

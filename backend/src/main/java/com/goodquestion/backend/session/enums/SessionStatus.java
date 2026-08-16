@@ -15,8 +15,4 @@ public enum SessionStatus {
     public boolean isResumable() {
         return RESUMABLE.contains(this);
     }
-
-    public static List<SessionStatus> resumableStatuses() {
-        return RESUMABLE;
-    }
 }
