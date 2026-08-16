@@ -291,6 +291,23 @@ html[data-shell="immersive"] {
     }
   }
 
+  /* 아이 화면 로딩(KidLoadingScreen) — 별 3개가 순서대로 튀어 오른다 */
+  .animate-kid-loading-bounce {
+    animation: kid-loading-bounce 1s ease-in-out infinite;
+  }
+  @keyframes kid-loading-bounce {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0) scale(0.85);
+      opacity: 0.55;
+    }
+    40% {
+      transform: translateY(-0.6rem) scale(1.05);
+      opacity: 1;
+    }
+  }
+
   /* 움직임을 줄이라고 설정한 사용자에게는 애니메이션을 멈춘다.
    * 모양은 그대로 보이므로 정보가 사라지지 않는다. */
   @media (prefers-reduced-motion: reduce) {
@@ -301,6 +318,7 @@ html[data-shell="immersive"] {
     .animate-mission-fleck,
     .animate-mission-glow,
     .animate-mission-ring,
+    .animate-kid-loading-bounce,
     .turn-glow {
       animation: none;
     }
@@ -310,6 +328,9 @@ html[data-shell="immersive"] {
     /* 링은 남긴다. 움직임만 빼고 "말하고 있다"는 정보는 유지한다. */
     .animate-speaking-ring {
       box-shadow: 0 0 0 0.25rem var(--color-info);
+    }
+    .animate-kid-loading-bounce {
+      opacity: 1;
     }
   }
 }

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 
 import { SidebarShell } from "@/components/shells/SidebarShell";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { StoryCard } from "@/components/ui/StoryCard";
 import { contentApi } from "@/lib/api";
 import type { ContentApi, StoryListResult } from "@/lib/api/types";
@@ -66,7 +67,7 @@ export function StoryListScreen({ api = contentApi }: { api?: ContentApi }) {
       </div>
 
       {data === null ? (
-        <p className="mt-8 text-parent-body text-muted">불러오고 있어요…</p>
+        <KidLoadingScreen className="mt-8" />
       ) : data.stories.length === 0 ? (
         <p className="mt-8 text-parent-body text-muted">
           이 주제의 이야기는 아직 없어요.

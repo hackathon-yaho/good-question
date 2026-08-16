@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 
 import { SidebarShell } from "@/components/shells/SidebarShell";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { StarDustChip } from "@/components/ui/StarDust";
 import { PillButton } from "@/components/ui/PillButton";
 import { contentApi } from "@/lib/api";
@@ -64,7 +65,7 @@ export function MypageScreen({ api = contentApi }: { api?: ContentApi }) {
   if (!data) {
     return (
       <SidebarShell>
-        <p className="text-parent-body text-muted">불러오고 있어요…</p>
+        <KidLoadingScreen className="h-full" />
       </SidebarShell>
     );
   }

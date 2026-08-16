@@ -30,6 +30,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { SidebarShell } from "@/components/shells/SidebarShell";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { ChildAvatar } from "@/components/ui/ChildAvatar";
 import { PillButton } from "@/components/ui/PillButton";
 import { StarDustChip } from "@/components/ui/StarDust";
@@ -126,7 +127,7 @@ export function HomeScreen({ api = accountApi }: { api?: AccountApi }) {
   if (!home) {
     return (
       <SidebarShell>
-        <p className="text-parent-body text-muted">불러오고 있어요…</p>
+        <KidLoadingScreen className="h-full" />
       </SidebarShell>
     );
   }

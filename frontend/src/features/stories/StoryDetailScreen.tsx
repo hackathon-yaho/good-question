@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 
 import { BackButton } from "@/components/ui/BackButton";
 import { CharacterPortrait } from "@/features/play/CharacterPortrait";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
@@ -186,7 +187,7 @@ export function StoryDetailScreen({
   if (!story) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-bg">
-        <p className="text-parent-body text-muted">불러오고 있어요…</p>
+        <KidLoadingScreen />
       </div>
     );
   }

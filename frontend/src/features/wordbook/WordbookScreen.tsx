@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 
 import { SidebarShell } from "@/components/shells/SidebarShell";
 import { FilterChipRow } from "@/components/ui/FilterChipRow";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { Modal } from "@/components/ui/Modal";
 import { PillButton } from "@/components/ui/PillButton";
 import { contentApi } from "@/lib/api";
@@ -96,7 +97,7 @@ export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
       </div>
 
       {words === null ? (
-        <p className="mt-8 text-parent-body text-muted">불러오고 있어요…</p>
+        <KidLoadingScreen className="mt-8" />
       ) : words.length === 0 ? (
         <div className="mt-10 rounded-card border border-border bg-surface p-8 text-center">
           <p className="text-parent-body leading-relaxed text-muted">
