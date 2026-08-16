@@ -35,9 +35,10 @@ public final class ProgressJudge {
     /**
      * 미션 노출 후 허용하는 최대 대화 턴 (D-50). GUIDED로 응답한 턴은 세지 않는다
      * (ProgressInput.missionEngagedTurns) — 대화 세션의 원래 maxTurns와는 무관하게, 이 값에
-     * 도달하면 무조건 닫는다.
+     * 도달하면 무조건 닫는다. 응답 turnCount/maxTurns가 미션 중 이 예산으로 전환될 때도
+     * 같은 값을 쓴다 (D-60, MessageServiceImpl).
      */
-    private static final int MISSION_MAX_TURNS_AFTER_REVEAL = 4;
+    public static final int MISSION_MAX_TURNS_AFTER_REVEAL = 4;
     /** 장면당 GUIDED 보호 턴 최대 횟수 (low-engagement-turn-protection.md). */
     public static final int GUIDED_TURN_PROTECTION_LIMIT = 2;
 

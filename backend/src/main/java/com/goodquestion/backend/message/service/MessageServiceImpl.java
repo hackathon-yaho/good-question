@@ -151,10 +151,10 @@ public class MessageServiceImpl implements MessageService {
                 turnsWithoutNewElement, lowInformationTurns, hasUnrevealedMission,
                 missionRevealedAtTurn, missionEngagedTurns, explicitZeroInfoRejection, guidedTurnProtectionUsed));
 
-        // 보호 턴이거나 미션이 이미 노출된 상태면 currentChildTurnCount를 그대로 둔다. 미션은
-        // missionEngagedTurns라는 자체 턴 예산을 쓰므로(D-50), 응답의 turnCount는 미션 노출 순간
-        // 값에 고정된다 — 안 그러면 미션 중 NORMAL/예산-소모 GUIDED 턴마다 계속 늘어나 maxTurns를
-        // 훌쩍 넘겨버린다 (원래 장면의 maxTurns와 아무 관계가 없어지는데도 그대로 노출됐던 버그).
+        // 보호 턴이거나 미션이 이미 노출된 상태면 currentChildTurnCount를 그대로 둔다 — 이 값은
+        // ProgressJudge 판단 입력(candidateTurnCount)과 세션 기록용이지, 응답에 그대로 나가는
+        // 값이 아니다(D-60). 미션 중 응답 turnCount/maxTurns는 아래에서 missionEngagedTurns
+        // 기준으로 따로 계산한다.
         int turnCount = (decision.protectedTurn() || missionRevealedAtTurn != null)
                 ? session.getCurrentChildTurnCount()
                 : candidateTurnCount;
@@ -185,6 +185,16 @@ public class MessageServiceImpl implements MessageService {
                 }
             }
         }
+
+        // D-60: 미션이 이미 노출된 상태면 응답 turnCount/maxTurns를 장면 예산이 아니라 미션
+        // 자체 예산(최소 1~최대 4, D-50)으로 전환한다 — 이 턴이 예산을 소모했으면(NORMAL 또는
+        // 3회째부터의 GUIDED) 방금 위에서 올라간 missionEngagedTurns가, 보호 턴이거나 무료
+        // GUIDED(최대 2회)였으면 이전 값이 그대로 응답에 실린다. 미션을 막 노출시킨 이번 턴
+        // 자체는 missionRevealedAtTurn이 아직 null이라 이 분기를 안 타고 기존 장면 값을 쓴다.
+        int responseTurnCount = missionRevealedAtTurn != null ? session.getMissionEngagedTurns() : turnCount;
+        Integer responseMaxTurns = missionRevealedAtTurn != null
+                ? ProgressJudge.MISSION_MAX_TURNS_AFTER_REVEAL
+                : scene.getMaxTurns();
 
         int nextTurnOrder = childTurnOrder + 1;
         Message characterMessage = messageRepository.save(
@@ -218,8 +228,8 @@ public class MessageServiceImpl implements MessageService {
                 characterTurn.text(),
                 characterDisplayName,
                 accumulated,
-                turnCount,
-                scene.getMaxTurns(),
+                responseTurnCount,
+                responseMaxTurns,
                 characterTurn.sceneEnded(),
                 nextSceneId,
                 missionTriggered,

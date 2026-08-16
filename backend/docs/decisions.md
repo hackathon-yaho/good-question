@@ -1760,6 +1760,50 @@ report-timeout-seconds(60초, 세션 완료 후 비동기 리포트 생성용)�
 
 ---
 
+### D-60 · 미션 중 응답 turnCount/maxTurns가 얼어붙던 것을 미션 자체 예산(1~4)으로 전환
+
+**증상**: 사용자 보고 — 대화3·4(미션 있는 장면)에서 미션이 노출된 뒤에는 `POST /messages`
+응답의 `turnCount`/`maxTurns`가 더 이상 안 움직인다. 프론트가 진행 상황을 보여줄 방법이 없다.
+
+**원인**: D-53(1)이 "미션 중 `turnCount`가 `maxTurns`를 넘어 계속 쌓이는" 버그를 고치면서,
+`missionRevealedAtTurn != null`이면 응답 `turnCount`를 미션 노출 시점 값에 통째로 얼려버렸다.
+당시 근거는 "프론트에 별도 미션 턴 카운터를 안 주니 `turnCount`가 미션 중 움직일 이유가
+없다"였는데, 실제로는 프론트가 이 필드로 미션 진행률을 보여주려 하고 있어 그 전제가 틀렸다.
+
+내부적으로는 `ProgressJudge`·`StorySession.missionEngagedTurns`가 D-50 그대로 미션 자체
+예산(최소 1~최대 4, GUIDED는 일반 보호 2회 + 미션 전용 무료 2회까지 예산을 안 씀)을 정확히
+계산하고 있었다 — 응답 DTO로 안 내보내고 있었을 뿐이다.
+
+**수정**: 세션에 기록하는 내부 `turnCount`(candidate/frozen, `ProgressInput`·
+`recordTurnResult` 입력)는 D-53 그대로 둔다 — 판단 로직을 건드리지 않았다. 응답에 실어
+보내는 값만 분리했다: `missionRevealedAtTurn != null`이면(=미션이 노출된 상태, 노출을
+유발한 그 턴 자체는 제외 — 그 턴은 아직 `missionRevealedAtTurn`이 null이라 기존 장면 값을
+씀) 미션 회계 반영 **이후**의 `session.getMissionEngagedTurns()`를 `turnCount`로,
+`ProgressJudge.MISSION_MAX_TURNS_AFTER_REVEAL`(4, `private`→`public`으로 공개)을
+`maxTurns`로 응답에 싣는다. 보호 턴·미션 무료 GUIDED 턴에는 `missionEngagedTurns`가
+안 늘어나므로 자동으로 값이 그대로 유지된다 — 장면 레벨에서 보호 턴이 `turnCount`를
+안 움직이는 것과 같은 원리를 미션 레벨에도 그대로 적용한 것뿐이다.
+
+같은 필드(`turnCount`/`maxTurns`)를 미션 중 의미만 바꿔 재사용할지, 별도 필드
+(`missionTurnCount` 등)를 새로 만들지는 사용자에게 확인 후 전자로 확정했다 — 프론트가
+필드 이름을 새로 안 배워도 되고, 이미 진행률 표시에 `turnCount`/`maxTurns`를 쓰고 있었다.
+
+**검증**: 로컬 서버(mock AI, `AI_SERVER_BASE_URL`을 `/api/mock-ai`로 맞춰 재기동 — `.env`가
+실 AI 서버를 가리키고 있어 처음엔 전부 `/respond` 실패로 즉시 CLOSING되는 걸 발견하고 바로잡음)에
+실제 세션을 대화1(장면3)→대화2(장면5)→대화3(장면7, 미션1)까지 진행하며 curl로 확인:
+- 대화1·2(미션 없음): `turnCount`가 장면 자체 `maxTurns`(4·5) 기준으로 기존과 동일하게 진행 —
+  회귀 없음.
+- 대화3: 미션 트리거 턴엔 `turnCount=1/5`(장면 값, 미노출 상태라 정상). 노출 후 저정보
+  발화("그냥 잘 모르겠어요")를 반복 — 일반 GUIDED 보호 2회 + 미션 무료 GUIDED 2회 동안
+  `turnCount=0/4`로 유지되다가 5번째 턴부터 `1/4→2/4→3/4→4/4`로 정확히 오르고, `4/4` 다음
+  턴에서 `CLOSING`+`sceneEnded:true`+`nextSceneId`(대화4로 전환)까지 정상 확인. 전체 단위
+  테스트 130/130 통과(회귀 없음).
+
+**변경 파일**: `ProgressJudge.java`(`MISSION_MAX_TURNS_AFTER_REVEAL` 공개),
+`MessageServiceImpl.java`.
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

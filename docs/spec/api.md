@@ -651,7 +651,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `characterMessage` | 말풍선 + TTS. `CLOSING`이면 LLM 생성이 아니라 `character_closing` 원문 ([PRD I-01](../product/prd.md)) |
 | `characterName` | 표시명 |
 | `accumulatedElements` | C-7·C-12 사고 요소 별 뱃지. §1-7 매핑으로 4그룹 변환해 표시 |
-| `turnCount` / `maxTurns` | C-3 턴 카운터 "N / M" |
+| `turnCount` / `maxTurns` | C-3 턴 카운터 "N / M". 대화3·4는 미션이 노출된 뒤부터 이 두 값의 기준이 **장면 자체 예산 → 미션 예산(최소 1~최대 4)으로 전환**된다 — `maxTurns`가 그 순간부터 항상 `4`로 보임 (D-60). 미션이 없거나 아직 노출 전이면 기존처럼 장면 값 그대로 |
 | `sceneEnded` | `true`면 `characterMessage` 재생 후 C-12로 |
 | `nextSceneId` | `sceneEnded=true`일 때 채움. 마지막 장면이면 `null` → `/activity`로 |
 | `missionTriggered` | 미션 노출 신호. 없으면 `null` |
