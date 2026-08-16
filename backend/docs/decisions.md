@@ -1663,6 +1663,53 @@ AI 버전으로 덮어써진 것을 확인. 5개 역량 카드의 `evidence`가 
 
 ---
 
+### D-57 · AI 재시도 예산을 Worker로 전부 이관, 백엔드 타임아웃 10초 → 105초 (ai-retry-deadline-v4)
+
+**배경**: AI팀 통합 테스트에서 간헐적 `502 MODEL_UPSTREAM_ERROR`로 장면이 조기 종료되는 문제가
+확인됐다 ([request/backend/ai-retry-deadline-v4.md](request/backend/ai-retry-deadline-v4.md), v3를
+대체). Worker가 `/analyze`·`/respond`에 대해 최초 요청 포함 최대 10회, 시도당 최대 10초,
+전체 예산 최대 102초로 재시도를 전담하기로 했다. 백엔드는 원래도 자체 재시도가 0회였으므로
+(`AiAnalyzeClientImpl`·`AiRespondClientImpl` 모두 실패 시 즉시 폴백) 코드 변경은 필요 없고,
+**Worker의 102초 예산을 백엔드 HTTP 클라이언트가 먼저 끊지 않도록 타임아웃만 늘리면 된다.**
+
+**변경**: `application.yml`의 `ai.server.timeout-seconds` 기본값을 `${AI_SERVER_TIMEOUT_SECONDS:10}` →
+`${AI_SERVER_TIMEOUT_SECONDS:105}`로 변경 (102초 예산 + 3초 여유). Render 환경변수
+`AI_SERVER_TIMEOUT_SECONDS`도 105로 갱신 필요.
+
+**영향**: 한 아이 발화에서 `/analyze`·`/respond`가 각각 최대 102초까지 걸릴 수 있어(최악 약
+204초), 프론트가 자체 15초 타임아웃을 걸면 안 된다 — 별도 프론트 요청서
+[frontend/message-response-time-budget-v3.md](request/frontend/message-response-time-budget-v3.md).
+report-timeout-seconds(60초, 세션 완료 후 비동기 리포트 생성용)는 이 요청 범위 밖이라 그대로 뒀다.
+
+**변경 파일**: `application.yml`.
+
+---
+
+### D-58 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
+
+**배경**: v1(`scene-vocabulary-recommendation.md`)은 `recommendedWord`를 장면 번호만 보고
+항상 하나씩 내려줬다 — 캐릭터가 실제로 그 단어를 말했는지와 무관했다. AI팀이 v2
+([request/backend/character-utterance-vocabulary-v2.md](request/backend/character-utterance-vocabulary-v2.md))로
+이를 대체: 이번 메시지에서 **최종 확정된 캐릭터 대사(Worker 응답이든 `character_closing`
+안전 폴백이든 구분 없이)** 안에 후보 단어가 실제로 연속된 문자열로 포함될 때만 추천하고,
+없으면 반드시 `null`이어야 한다.
+
+**구현**: `highlightWords`가 이미 같은 패턴(D-22 — 대사에 실제 포함될 때만 채택)이었으므로
+그대로 재사용했다. `SceneVocabulary.forSceneOrder(...)`(장면만 보고 무조건 반환)는 그대로
+남기고, 대사 대조까지 포함한 `SceneVocabulary.matchInText(sceneOrder, characterText)`를
+추가해 `MessageServiceImpl`이 이 메서드만 쓰도록 바꿨다. 후보 데이터(장면별 단어 1개, v1과
+동일)는 그대로 재사용 — 콘텐츠 검토는 여전히 대기 중이라는 사실은 안 바뀐다.
+
+**검증**: `SceneVocabularyTest` 5건 — 후보 단어가 Worker 응답 텍스트에 있는 경우, 
+`character_closing` 폴백 텍스트에 있는 경우(문서가 둘 다 자동 테스트하라고 명시한 완료조건),
+대사에 없는 경우(null), 후보가 없는 장면(null), 대사가 null인 경우(null). 전체
+125/125 통과.
+
+**변경 파일**: `story/constant/SceneVocabulary.java`, `message/service/MessageServiceImpl.java`,
+`story/constant/SceneVocabularyTest.java`(신규).
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

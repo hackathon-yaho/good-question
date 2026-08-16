@@ -227,7 +227,7 @@ public class MessageServiceImpl implements MessageService {
                 characterMessage.getId(),
                 characterTurn.characterState() == null ? null : characterTurn.characterState().name(),
                 characterTurn.sceneEnded() ? null : missionProgress(session, scene),
-                RecommendedWordResponse.from(SceneVocabulary.forSceneOrder(scene.getSceneOrder()))
+                RecommendedWordResponse.from(SceneVocabulary.matchInText(scene.getSceneOrder(), characterTurn.text()))
         );
     }
 
@@ -267,6 +267,7 @@ public class MessageServiceImpl implements MessageService {
                 .map(candidate -> new HighlightWordResponse(candidate.word(), candidate.meaning()))
                 .toList();
     }
+
 
     private AnalyzeAiRequest buildAnalyzeRequest(StoryScene scene, String previousCharacterMessage, String childUtterance) {
         return new AnalyzeAiRequest(

@@ -203,8 +203,8 @@ analyze/respond 각각 실패 폴백, 미션 트리거+중복방지, STT_EMPTY, 
 
 | ID | 항목 | 등급 | 비고 |
 | --- | --- | --- | --- |
-| B-09 | ~~`POST /analyze` 클라이언트~~ | 필수 | 타임아웃 5초 · 재시도 0회 — **완료.** `message/service/ai/AiAnalyzeClientImpl.java` |
-| B-10 | ~~`POST /respond` 클라이언트~~ | 필수 | 타임아웃 5초 · 재시도 0회 — **완료.** `message/service/ai/AiRespondClientImpl.java` |
+| B-09 | ~~`POST /analyze` 클라이언트~~ | 필수 | 타임아웃 105초(D-57, ai-retry-deadline-v4) · 재시도 0회 — **완료.** `message/service/ai/AiAnalyzeClientImpl.java` |
+| B-10 | ~~`POST /respond` 클라이언트~~ | 필수 | 타임아웃 105초(D-57, ai-retry-deadline-v4) · 재시도 0회 — **완료.** `message/service/ai/AiRespondClientImpl.java` |
 | B-11 | ~~**AI 서버 mock 스텁**~~ | 필수-기반 | `aimock/AiMockController.java` — `POST /api/mock-ai/analyze`·`/respond`, 고정 JSON, 인증 불필요. **완료** |
 | B-12 | ~~실패 폴백 처리~~ | 필수 | 아래 표 — **완료** (6장에도 같은 항목 있음, Phase 4에서 구현 후 이 표 갱신을 놓쳤었음) |
 
