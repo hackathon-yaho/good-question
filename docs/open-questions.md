@@ -105,7 +105,7 @@ H-7 회원 탈퇴. 별가루도 지급은 되지만(`children.star_dust`) 어떤
 | **Q-09** 빈 발화 | STT 분리로 자동 해소. 빈 발화 전송 경로 자체가 없어짐 (D-02) |
 | Q-02 소셜 로그인 | 카카오 단독 (D-06) |
 | Q-03 B-3 정보 블록 | `stories.situation`·`child_role` 컬럼 추가 (D-07) |
-| Q-06 단어장 범위 | `wordbook` 완료. 이번 캐릭터 대사에 실제 나온 8세 이하 후보만 `recommendedWord` 카드로 표시하고, 대사 `highlightWords`는 표시하지 않음 ([v3 요청](request/frontend/scene-vocabulary-card-v3.md)) |
+| Q-06 단어장 범위 | `wordbook` 완료. 이번 캐릭터 대사에 실제 나온 8세 이하 후보 최대 하나를 기존 `highlightWords`로 표시 ([백엔드 v1](request/backend/highlight-words-current-character-v1.md)) |
 | Q-10 장면 수 4 vs 9 | `currentSceneOrder` + `sceneProgress` 분리 (D-12) |
 | Q-11 `avatar_id` | 컬럼 추가, 값 검증 없음 (D-08) |
 | Q-12 별가루 | **제외 권고를 뒤집어 채택.** 요건 외 팀 추가 · 후순위 (D-09) |
@@ -136,7 +136,7 @@ H-7 회원 탈퇴. 별가루도 지급은 되지만(`children.star_dust`) 어떤
 | ~~**B-3**~~ | ~~인증 방식 (Q-01)~~ | ✅ **해소.** 자체 JWT + 카카오 단독 |
 | ~~**B-4**~~ | ~~AI 타임아웃·실패 처리 (Q-14)~~ | ✅ **2026-08-16 재확정.** Worker 전체 102초 / 각 시도 10초 / 최대 10회 / 안전 폴백 |
 | **B-6** | 반복 저정보 발화의 강제 장면 종료 | 🔴 백엔드 구현 요청 전달. 장면당 GUIDED 2회가 진행·미션 턴과 종료를 보호 |
-| **B-7** | 8세 이하 학습 단어 노출 | 🟡 [백엔드](request/backend/character-utterance-vocabulary-v2.md)·[프론트](request/frontend/scene-vocabulary-card-v3.md) 요청 전달. 개별 아이의 "모름" 판정은 하지 않음 |
+| **B-7** | 8세 이하 학습 단어 노출 | 🟡 기존 프론트 `highlightWords` 흐름 유지. [백엔드 구현 요청](request/backend/highlight-words-current-character-v1.md) main 병합·Render 재배포 대기. 개별 아이의 "모름" 판정은 하지 않음 |
 | **B-5** | **구현 범위 합의** | 🔴 **미해소.** 화면 명세 48개 vs [작업 분장 2.1](team/roles.md) 필수 11개. 아래 §4 참조 |
 
 **B-5(프론트 범위), B-6(반복 저정보 발화), B-7(학습 단어 노출)이 남아 있습니다.** B-6·B-7은

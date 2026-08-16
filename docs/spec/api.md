@@ -71,7 +71,7 @@
 | 3.3 | `stories.situation` · `child_role` 컬럼 추가 확정 (D-07) |
 | **3.5** | **발화 전송을 요청 3개로 분리.** `POST /api/stt` · `GET /api/tts` 신규 (D-02) |
 | 3.6 | 카드 재시도 3회 제한, 3회째 `correctOrder` 공개 (D-10) |
-| 3.7 | `highlightWords`는 장면별 후보 단어가 실제 대사에 있을 때만 채워짐, `wordbook` API 3개 구현 완료 (D-11 · D-22) |
+| 3.7 | `highlightWords`는 이번 캐릭터 대사에 실제 포함된 8세 이하 후보일 때만 최대 하나 채워짐, `wordbook` API 3개 구현 완료 (D-11 · D-22) |
 | 3.8 | 보호자 리포트 3개 엔드포인트 응답 형태 확정 (프론트 mock 그대로 반영) |
 | 3.9 | 마이페이지 구현 완료 — 문서 전체 점검 중 Phase 추적에서 빠져 있던 걸 발견 (D-25) |
 | 4.3 | 타임아웃·재시도·실패 동작 확정 (D-03) |
@@ -646,8 +646,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
     { "word": "구박", "meaning": "누군가를 못마땅해하며 자꾸 나무라는 것" }
   ],
   "messageId": "d82d423b-e4af-43c6-b99c-3b34e1941cfc",
-  "characterState": "WORRIED",
-  "recommendedWord": { "word": "창피한", "meaning": "다른 사람이 볼까 봐 얼굴이 뜨거운 마음" }
+  "characterState": "WORRIED"
 }
 ```
 
@@ -661,11 +660,10 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `sceneEnded` | `true`면 `characterMessage` 재생 후 C-12로 |
 | `nextSceneId` | `sceneEnded=true`일 때 채움. 마지막 장면이면 `null` → `/activity`로 |
 | `missionTriggered` | 미션 노출 신호. 없으면 `null` |
-| `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. 장면별 후보 단어가 **이번 턴 `characterMessage`에 실제로 있을 때만** 채워진다. 없는 턴은 빈 배열 `[]` ([D-11](../../backend/docs/decisions.md) · [D-22](../../backend/docs/decisions.md)) |
+| `highlightWords` | C-3 자막 밑줄 + C-9 단어 팝업. 8세 이하 후보 중 **이번 턴 `characterMessage`에 실제로 있는 단어를 최대 하나만** 채운다. 없는 턴은 빈 배열 `[]` ([D-11](../../backend/docs/decisions.md) · [D-22](../../backend/docs/decisions.md) · [v1 요청](../request/backend/highlight-words-current-character-v1.md)) |
 | `messageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)). 필드명 `characterMessageId`→`messageId` 정정은 [D-26](../../backend/docs/decisions.md) |
 | `characterState` | **신규 (O-12).** 대화 중 캐릭터 이미지 전환용 상태값. AI가 대사 내용에 맞춰 판단해 내려줌. `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 중 하나, `CLOSING`이면 항상 `null` ([D-27](../../backend/docs/decisions.md)). 상태별 캐릭터 이미지는 [request/ai/story-image-assets.md](../request/ai/story-image-assets.md) 도착 대기 중 |
 | `missionProgress` | **신규.** 미션 체크리스트 항목 단위 진행(`{ missionId, satisfiedIndexes }`). 미션 노출 전이거나 `CLOSING`이면 `null` ([D-30](../../backend/docs/decisions.md), [request/backend/mission-progress.md](../request/backend/mission-progress.md)) |
-| `recommendedWord` | **신규.** 오늘의 단어 카드 `{ word, meaning }`. `word`는 반드시 **이번 턴 `characterMessage`에 실제 포함**되며, 적절한 8세 이하 후보가 없으면 `null`이다. LLM 입출력에는 관여하지 않는다 ([실제 대사 기반 요청 v2](../request/backend/character-utterance-vocabulary-v2.md)). |
 
 **프론트가 하지 말아야 할 것**
 
@@ -1298,7 +1296,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 | ~~백엔드→AI 타임아웃·재시도·실패 응답~~ | ✅ Worker 전체 102초 / 백엔드 105초 / AI 서버 최대 10회·각 시도 10초 / 안전 폴백 — 2.5절 · v4 요청 |
 | ~~카드 순서 재시도 횟수 제한~~ | ✅ **3회** — 3.6절 · D-10 |
 | ~~`children.avatar_id` 스키마 추가~~ | ✅ 추가. 값 검증 없음 — 3.2절 · D-08 |
-| ~~`recommendedWord` 데이터 출처~~ | ✅ 현재 캐릭터 대사에 실제 있는 검토 후보만 채움, 없으면 `null` — 3.7절 · v2 요청 |
+| ~~`recommendedWord` 데이터 출처~~ | ✅ 프론트 미사용 필드·상수 제거. 기존 `highlightWords`에 현재 캐릭터 대사 기반 후보 최대 하나를 사용 — 3.7절 · v1 요청 |
 
 ### 남은 것
 

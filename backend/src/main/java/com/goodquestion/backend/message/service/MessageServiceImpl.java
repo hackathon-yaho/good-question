@@ -8,7 +8,6 @@ import com.goodquestion.backend.message.dto.response.HighlightWordResponse;
 import com.goodquestion.backend.message.dto.response.MessageCreateResponse;
 import com.goodquestion.backend.message.dto.response.MissionProgressResponse;
 import com.goodquestion.backend.message.dto.response.MissionTriggeredResponse;
-import com.goodquestion.backend.message.dto.response.RecommendedWordResponse;
 import com.goodquestion.backend.message.entity.DetectedElement;
 import com.goodquestion.backend.message.entity.Message;
 import com.goodquestion.backend.message.entity.UtteranceAnalysis;
@@ -45,7 +44,6 @@ import com.goodquestion.backend.story.constant.DialogueContents;
 import com.goodquestion.backend.story.constant.HighlightWords;
 import com.goodquestion.backend.story.constant.MissionDefinition;
 import com.goodquestion.backend.story.constant.Missions;
-import com.goodquestion.backend.story.constant.SceneVocabulary;
 import com.goodquestion.backend.story.entity.Story;
 import com.goodquestion.backend.story.entity.StoryScene;
 import com.goodquestion.backend.story.repository.StorySceneRepository;
@@ -236,8 +234,7 @@ public class MessageServiceImpl implements MessageService {
                 detectHighlightWords(scene.getSceneOrder(), characterTurn.text()),
                 characterMessage.getId(),
                 characterTurn.characterState() == null ? null : characterTurn.characterState().name(),
-                characterTurn.sceneEnded() ? null : missionProgress(session, scene),
-                RecommendedWordResponse.from(SceneVocabulary.matchInText(scene.getSceneOrder(), characterTurn.text()))
+                characterTurn.sceneEnded() ? null : missionProgress(session, scene)
         );
     }
 
@@ -272,8 +269,7 @@ public class MessageServiceImpl implements MessageService {
 
     /** D-22. 후보 단어가 이번 턴 캐릭터 응답에 실제로 있을 때만 골라낸다 (D-11의 LLM 불일치 문제 해결). */
     private List<HighlightWordResponse> detectHighlightWords(int sceneOrder, String characterText) {
-        return HighlightWords.forSceneOrder(sceneOrder).stream()
-                .filter(candidate -> characterText != null && characterText.contains(candidate.word()))
+        return HighlightWords.findInCharacterText(sceneOrder, characterText).stream()
                 .map(candidate -> new HighlightWordResponse(candidate.word(), candidate.meaning()))
                 .toList();
     }

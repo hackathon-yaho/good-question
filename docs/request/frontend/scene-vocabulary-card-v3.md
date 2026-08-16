@@ -5,8 +5,8 @@
 - **우선순위**: 필수
 - **대상**: 프론트엔드 파트
 
-> **대체됨**: [v2](scene-vocabulary-card-v2.md)의 장면 고정 추천 가정은 적용하지 않는다.
-> 백엔드 계약은 [실제 대사 기반 추천 단어 v2](../backend/character-utterance-vocabulary-v2.md)를 따른다.
+> **대체됨**: 프론트는 기존 `highlightWords` 밑줄·단어장 흐름을 유지한다.
+> `recommendedWord` 카드 계약은 [현재 캐릭터 대사 기반 `highlightWords` v1](../backend/highlight-words-current-character-v1.md)으로 대체된다.
 
 ## 표시 계약
 
