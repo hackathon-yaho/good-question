@@ -15,8 +15,21 @@ import { API_BASE } from "@/lib/api/http";
 
 /** ① 변환 예산. 요청 문서 "최대 8초" */
 export const STT_TIMEOUT_MS = 8_000;
-/** ② 응답 예산. 요청 문서 "최대 10초" */
-export const RESPOND_TIMEOUT_MS = 10_000;
+/**
+ * ② 응답 예산.
+ *
+ * ⚠️ 예전엔 "최대 10초"였지만 D-57(AI 재시도 예산 v4)로 백엔드가 `/analyze`·
+ *    `/respond` 각각에 최대 105초(AI 워커 재시도 최대 10회 포함)를 쓰도록
+ *    바뀌었다 — 한 발화가 최악 약 204초 걸릴 수 있다는 뜻이다.
+ *    (docs/request/frontend/message-response-time-budget-v3.md)
+ *
+ *    프론트가 그보다 훨씬 짧은 타이머로 먼저 포기하면, AI가 정상적으로 늦게
+ *    응답하는 상황에서도 "연결이 끊겼어요"(I-3)를 잘못 띄우게 된다 — 게다가
+ *    `withTimeout`은 원래 요청을 취소하지 않으므로 그 요청은 서버에서 계속
+ *    진행되는데, 아이가 "다시 시도하기"를 누르면 같은 발화가 중복 제출될
+ *    위험까지 생긴다. 그래서 실제 최악 시간(약 204초)보다 여유 있게 잡는다.
+ */
+export const RESPOND_TIMEOUT_MS = 215_000;
 
 /**
  * ① 오디오 업로드 → 텍스트.

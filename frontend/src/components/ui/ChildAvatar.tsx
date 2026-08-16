@@ -35,18 +35,15 @@ export const AVATAR_IDS = [
 
 export type AvatarId = (typeof AVATAR_IDS)[number];
 
-/**
- * 무료 6종 + 상점에서 구매하는 아바타 전체. 상점 아바타는 아직 일러스트가 없어
- * `AVATAR_IMAGE`가 존재하지 않는 경로를 가리키고, 아래 실패 폴백(이니셜+색상 원)이
- * 그대로 그려준다.
- */
+/** 무료 6종 + 상점에서 구매하는 아바타 전체. */
 export const ALL_AVATAR_IDS: readonly string[] = [
   ...AVATAR_IDS,
   ...SHOP_AVATARS.map((a) => a.id),
 ];
 
 /**
- * 파일은 `public/avatars/`에 256×256 WebP로 있다.
+ * 무료 6종은 `public/avatars/`에, 상점 아바타는 `public/avatars/shop/`에
+ * 256×256 WebP로 있다 (2026-08-16, 상점 아바타 실 에셋 수령).
  * 원본 1024px은 `public/characters/`에 두고 커밋하지 않는다.
  */
 const AVATAR_IMAGE: Record<string, string> = {
@@ -56,9 +53,7 @@ const AVATAR_IMAGE: Record<string, string> = {
   color4: "/avatars/rabbit.webp",
   color5: "/avatars/turtle.webp",
   color6: "/avatars/cat.webp",
-  // 상점 아바타 — 실제 일러스트가 준비되기 전까지는 존재하지 않는 경로를 가리켜
-  // 아래 실패 폴백(이니셜+색상 원)으로 대체한다.
-  ...Object.fromEntries(SHOP_AVATARS.map((a) => [a.id, `/avatars/${a.id}.webp`])),
+  ...Object.fromEntries(SHOP_AVATARS.map((a) => [a.id, `/avatars/shop/${a.id}.webp`])),
 };
 
 /** 아이가 고를 때 읽어 줄 이름. 스크린리더와 A-4 라벨에 쓴다. */
@@ -89,7 +84,7 @@ const PALETTE: Record<string, string> = {
   color4: PALETTE_CYCLE[3],
   color5: PALETTE_CYCLE[4],
   color6: PALETTE_CYCLE[5],
-  // 상점 아바타 — 실제 배색이 정해지기 전까지 6색을 순서대로 재사용한다.
+  // 상점 아바타 — 이미지 로드에 실패했을 때만 쓰는 방어용 폴백이라 6색을 순서대로 재사용한다.
   ...Object.fromEntries(
     SHOP_AVATARS.map((a, i) => [a.id, PALETTE_CYCLE[i % PALETTE_CYCLE.length]])
   ),

@@ -153,7 +153,7 @@ export function ShopScreen({ api = contentApi }: { api?: ContentApi }) {
       {category !== "avatar" ? (
         <ComingSoonPanel {...COMING_SOON[category]} />
       ) : (
-        <ul className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <ul className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(10rem,12.5rem))] justify-center gap-4">
           {ITEMS.map((item) => {
             const owned = ownedAvatarIds.includes(item.id);
             const canAfford = (starDust ?? 0) >= item.price;
@@ -173,10 +173,10 @@ export function ShopScreen({ api = contentApi }: { api?: ContentApi }) {
                   </span>
                 ) : (
                   <PillButton
-                    fullWidth
-                    leading={<StarDustIcon size={18} className="text-accent" />}
+                    leading={<StarDustIcon size={16} className="text-accent" />}
                     disabled={!canAfford || busy}
                     onClick={() => setConfirming(item)}
+                    className="!min-h-9 !px-4 !text-sm"
                   >
                     {item.price}
                   </PillButton>

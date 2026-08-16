@@ -23,10 +23,10 @@ const ok = (cond, label, extra = "") => {
   console.log(`  ${cond ? "OK  " : "FAIL"} ${label}${extra ? ` — ${extra}` : ""}`);
 };
 const path = () => new URL(page.url()).pathname;
-/** 라벨을 담은 카드(li) 안에서만 버튼을 찾는다 — "장착하기"가 여러 카드에 반복된다. */
+/** 라벨을 담은 카드(li) 안에서만 버튼을 찾는다 — 같은 가격/문구가 여러 카드에 반복된다. */
 const cardFor = (label) => page.locator("li", { hasText: label });
 /**
- * 잔액 칩만 정확히 짚는다. 가격이 잔액과 같아지면(예: 200 == 200) "별가루 N 구매"
+ * 잔액 칩만 정확히 짚는다. 가격이 잔액과 같아지면(예: 200 == 200) "N" 가격
  * 버튼과 텍스트가 겹쳐 `getByText`가 strict mode 위반으로 던진다.
  */
 const balanceChip = () => page.locator("span.bg-accent-soft");
@@ -104,54 +104,58 @@ await page.waitForTimeout(200);
 ok(await page.getByText("이야기 상점은 곧 열려요!").isVisible(), "이야기 준비 중 문구");
 await page.getByRole("tab", { name: "아바타" }).click();
 await page.waitForTimeout(200);
-ok((await page.locator("ul li").count()) === 4, "아바타 탭으로 되돌리면 그리드 복귀 (상점 4종)");
+ok((await page.locator("ul li").count()) === 9, "아바타 탭으로 되돌리면 그리드 복귀 (상점 9종)");
 
-console.log("\n=== 상점 4종만 진열 — 무료 6종은 안 보임, 잠금/보유 표시 ===");
+console.log("\n=== 상점 9종만 진열 — 무료 6종은 안 보임, 가격 표시 ===");
 const cardCount = await page.locator("ul li").count();
-ok(cardCount === 4, "카드 4장 — 무료 6종은 살 게 없어 진열하지 않는다", `${cardCount}장`);
+ok(cardCount === 9, "카드 9장 — 무료 6종은 살 게 없어 진열하지 않는다", `${cardCount}장`);
 ok((await page.getByText("여우", { exact: true }).count()) === 0, "무료 아바타(여우)는 상점에 없음");
 ok(
-  (await cardFor("판다").getByRole("button", { name: "150" }).count()) === 1,
-  "판다(150) — 별가루 아이콘+가격만, '구매' 글자 없음"
+  (await cardFor("늑대").getByRole("button", { name: "150" }).count()) === 1,
+  "늑대(150) — 별가루 아이콘+가격만, '구매' 글자 없음"
 );
 ok(
-  (await cardFor("판다").getByText("구매", { exact: false }).count()) === 0,
+  (await cardFor("늑대").getByText("구매", { exact: false }).count()) === 0,
   "'구매'라는 글자 자체가 없다"
 );
 ok(
-  (await cardFor("사자").getByRole("button", { name: "200" }).count()) === 1,
-  "사자(200) — 딱 맞아서 구매 가능"
+  (await cardFor("펭귄").getByRole("button", { name: "200" }).count()) === 1,
+  "펭귄(200) — 딱 맞아서 구매 가능"
 );
-const owlBtn = cardFor("부엉이").getByRole("button", { name: "250" });
-ok((await owlBtn.count()) === 1, "부엉이(250) — 가격은 보이되");
-ok(await owlBtn.isDisabled(), "잔액 부족이면 버튼 비활성");
+const koalaBtn = cardFor("코알라").getByRole("button", { name: "225" });
+ok((await koalaBtn.count()) === 1, "코알라(225) — 가격은 보이되");
+ok(await koalaBtn.isDisabled(), "잔액 부족이면 버튼 비활성");
+ok(
+  (await cardFor("천사고양이").getByRole("button", { name: "350" }).isDisabled()),
+  "가장 비싼 천사고양이(350)도 잔액 부족으로 비활성"
+);
 
 console.log("\n=== 구매 확인 알림창 — 취소하면 안 산다 ===");
-await cardFor("사자").getByRole("button", { name: "200" }).click();
-await page.getByRole("heading", { name: "사자를 데려올까요?" }).waitFor({ timeout: 6000 }).catch(() => {});
+await cardFor("펭귄").getByRole("button", { name: "200" }).click();
+await page.getByRole("heading", { name: "펭귄을 데려올까요?" }).waitFor({ timeout: 6000 }).catch(() => {});
 ok(await page.getByRole("dialog").count() === 1, "구매 확인 알림창이 뜬다");
 ok(await page.getByText("별가루 200개를 쓸 거예요").isVisible(), "쓸 별가루 양을 미리 보여준다");
 await page.getByRole("button", { name: "다음에 할래요" }).click();
 await page.waitForTimeout(300);
 ok((await page.getByRole("dialog").count()) === 0, "취소하면 알림창만 닫힌다");
 ok(
-  (await cardFor("사자").getByRole("button", { name: "200" }).count()) === 1,
-  "취소했으니 사자는 그대로 구매 대기 상태"
+  (await cardFor("펭귄").getByRole("button", { name: "200" }).count()) === 1,
+  "취소했으니 펭귄은 그대로 구매 대기 상태"
 );
 ok((await balanceChip().innerText()).includes("별가루 200"), "취소했으니 별가루도 그대로");
 
 console.log("\n=== 구매 확인 → 확정하면 산다 (장착은 안 바뀐다) ===");
-await cardFor("판다").getByRole("button", { name: "150" }).click();
-await page.getByRole("heading", { name: "판다를 데려올까요?" }).waitFor({ timeout: 6000 }).catch(() => {});
+await cardFor("늑대").getByRole("button", { name: "150" }).click();
+await page.getByRole("heading", { name: "늑대를 데려올까요?" }).waitFor({ timeout: 6000 }).catch(() => {});
 await page.getByRole("button", { name: "네, 데려올래요! 🎉" }).click();
 await page.waitForTimeout(500);
 ok(
-  await page.getByText("판다 아바타의 잠금을 해제했어요!").isVisible(),
+  await page.getByText("늑대 아바타의 잠금을 해제했어요!").isVisible(),
   "구매 성공 토스트 (장착이 아니라 '잠금 해제')"
 );
 ok((await page.getByRole("dialog").count()) === 0, "구매 후 알림창이 닫힌다");
 ok(
-  (await cardFor("판다").getByRole("button").count()) === 0,
+  (await cardFor("늑대").getByRole("button").count()) === 0,
   "구매 즉시 보유 중으로 바뀌고 버튼이 사라진다"
 );
 ok((await balanceChip().innerText()).includes("별가루 50"), "200 - 150 = 50으로 차감");
@@ -169,29 +173,24 @@ await profileAvatarButton().click();
 await page.getByRole("heading", { name: "아바타 바꾸기" }).waitFor({ timeout: 6000 }).catch(() => {});
 ok(await page.getByRole("dialog").count() === 1, "아바타 변경 모달 열림");
 const modalItemCount = await page.getByRole("dialog").locator("ul li").count();
-ok(modalItemCount === 7, "모달에는 보유한 것만 (무료 6 + 방금 산 판다)", `${modalItemCount}개`);
+ok(modalItemCount === 7, "모달에는 보유한 것만 (무료 6 + 방금 산 늑대)", `${modalItemCount}개`);
 ok(
-  (await page.getByRole("dialog").getByRole("button", { name: "아바타 사자" }).count()) === 0,
-  "아직 안 산 사자·부엉이·알파카는 모달에 없음"
+  (await page.getByRole("dialog").getByRole("button", { name: "아바타 펭귄" }).count()) === 0,
+  "아직 안 산 펭귄 등은 모달에 없음"
 );
-await page.getByRole("dialog").getByRole("button", { name: "아바타 판다" }).click();
+await page.getByRole("dialog").getByRole("button", { name: "아바타 늑대" }).click();
 await page.waitForTimeout(600);
 ok((await page.getByRole("dialog").count()) === 0, "선택하면 모달이 닫힌다");
-// 판다는 아직 일러스트가 없어 이미지가 404로 실패하고 이니셜 폴백(색상 원)으로
-// 바뀐다 — 그 폴백 색상(판다 = PALETTE_CYCLE[0] = bg-primary)으로 전환을 확인한다.
 ok(
-  (await profileAvatarButton().locator("span[style].bg-primary").count()) === 1,
-  "프로필 아바타가 판다로 바뀜 (아직 일러스트가 없어 이니셜 폴백으로 표시)"
+  (await profileAvatarButton().locator('img[src="/avatars/shop/wolf.webp"]').count()) === 1,
+  "프로필 아바타가 실제 늑대 이미지로 바뀜 (실 에셋)"
 );
 
-// 상점 아바타는 아직 일러스트가 없어 이미지 404가 나는 게 정상이다 (ChildAvatar
-// 실패 폴백 · lib/shop-catalog.ts). 그 외 에러만 실패 판단에 참고용으로 보여준다.
-const realErrs = [...new Set(errs)].filter((e) => !/\/avatars\/shop\d+\.webp/.test(e));
-if (realErrs.length) {
+if (errs.length) {
   console.log("\n=== 에러 ===");
-  realErrs.slice(0, 8).forEach((e) => console.log("  " + e));
+  [...new Set(errs)].slice(0, 8).forEach((e) => console.log("  " + e));
 }
 console.log(`\n${fails === 0 ? "전부 통과" : `실패 ${fails}건`}`);
 await page.screenshot({ path: SHOT("shop-shot") });
 await browser.close();
-process.exit(fails > 0 ? 1 : 0);
+process.exit(fails > 0 || errs.length > 0 ? 1 : 0);
