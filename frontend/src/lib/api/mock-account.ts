@@ -21,6 +21,7 @@ import type {
 import { activeMockSession, mockSessionsOf } from "@/lib/api/mock";
 import { STORY_META } from "@/mocks/story-banggui";
 import { CATALOG_STORIES } from "@/mocks/story-catalog";
+import { SHOP_AVATARS } from "@/lib/shop-catalog";
 
 /** 아이 최대 등록 인원 — PRD I-09 */
 const CHILD_LIMIT = 3;
@@ -37,6 +38,22 @@ const STAR_DUST_PER_STORY = 100;
 /** 완료한 이야기 수. 실제로는 서버가 `children.star_dust`를 직접 들고 있다. */
 function completedCount(childId: string): number {
   return mockSessionsOf(childId).filter((s) => s.status === "completed").length;
+}
+
+/**
+ * 별가루 잔액 = 적립(완료 수×100) − 상점에서 산 아바타 가격 합.
+ *
+ * `mock-content.ts`의 `starDustBalance`와 같은 공식이다. 순환 참조를 피하려고
+ * (그쪽 파일 주석 참조) 가져다 쓰지 않고 여기 따로 둔다 — 둘 다 손대지 않으면
+ * 홈(B-1)과 마이페이지·상점의 별가루가 서로 다르게 보인다.
+ */
+function starDustBalance(childId: string, ownedAvatarIds: string[] | undefined): number {
+  const earned = completedCount(childId) * STAR_DUST_PER_STORY;
+  const spent = (ownedAvatarIds ?? []).reduce((sum, id) => {
+    const item = SHOP_AVATARS.find((a) => a.id === id);
+    return sum + (item?.price ?? 0);
+  }, 0);
+  return earned - spent;
 }
 
 type StoredChild = {
@@ -168,8 +185,8 @@ export const mockAccountApi: AccountApi = {
         id: child.id,
         name: child.name,
         avatarId: child.avatarId,
-        // 백엔드 B-20: 이야기 완료 1편당 +100
-        starDust: completedCount(child.id) * STAR_DUST_PER_STORY,
+        // 백엔드 B-20: 이야기 완료 1편당 +100, 상점 구매분은 차감
+        starDust: starDustBalance(child.id, child.ownedAvatarIds),
       },
       inProgress: active
         ? {
@@ -183,7 +200,9 @@ export const mockAccountApi: AccountApi = {
           }
         : null,
       // 추천 로직은 구현 대상이 아니다. published 목록을 그대로 내려준다. (PRD F-02)
-      // 재생 가능한 1편 + 카탈로그 전용 2편 = 3편. (계획 D3a · story-catalog.ts)
+      // 재생 가능한 1편 + 카탈로그에서 앞의 2편 = 3편. (계획 D3a · story-catalog.ts)
+      // 카탈로그가 5편으로 늘어난 뒤에도 홈 추천은 3개로 유지하기로 했다
+      // (2026-08-16 팀 결정) — 나머지는 B-2 목록에서 전부 보인다.
       recommended: [
         {
           id: STORY_META.id,
@@ -192,7 +211,7 @@ export const mockAccountApi: AccountApi = {
           estimatedMinutes: STORY_META.estimatedMinutes,
           topics: [...STORY_META.topics],
         },
-        ...CATALOG_STORIES.map((story) => ({
+        ...CATALOG_STORIES.slice(0, 2).map((story) => ({
           id: story.id,
           title: story.title,
           coverImageUrl: story.coverImageUrl,

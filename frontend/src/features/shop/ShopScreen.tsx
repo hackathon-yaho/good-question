@@ -164,17 +164,7 @@ export function ShopScreen({ api = contentApi }: { api?: ContentApi }) {
                 key={item.id}
                 className="flex flex-col items-center gap-3 rounded-card border border-border bg-surface p-5 text-center"
               >
-                <div className="relative">
-                  <ChildAvatar name={name} avatarId={item.id} size={72} />
-                  {/* 잠금/잠금 해제 표시 — 이 화면은 보유 상태만 보여준다. 실제로
-                      바꿔 쓰는 것은 F-1 프로필의 아바타 변경 모달이 한다. */}
-                  <span
-                    aria-hidden
-                    className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-surface bg-surface text-sm shadow-soft"
-                  >
-                    {owned ? "🔓" : "🔒"}
-                  </span>
-                </div>
+                <ChildAvatar name={name} avatarId={item.id} size={72} />
                 <p className="text-parent-body font-bold text-text">{item.label}</p>
 
                 {owned ? (
@@ -184,7 +174,7 @@ export function ShopScreen({ api = contentApi }: { api?: ContentApi }) {
                 ) : (
                   <PillButton
                     fullWidth
-                    leading={<StarDustIcon size={18} />}
+                    leading={<StarDustIcon size={18} className="text-accent" />}
                     disabled={!canAfford || busy}
                     onClick={() => setConfirming(item)}
                   >

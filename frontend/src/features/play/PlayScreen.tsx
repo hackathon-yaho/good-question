@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { useRouter } from "next/navigation";
 
 import { ImmersiveShell } from "@/components/shells/ImmersiveShell";
+import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { PillButton } from "@/components/ui/PillButton";
 import { useToast } from "@/components/ui/Toast";
 
@@ -564,10 +565,13 @@ export function PlayScreen({
     : undefined;
 
   if (!scene) {
+    // 도입부(intro)에 들어가기 전까지만 로딩 화면을 쓴다. 도입 이후 대화가
+    // 진행되는 동안에는 장면 전환마다 스치듯 나타나 오히려 산만해지므로
+    // 쓰지 않는다 (팀 결정, 2026-08-16).
     return (
       <ImmersiveShell variant="full" fontScale={settings.fontScale}>
         <div className="flex size-full items-center justify-center">
-          <p className="text-kid-body text-muted">이야기를 불러오고 있어요…</p>
+          <KidLoadingScreen label="이야기를 불러오고 있어요" />
         </div>
       </ImmersiveShell>
     );

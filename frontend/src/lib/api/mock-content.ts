@@ -163,7 +163,7 @@ export const mockContentApi: ContentApi = {
         !topic || topic === "all"
           ? all
           : all.filter((item) => item.topics.includes(topic)),
-      // 세 편의 주제를 합집합으로 낸다. 1편 것만 내면 나머지 편이 걸러지지 않는다.
+      // 모든 이야기의 주제를 합집합으로 낸다. 1편 것만 내면 나머지 편이 걸러지지 않는다.
       availableTopics: [
         ...new Set(all.flatMap((item) => item.topics)),
       ],

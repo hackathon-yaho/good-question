@@ -110,9 +110,15 @@ export function ChildAvatar({
   size = 96,
   selected = false,
 }: Props) {
-  const [failed, setFailed] = useState(false);
-
   const key = ALL_AVATAR_IDS.includes(avatarId ?? "") ? (avatarId as string) : "color1";
+
+  /**
+   * 실패 여부를 어떤 key에서 실패했는지로 기억한다 — 단순 boolean이면 아바타를
+   * 바꿔도(같은 컴포넌트 인스턴스가 재사용되므로) 이전 실패가 그대로 남아
+   * 배경색만 바뀌고 새 이미지는 영영 안 뜨는 버그가 생긴다.
+   */
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const failed = failedKey === key;
 
   const frame = [
     "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold select-none",
@@ -144,7 +150,7 @@ export function ChildAvatar({
         width={size}
         height={size}
         loading="lazy"
-        onError={() => setFailed(true)}
+        onError={() => setFailedKey(key)}
         className="size-full object-cover"
       />
     </span>
