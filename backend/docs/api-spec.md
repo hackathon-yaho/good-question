@@ -1011,9 +1011,9 @@ Content-Type: application/json
 | missionTriggered.checklist[] | 미션 확인 항목 목록. `mission_2`는 항상 빈 배열 | array | N | 아래 참조 |
 | missionTriggered.checklist[].label | 화면에 보여줄 문구 | String | N | "무엇을 사용할 것인지" |
 | missionTriggered.checklist[].element | 내부 사고 요소 코드. **화면에 그대로 노출 금지**(내부용) | String | N | "SOLUTION" |
-| highlightWords[] | 이번 턴 `characterMessage`에 **실제로 등장한** 밑줄 단어 후보. 없으면 빈 배열 | array | N | [] |
-| highlightWords[].word | 밑줄 칠 단어 | String | N | "부끄러워" |
-| highlightWords[].meaning | 아이 눈높이 뜻풀이 | String | N | "남에게 보이기 부끄럽고 수줍은 마음" |
+| highlightWords[] | 이번 턴 `characterMessage`에 **실제로 등장한 8세 이하 후보 한 개**. 후보가 없으면 빈 배열 | array | N | [] |
+| highlightWords[].word | 현재 캐릭터 대사에 실제로 있는 밑줄 단어 | String | N | "망설여" |
+| highlightWords[].meaning | 아이 눈높이 뜻풀이 | String | N | "어떻게 할지 바로 정하지 못하고 고민하는 모습" |
 | messageId | 방금 저장된 캐릭터 메시지의 id. **`GET /tts?messageId=`로 이 대사를 음성 재생할 때 사용**. (필드명 `characterMessageId`→`messageId` 정정: D-26) | UUID(string) | N | "d82d423b-..." |
 | characterState | 대화 중 캐릭터 이미지를 바꾸는 데 쓰는 상태값(O-12, D-27). AI가 그때그때 생성한 대사에 맞춰 판단해서 내려줌. `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 중 하나. **`closing`이면 AI를 호출하지 않으므로 항상 `null`** | String | Y | "MOVED" |
 | missionProgress | 미션 체크리스트 **항목 단위** 진행(D-30). 미션 노출 전이거나 `closing`이면 `null` | object | Y | 아래 참조 |
@@ -1109,7 +1109,7 @@ Content-Type: application/json
 ```json
 {
   "responseMode": "closing",
-  "characterMessage": "\"이제는 부끄러워하며 숨기지 않고, 조심해서 좋은 일에 써 볼게.\"",
+  "characterMessage": "\"이제는 특별한 점도 좋은 일에 쓸 수 있을 것 같아.\"",
   "characterName": "방귀쟁이 며느리",
   "accumulatedElements": [],
   "turnCount": 4,
@@ -1117,7 +1117,7 @@ Content-Type: application/json
   "sceneEnded": true,
   "nextSceneId": null,
   "missionTriggered": null,
-  "highlightWords": [{ "word": "부끄러워", "meaning": "남에게 보이기 부끄럽고 수줍은 마음" }],
+  "highlightWords": [{ "word": "특별한", "meaning": "다른 것보다 더 눈에 띄거나 소중한" }],
   "messageId": "d82d423b-e4af-43c6-b99c-3b34e1941cfc",
   "characterState": null,
   "missionProgress": null
@@ -1535,10 +1535,10 @@ GET /wordbook?childId=3ba024ff-8f6c-4bdf-9ffa-a5b417df56d5&filter=liked
 | key | 설명 | value 타입 | 필수 | 예시 |
 | --- | --- | --- | --- | --- |
 | childId | 저장할 아이 id | UUID(string) | Y | "3ba024ff-..." |
-| word | 단어 | String | Y (공백 불가) | "부끄러워" |
-| meaning | 뜻풀이(6장 `highlightWords[].meaning`을 그대로 쓰면 됨) | String | Y (공백 불가) | "남에게 보이기 부끄럽고 수줍은 마음" |
+| word | 단어 | String | Y (공백 불가) | "특별한" |
+| meaning | 뜻풀이(6장 `highlightWords[].meaning`을 그대로 쓰면 됨) | String | Y (공백 불가) | "다른 것보다 더 눈에 띄거나 소중한" |
 | sourceSceneId | 이 단어를 만난 장면 id | UUID(string) | Y | "bcfd6554-..." |
-| contextSentence | 저장 시점 화면에 떠 있던 대사 원문(캐릭터 발화 전체 문장). 없어도 저장은 되지만 상세 화면에 근거 문장이 안 보이게 됨 | String | N | "이제는 부끄러워하며 숨기지 않고…" |
+| contextSentence | 저장 시점 화면에 떠 있던 대사 원문(캐릭터 발화 전체 문장). 없어도 저장은 되지만 상세 화면에 근거 문장이 안 보이게 됨 | String | N | "이제는 특별한 점도 좋은 일에 쓸 수 있을 것 같아." |
 
 **Request Example**
 
