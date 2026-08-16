@@ -106,13 +106,6 @@ export function LoginScreen() {
             className="h-auto w-50"
           />
         </div>
-        <div className="relative z-10 p-12">
-          <p className="max-w-md text-parent-title leading-relaxed font-bold text-text">
-            옛이야기 속 인물과 이야기를 나누며
-            <br />
-            아이가 자기 생각을 말로 꺼냅니다.
-          </p>
-        </div>
       </aside>
 
       {/* 우 45% 폼 */}

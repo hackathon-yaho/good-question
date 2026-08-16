@@ -105,12 +105,15 @@ export function WordbookScreen({ api = contentApi }: { api?: ContentApi }) {
           </p>
         </div>
       ) : (
-        // 3열 + 최소 width로 모바일에서도 카드가 너무 작아지지 않게 한다
-        <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        // 카드 최소 width(260px)를 트랙 자체의 하한으로 둔다. `sm:/lg:` 같은 고정
+        // 열-개수 분기 + `min-w`를 함께 쓰면 사이드바 접힘/펼침 등으로 트랙이 260px보다
+        // 좁아지는 구간이 생겨 카드가 서로 겹친다. auto-fill이면 트랙이 항상 260px 이상만
+        // 만들어지고, 안 되면 열 수 자체가 줄어든다.
+        <ul className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5">
           {words.map((word, index) => (
             <li
               key={word.id}
-              className="flex min-w-[260px] flex-col gap-3 rounded-card border border-border bg-surface p-5 shadow-soft"
+              className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5 shadow-soft"
             >
               <div className="flex items-start justify-between gap-2">
                 <button
