@@ -21,7 +21,7 @@ import { KidLoadingScreen } from "@/components/ui/KidLoadingScreen";
 import { PillButton } from "@/components/ui/PillButton";
 import { accountApi } from "@/lib/api";
 import type { AccountApi, Child } from "@/lib/api/types";
-import { setSelectedChildId } from "@/lib/client-store";
+import { getSelectedChildId, setSelectedChildId } from "@/lib/client-store";
 import { rem } from "@/lib/rem";
 import { relativeActivity } from "@/lib/relative-date";
 
@@ -64,6 +64,18 @@ export function ProfileSelectScreen({
     },
     [router]
   );
+
+  /**
+   * A-6은 "선택된 아이 기준"으로 통계를 보여준다(docs/spec/screens.md A-6).
+   * 아이를 막 삭제해 선택이 비어 있는 채로 여기 왔다면, 목록의 첫 아이를
+   * 기본으로 골라야 A-6이 다시 `/profiles`로 튕기지 않는다.
+   */
+  const enterParentMode = useCallback(() => {
+    if (getSelectedChildId() === null && children && children.length > 0) {
+      setSelectedChildId(children[0].id);
+    }
+    router.push("/parent");
+  }, [children, router]);
 
   if (failed) {
     return (
@@ -130,7 +142,7 @@ export function ProfileSelectScreen({
         <PillButton
           variant="outlined"
           leading={<span aria-hidden>🔒</span>}
-          onClick={() => router.push("/parent")}
+          onClick={enterParentMode}
         >
           보호자 모드
         </PillButton>
