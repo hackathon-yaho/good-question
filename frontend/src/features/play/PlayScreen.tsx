@@ -115,7 +115,7 @@ export function PlayScreen({
   /** 미션 종료 오버레이(MissionCompleteOverlay). 흐름을 막지 않는 순수 장식 레이어다 */
   const [showMissionComplete, setShowMissionComplete] = useState(false);
 
-  const { speak, cancel: cancelTts, unlock: unlockAudio } = useCharacterVoice();
+  const { speak, cancel: cancelTts, unlock: unlockAudio, speaking } = useCharacterVoice();
 
   // 이미 읽은 문장을 다시 읽지 않기 위한 키. 리렌더마다 speak가 재실행되면 소리가 겹친다.
   const spokenKeyRef = useRef<string | null>(null);
@@ -813,17 +813,23 @@ export function PlayScreen({
 
             <div className="flex shrink-0 flex-col items-center gap-2 px-6 pb-5">
               <p className="text-kid-body font-semibold text-muted">
-                {isMission2 && state.mission2Choice === null
-                  ? "친구를 고르면 말할 수 있어"
-                  : "미션을 읽고 준비되면 눌러줘"}
+                {speaking
+                  ? "캐릭터가 말하고 있어"
+                  : isMission2 && state.mission2Choice === null
+                    ? "친구를 고르면 말할 수 있어"
+                    : "미션을 읽고 준비되면 눌러줘"}
               </p>
               {/* 채움 primary — 이 화면의 유일한 행동이고, 누르면 내 차례가
                   시작된다. §1-5가 primary를 "주요 CTA · 내 차례"로 정했다.
                   미션 2는 **고르기 전에는 누를 수 없다** — 문장 틀의 주어가 비어 있는
-                  상태로 말하게 하면 무엇을 말해야 하는지 알 수 없다. */}
+                  상태로 말하게 하면 무엇을 말해야 하는지 알 수 없다.
+                  캐릭터가 미션 대사를 읽는 동안에도 **누를 수 없다** — 여기서 누르면
+                  MISSION_DISMISS가 즉시 아이 차례로 넘기고 마이크를 켜는데, 그 뒤
+                  뒤늦게 도착하는 TTS onDone(CHARACTER_TTS_DONE)이 recording을
+                  다시 false로 덮어써 마이크가 꺼진 채로 남는다. */}
               <PillButton
                 size="kid"
-                disabled={isMission2 && state.mission2Choice === null}
+                disabled={speaking || (isMission2 && state.mission2Choice === null)}
                 onClick={() => dispatch({ type: "MISSION_DISMISS" })}
               >
                 말해볼래요
