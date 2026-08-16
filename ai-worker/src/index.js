@@ -175,6 +175,7 @@ export async function handleRequest(request, env, dependencies = {}) {
       maxOutputTokens: 900,
       totalTimeoutMs: 60_000,
       attemptTimeoutMs: 19_000,
+      maxAttempts: 3,
       validate: (output) => validateReportResponse(output, body),
       fetcher: dependencies.openaiFetch ?? fetch,
       now: dependencies.now,

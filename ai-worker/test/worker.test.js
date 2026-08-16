@@ -98,7 +98,7 @@ test("health is public and exposes the deployed prompt versions", async () => {
   assert.deepEqual(await response.json(), {
     status: "ok",
     model: "gpt-5-mini",
-    promptVersions: { analyze: "analyze_v3", respond: "respond_v8", report: "report_v1" },
+    promptVersions: { analyze: "analyze_v3", respond: "respond_v9", report: "report_v1" },
   });
 });
 
@@ -214,7 +214,7 @@ test("respond sends the current schema and rejects unsafe output before retrying
         if (calls === 1) {
           return openAiResponse({
             status: "completed",
-            output_text: JSON.stringify({ text: "잘했어!", characterState: "HAPPY" }),
+            output_text: JSON.stringify({ text: "그 말도 이해가 되지만, 나는 아직 걱정이야.", characterState: "WORRIED" }),
           });
         }
         return openAiResponse({
@@ -312,12 +312,14 @@ test("report retries instead of returning a deficit statement to a guardian", as
   assert.equal((await response.json()).competencies[1].feature, second.competencies[1].feature);
 });
 
-test("three request timeouts are returned as a stable 504", async () => {
+test("dialogue retries up to ten attempts inside its deadline and returns a stable 504", async () => {
+  let calls = 0;
   const response = await handleRequest(
     request("/analyze", analyzePayload(), { "X-Internal-Token": env.AI_INTERNAL_TOKEN }),
     env,
     {
       openaiFetch: async () => {
+        calls += 1;
         const error = new Error("aborted");
         error.name = "AbortError";
         throw error;
@@ -328,6 +330,7 @@ test("three request timeouts are returned as a stable 504", async () => {
 
   assert.equal(response.status, 504);
   assert.equal((await response.json()).code, "MODEL_TIMEOUT");
+  assert.equal(calls, 10);
 });
 
 test("retry exhaustion retains only safe upstream status reasons", async () => {
@@ -349,10 +352,10 @@ test("retry exhaustion retains only safe upstream status reasons", async () => {
     }),
     (error) => {
       assert.ok(error instanceof ModelUpstreamError);
-      assert.deepEqual(error.attemptReasons, ["OPENAI_STATUS_429", "OPENAI_STATUS_429", "OPENAI_STATUS_429"]);
+      assert.deepEqual(error.attemptReasons, Array(10).fill("OPENAI_STATUS_429"));
       return true;
     },
   );
 
-  assert.equal(calls, 3);
+  assert.equal(calls, 10);
 });

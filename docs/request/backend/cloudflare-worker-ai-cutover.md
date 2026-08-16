@@ -30,7 +30,7 @@ Cloudflare Worker 배포 주소가 확정되었습니다. Render 백엔드 환�
 ## API 스키마
 
 기존 대화 계약은 [AI 서버 연동 v1](ai-service-integration-v1.md)과
-[재시도·시간 예산 v2](ai-retry-deadline-v2.md)를 그대로 따른다. 보호자 리포트 계약은
+[재시도·시간 예산 v3](ai-retry-deadline-v3.md)를 그대로 따른다. 보호자 리포트 계약은
 [AI 생성 요청](../ai/parent-report-ai-generation.md)을 따른다.
 
 | 호출 | 인증 | 실패 시 백엔드 동작 |
@@ -42,7 +42,7 @@ Cloudflare Worker 배포 주소가 확정되었습니다. Render 백엔드 환�
 
 ## 제약 조건
 
-- 백엔드는 AI 서버를 재시도하지 않는다. AI Worker가 `/analyze`·`/respond`는 전체 10초, `/report`는 전체 60초 안에서 최초 포함 최대 3회만 시도한다.
+- 백엔드는 AI 서버를 재시도하지 않는다. AI Worker가 `/analyze`·`/respond`는 Worker 내부 9초(백엔드 연결 10초) 안에서 최초 포함 최대 10회, `/report`는 전체 60초 안에서 최초 포함 최대 3회 시도한다.
 - AI Worker 주소·OpenAI API 키·내부 토큰을 프론트 환경변수 또는 클라이언트 응답에 노출하지 않는다.
 - CORS 설정·프론트 API 변경은 필요 없다.
 - Worker 실제 주소로 첫 실연동이 성공하기 전에는 `AiMockController`를 삭제하지 않는다. 성공 후 mock 제거 여부는 백엔드 담당이 별도 PR로 정리한다.

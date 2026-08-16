@@ -10,7 +10,7 @@ Cloudflare Workers에 배포하는 굿퀘스천 AI 서버다. 공개 주소가 �
 - `POST /respond` — `X-Internal-Token` 필수
 - `POST /report` — 보호자 리포트 고도화용, `X-Internal-Token` 필수
 - 기본 모델 `gpt-5-mini`, Responses API `store: false`
-- `/analyze`·`/respond`는 전체 10초, `/report`는 전체 60초 안에서 최초 포함 최대 3회. 백엔드는 재시도하지 않는다.
+- `/analyze`·`/respond`는 백엔드의 10초 연결 제한 안에서 Worker 내부 9초를 쓰며, 최초 포함 최대 10회까지 재시도한다. 각 시도는 최대 3초이고, 남은 1초는 Worker가 구조화된 응답을 돌려줄 여유다. `/report`는 전체 60초 안에서 최초 포함 최대 3회다. 백엔드는 재시도하지 않는다.
 
 요청·응답 스키마와 책임 경계는
 [AI 서버 연동 v1](../docs/request/backend/ai-service-integration-v1.md)를 따른다.
