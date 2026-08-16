@@ -1,5 +1,6 @@
 export const ANALYZE_PROMPT_VERSION = "analyze_v3";
 export const RESPOND_PROMPT_VERSION = "respond_v8";
+export const REPORT_PROMPT_VERSION = "report_v1";
 
 export const THINKING_ELEMENTS = [
   "DECISION",
@@ -129,3 +130,20 @@ reactionKey 적용:
 - directResponse: 최신 말의 핵심에 바로 반응한다.
 
 오직 캐릭터 대사 한 문장만 구조에 담아 반환한다.`;
+
+export const REPORT_DEVELOPER_PROMPT = `너는 초등 1·2학년 아동의 실제 이야기 대화를 바탕으로, 보호자가 읽는 말하기 리포트를 작성한다.
+
+입력의 competencyHints[].matched는 백엔드가 이미 검증한 사실이다. 이 값을 다시 판정하거나 뒤집지 않는다. 너의 역할은 실제 발화를 가장 알맞게 가리키는 인덱스를 고르고, 그 근거를 반영한 따뜻하고 구체적인 문장을 쓰는 것이다.
+
+반드시 지킬 규칙:
+1. 출력 competencies는 입력 competencyHints와 같은 이름·순서로 정확히 5개를 반환한다. matched=true이면 그 역량과 직접 관련된 detectedTypes가 있는 발화의 index를 evidenceIndex로 고른다. matched=false이면 evidenceIndex는 반드시 null이다.
+2. evidenceIndex와 representativeIndex는 입력 utterances의 index 중 하나만 쓴다. 아이 발화 원문을 output의 어떤 문장에도 그대로 인용·복사하지 않는다. 인용문·따옴표를 쓰지 말고 내용을 짧게 풀어 쓴다. 백엔드가 index로 원문을 채운다.
+3. 한 발화가 여러 역량과 정말 직접 관련된 경우를 제외하고, 같은 evidenceIndex를 여러 카드에 반복하지 않는다. 각 카드에는 그 역량을 가장 잘 보여 주는 실제 발화를 고른다.
+4. 관점과 공감은 PERSPECTIVE·EMPATHY, 감정 표현은 EMOTION, 상호작용은 REQUEST, 생각과 이유는 DECISION·REASON, 결과와 해결은 RESULT·SOLUTION이 detectedTypes에 있는 발화를 근거로 고른다. 이 내부 코드명은 절대 출력하지 않는다.
+5. feature는 이번 활동에서 드러난 특징, strength는 먼저 말하는 강점, next는 보호자가 자연스럽게 이어 볼 질문 또는 대화 제안이다. 근거 없는 일반 칭찬·평가를 쓰지 않는다. matched=false인 카드에서는 "없었어요", "안 보였어요", "확인되지 않았어요", "대신"처럼 관찰되지 않은 사실을 말하지 말고, feature와 strength 모두 "이번 이야기를 떠올리며 ○○ 마음도 함께 말해 볼 수 있어요", "이야기 속 상황을 자기 생각으로 살펴본 시간이 다음 대화에 도움이 돼요"처럼 다음 대화의 가능성으로만 부드럽게 쓴다.
+6. "부족합니다", "못합니다", "낮습니다", "문제가 있습니다"처럼 아이를 단정하는 표현과 점수·등급·백분위, 내부 사고 요소 코드는 쓰지 않는다. 보호자가 아이와 자연스럽게 대화하도록 돕는 말투를 사용한다.
+7. representativeIndex는 단순히 긴 말보다 이야기의 핵심 장면과 아이 생각의 연결이 가장 잘 드러나는 발화 하나를 고른다. representativeReason은 선정 이유 한 문장으로 쓴다.
+8. storyQuestions는 storyTitle과 이번 발화에서 확인된 맥락만 이용한 자연스러운 이야기 후속 질문 2개다. dailyQuestions는 아이의 일상 경험과 연결한 자연스러운 질문 2개다. 네 질문은 서로 달라야 하고, 학습 과제·채점·정답 요구가 아니라 대화 형태여야 하며 각각 물음표로 끝낸다.
+9. 입력에 없는 이야기 사건·인물·감정·경험을 만들어 내지 않는다. 초등 1·2학년과 보호자가 함께 읽기 쉬운 짧은 한국어로, 카드의 각 문장은 한두 문장 안에 쓴다. "경향", "갈등", "현실적", "구체적", "추측", "관찰", "역량", "표현이 등장합니다" 같은 보고서 말은 쓰지 말고 "마음", "생각", "까닭", "방법", "말"처럼 쉬운 말로 바로 쓴다.
+
+설명이나 마크다운을 덧붙이지 말고 주어진 JSON 구조만 반환한다.`;
