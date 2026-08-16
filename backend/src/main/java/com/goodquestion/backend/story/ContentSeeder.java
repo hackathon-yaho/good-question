@@ -43,6 +43,31 @@ public class ContentSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        seedBanggui();
+
+        // 준비 중(comingSoon) 이야기 3편 — 각자 자기 제목으로 중복을 막으므로, 위 방귀 뀌는
+        // 며느리가 이미 있어 건너뛰는 재기동에도 항상 실행된다 (D-61 seedComingSoonStory 참고).
+        seedComingSoonStory("해님과 달님",
+                "쫓기던 오누이가 서로를 지키며 해와 달이 되는 이야기",
+                "오누이가 어머니를 흉내 낸 목소리에 문을 열지 말지 고민해요.",
+                "오누이가 서로를 지킬 방법을 찾도록 도와주세요.",
+                List.of("가족", "용기"),
+                "/story-assets/generated/folktales-v1/cover-sun-moon.webp");
+        seedComingSoonStory("콩쥐와 팥쥐",
+                "새어머니와 팥쥐에게 구박받던 콩쥐가 마음씨 고운 태도로 어려움을 이겨내는 이야기",
+                "밑 빠진 항아리에 물을 채워야 하는 콩쥐가 방법을 몰라 난감해해요.",
+                "콩쥐가 포기하지 않고 지혜롭게 방법을 찾도록 도와주세요.",
+                List.of("성실함", "친절"),
+                "/story-assets/generated/folktales-v1/cover-kongjwi-patjwi.webp");
+        seedComingSoonStory("흥부와 놀부",
+                "다친 제비를 정성껏 돌본 흥부가 착한 마음 덕분에 복을 받는 이야기",
+                "다친 제비를 발견한 흥부가 어떻게 도와줄지 고민해요.",
+                "흥부가 제비를 정성껏 돌보도록 도와주세요.",
+                List.of("나눔", "정직"),
+                "/story-assets/generated/folktales-v1/cover-heungbu-nolbu.webp");
+    }
+
+    private void seedBanggui() {
         if (storyRepository.existsByTitle(STORY_TITLE)) {
             log.info("[ContentSeeder] '{}' 이미 존재 — 시드를 건너뜁니다.", STORY_TITLE);
             return;
@@ -152,5 +177,26 @@ public class ContentSeeder implements ApplicationRunner {
         ));
 
         log.info("[ContentSeeder] '{}' 시드 완료 — 장면 9건 적재.", STORY_TITLE);
+    }
+
+    /**
+     * 장면 데이터 없이 표지·소개만 있는 "준비 중" 이야기 (catalog-only-stories.md, D-61).
+     * story_scenes가 없으므로 응답의 comingSoon이 자동으로 true가 되고(옵션 B), 실제 대화가
+     * 만들어지면 장면을 추가하는 것만으로 자동 재생 가능 상태가 된다 — 이 메서드를 다시 손댈
+     * 필요가 없다. 제목·소개 문구·주제는 프론트 목 카탈로그(story-catalog.ts)에서 이미 팀이
+     * 검토한 문구를 그대로 옮겼다. 표지는 AI 파트가 넘긴 실제 자산(generated/folktales-v1).
+     */
+    private void seedComingSoonStory(String title, String summary, String situation, String childRole,
+                                      List<String> topics, String coverImageUrl) {
+        if (storyRepository.existsByTitle(title)) {
+            log.info("[ContentSeeder] '{}' 이미 존재 — 시드를 건너뜁니다.", title);
+            return;
+        }
+
+        Story story = Story.create(title, summary, situation, childRole, "보통", topics, 20);
+        story.updateCoverImageUrl(coverImageUrl);
+        story.publish();
+        storyRepository.save(story);
+        log.info("[ContentSeeder] '{}' 시드 완료 — 준비 중(comingSoon), 장면 없음.", title);
     }
 }

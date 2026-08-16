@@ -57,6 +57,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | — | ~~`post_activity_config`~~ | 필수-기반 | **완료** |
 | M-19 | ~~`remainingWorries` · `guidanceStyle` **코드 상수**~~ | 필수-기반 | **완료.** `story/constant/DialogueContents.java`, scene_order 키. 단위 테스트 포함 |
 | B-08 | ~~캐릭터 **표시명** 매핑 코드 상수~~ | 필수-기반 | **완료.** `DialogueContents`에 함께 둠 (scene_order 단위라 별도 클래스로 안 나눔) |
+| — | ~~준비 중(comingSoon) 이야기 3건 — 해님과 달님·콩쥐와 팥쥐·흥부와 놀부~~ | 선택 | **완료 (D-61).** `ContentSeeder.seedComingSoonStory()`. 장면 없이 표지·소개만. `story-catalog.ts`(프론트 목) 문구 그대로, 표지는 `generated/folktales-v1/` |
 
 ### 주의
 
@@ -107,10 +108,10 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
-| M-08 | ~~진행 중 이야기 · 이어하기~~ | 필수 | `GET /api/home?childId=` — **완료.** `child.starDust` 추가 (선택, 프론트 요청 — D-33) |
-| M-10 | ~~이야기 목록~~ | 필수 | `GET /api/stories?childId=&topic=` — **완료** |
+| M-08 | ~~진행 중 이야기 · 이어하기~~ | 필수 | `GET /api/home?childId=` — **완료.** `child.starDust` 추가 (선택, 프론트 요청 — D-33) · 이미 완료한 이야기인데도 이어하기가 뜨던 status-first 쿼리 버그 수정 (D-58) |
+| M-10 | ~~이야기 목록~~ | 필수 | `GET /api/stories?childId=&topic=` — **완료.** `comingSoon` 필드 추가 (선택, 프론트 요청 — D-61) |
 | M-11 | ~~주제별 필터링~~ | 필수 | 〃 (`stories.topics` 기준) — **완료** |
-| — | ~~이야기 상세~~ | 필수 | `GET /api/stories/{storyId}?childId=` — **완료** |
+| — | ~~이야기 상세~~ | 필수 | `GET /api/stories/{storyId}?childId=` — **완료.** `comingSoon` 필드 추가 (D-61) |
 
 스키마: [api.md 3.3](../../docs/spec/api.md)
 
@@ -310,6 +311,7 @@ PRD 9.3의 2안이며, api.md 1절 기준과 다릅니다.
 - **"구체적인가"를 미션 로직이 새로 판정하지 않는다.** `element_criteria` 통과 여부(= `detectedElements` 포함 여부)가 이미 그 판정이다. `childIntent`와 누적 요소의 차이가 곧 "방향은 말했지만 구체적이지 않음" — D-20
 - 조건 1은 `childIntent == SOLUTION`만으로 판정하지 않는다. **"방귀" 키워드 대조가 함께 필요** — 없으면 장대·사다리 제안에도 미션1이 뜬다
 - 남는 리스크는 AI 계약이 아니라 `element_criteria` 튜닝이다 (PRD 7.5.4 검증에 포함)
+- **미션 노출 후 응답 `turnCount`/`maxTurns`는 장면 예산이 아니라 미션 자체 예산(최소 1~최대 4)을 보여준다** — **완료 (D-60).** 이전엔 노출 시점 값에 얼어붙어 있었다(D-53). 로컬 mock으로 대화3(장면7)을 노출 후 4턴째까지 실제로 진행해 `turnCount`가 `0/4→1/4→2/4→3/4→4/4`로 오르고 `4/4`에서 `CLOSING`으로 닫히는 것까지 curl로 확인
 
 ---
 

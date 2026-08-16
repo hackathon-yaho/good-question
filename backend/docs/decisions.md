@@ -1685,7 +1685,42 @@ report-timeout-seconds(60초, 세션 완료 후 비동기 리포트 생성용)�
 
 ---
 
-### D-58 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
+### D-58 · 홈 "이어하기"가 이미 끝낸 이야기인데도 뜨던 문제 — status-first 쿼리가 원인
+
+사용자 보고: 이야기를 끝까지 하고 별가루(`activity/retelling`)까지 받았는데 홈 화면에
+"이어하기"가 계속 떠 있었다.
+
+**원인**: `HomeServiceImpl.getHome()`은 `findFirstByChildAndStatusInOrderByLastActivityAtDesc`로
+"resumable 상태인 것들 중 가장 최근"을 찾았다. `COMPLETED`는 이 쿼리 대상에서 아예 빠지므로,
+같은 아이가 다른 시점에 남긴 오래된 `STOPPED` 세션(예: "새로하기"로 재시작하면서 예전
+세션은 `stop()`만 되고 그대로 DB에 남는다 — `SessionServiceImpl.createSession()`의
+`restart` 분기)이 실제로는 더 예전 활동인데도 "가장 최근 resumable"로 걸려 이어하기에
+떴다. `StoryServiceImpl.getStoryDetail()`은 이미 D-48에서 "최근 활동순으로 먼저 정렬 →
+resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는데, 홈만 반대 순서
+(filter-then-order 격인 status-first)를 쓰고 있었다.
+
+**수정**: 홈도 D-48과 같은 패턴으로 통일 — `findFirstByChildOrderByLastActivityAtDesc(child)`로
+아이의 가장 최근 세션을 먼저 찾고, `isResumable()`로 필터링. 세션 삭제나 새 종료 상태
+추가 없이 쿼리 순서만 바꿔서 해결했다 — "새로하기"가 남기는 orphan `STOPPED` 행 자체는
+그대로 두되(메시지·리포트 FK 때문에 삭제하려면 별도 cascade 작업이 필요), 홈이 그 행을
+"가장 최근"으로 잘못 집어내는 것만 막는다.
+
+`StorySessionRepository.findFirstByChildAndStatusInOrderByLastActivityAtDesc(...)`와
+`SessionStatus.resumableStatuses()`는 이 변경으로 호출처가 없어져 같이 제거했다.
+
+**검증**: 로컬 DB에서 실제 IN_PROGRESS 세션 하나를 COMPLETED로 바꾼 뒤(더 오래된 STOPPED
+세션들은 그대로 둔 채) `GET /api/home` 호출 → `inProgress: null` 확인. 원상복구 후 다시
+호출해 원래 IN_PROGRESS가 정상적으로 잡히는 것도 확인.
+
+**변경 파일**: `HomeServiceImpl.java`, `StorySessionRepository.java`, `SessionStatus.java`.
+
+---
+
+### D-62 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
+
+> 번호 정정: 이 결정은 원래 D-58로 기록됐으나, 병합 시점 차이로 다른 세션의 D-58(홈
+> "이어하기" 버그 수정, 바로 위)과 번호가 겹쳐 D-62로 재번호했다. 코드 주석
+> (`SceneVocabulary.java`, `SceneVocabularyTest.java`)도 함께 맞췄다.
 
 **배경**: v1(`scene-vocabulary-recommendation.md`)은 `recommendedWord`를 장면 번호만 보고
 항상 하나씩 내려줬다 — 캐릭터가 실제로 그 단어를 말했는지와 무관했다. AI팀이 v2
@@ -1757,6 +1792,90 @@ report-timeout-seconds(60초, 세션 완료 후 비동기 리포트 생성용)�
 
 **변경 파일**: `shop/*`(신규), `Child.java`(`deductStarDust`), `ErrorCode.java`,
 `MypageChildResponse.java`, `MypageServiceImpl.java`.
+
+---
+
+### D-60 · 미션 중 응답 turnCount/maxTurns가 얼어붙던 것을 미션 자체 예산(1~4)으로 전환
+
+**증상**: 사용자 보고 — 대화3·4(미션 있는 장면)에서 미션이 노출된 뒤에는 `POST /messages`
+응답의 `turnCount`/`maxTurns`가 더 이상 안 움직인다. 프론트가 진행 상황을 보여줄 방법이 없다.
+
+**원인**: D-53(1)이 "미션 중 `turnCount`가 `maxTurns`를 넘어 계속 쌓이는" 버그를 고치면서,
+`missionRevealedAtTurn != null`이면 응답 `turnCount`를 미션 노출 시점 값에 통째로 얼려버렸다.
+당시 근거는 "프론트에 별도 미션 턴 카운터를 안 주니 `turnCount`가 미션 중 움직일 이유가
+없다"였는데, 실제로는 프론트가 이 필드로 미션 진행률을 보여주려 하고 있어 그 전제가 틀렸다.
+
+내부적으로는 `ProgressJudge`·`StorySession.missionEngagedTurns`가 D-50 그대로 미션 자체
+예산(최소 1~최대 4, GUIDED는 일반 보호 2회 + 미션 전용 무료 2회까지 예산을 안 씀)을 정확히
+계산하고 있었다 — 응답 DTO로 안 내보내고 있었을 뿐이다.
+
+**수정**: 세션에 기록하는 내부 `turnCount`(candidate/frozen, `ProgressInput`·
+`recordTurnResult` 입력)는 D-53 그대로 둔다 — 판단 로직을 건드리지 않았다. 응답에 실어
+보내는 값만 분리했다: `missionRevealedAtTurn != null`이면(=미션이 노출된 상태, 노출을
+유발한 그 턴 자체는 제외 — 그 턴은 아직 `missionRevealedAtTurn`이 null이라 기존 장면 값을
+씀) 미션 회계 반영 **이후**의 `session.getMissionEngagedTurns()`를 `turnCount`로,
+`ProgressJudge.MISSION_MAX_TURNS_AFTER_REVEAL`(4, `private`→`public`으로 공개)을
+`maxTurns`로 응답에 싣는다. 보호 턴·미션 무료 GUIDED 턴에는 `missionEngagedTurns`가
+안 늘어나므로 자동으로 값이 그대로 유지된다 — 장면 레벨에서 보호 턴이 `turnCount`를
+안 움직이는 것과 같은 원리를 미션 레벨에도 그대로 적용한 것뿐이다.
+
+같은 필드(`turnCount`/`maxTurns`)를 미션 중 의미만 바꿔 재사용할지, 별도 필드
+(`missionTurnCount` 등)를 새로 만들지는 사용자에게 확인 후 전자로 확정했다 — 프론트가
+필드 이름을 새로 안 배워도 되고, 이미 진행률 표시에 `turnCount`/`maxTurns`를 쓰고 있었다.
+
+**검증**: 로컬 서버(mock AI, `AI_SERVER_BASE_URL`을 `/api/mock-ai`로 맞춰 재기동 — `.env`가
+실 AI 서버를 가리키고 있어 처음엔 전부 `/respond` 실패로 즉시 CLOSING되는 걸 발견하고 바로잡음)에
+실제 세션을 대화1(장면3)→대화2(장면5)→대화3(장면7, 미션1)까지 진행하며 curl로 확인:
+- 대화1·2(미션 없음): `turnCount`가 장면 자체 `maxTurns`(4·5) 기준으로 기존과 동일하게 진행 —
+  회귀 없음.
+- 대화3: 미션 트리거 턴엔 `turnCount=1/5`(장면 값, 미노출 상태라 정상). 노출 후 저정보
+  발화("그냥 잘 모르겠어요")를 반복 — 일반 GUIDED 보호 2회 + 미션 무료 GUIDED 2회 동안
+  `turnCount=0/4`로 유지되다가 5번째 턴부터 `1/4→2/4→3/4→4/4`로 정확히 오르고, `4/4` 다음
+  턴에서 `CLOSING`+`sceneEnded:true`+`nextSceneId`(대화4로 전환)까지 정상 확인. 전체 단위
+  테스트 130/130 통과(회귀 없음).
+
+**변경 파일**: `ProgressJudge.java`(`MISSION_MAX_TURNS_AFTER_REVEAL` 공개),
+`MessageServiceImpl.java`.
+
+---
+
+### D-61 · comingSoon 필드 + 준비 중 이야기 3편 시드 (catalog-only-stories.md)
+
+**배경**: 프론트가 이야기 목록·상세 화면 검증용으로 새 이야기 3편(해님과 달님·콩쥐와
+팥쥐·흥부와 놀부)을 목(mock) 카탈로그에 먼저 만들어 뒀고, AI 파트가 표지·캐릭터 일러스트
+(`frontend/public/story-assets/generated/folktales-v1/`)까지 실제로 넘겼다. 다만 대화
+장면(`story_scenes`)은 아직 없다 — 사용자가 "이 이미지에 맞는 샘플 동화를 추가해달라"고
+요청한 것도 **재생 가능한 대화까지**가 아니라 목록·상세에 뜨는 카탈로그 항목이었다.
+[request/backend/catalog-only-stories.md](request/backend/catalog-only-stories.md)가 이
+상태(장면 없이 노출만 되는 이야기)를 위한 계약을 이미 정의해 두고 있었다.
+
+**구현**:
+1. `GET /api/stories`·`GET /api/stories/{storyId}` 응답에 `comingSoon`(boolean, 항상 포함)을
+   추가했다. 문서가 권장한 **옵션 B**(컬럼 추가 없이 `story_scenes` 개수로 계산)를 그대로
+   따랐다 — `StorySceneRepository.existsByStory(story)`가 없으면 `comingSoon: true`.
+   컬럼을 안 만들어서 나중에 실제 장면이 생기면 이 메서드를 다시 안 건드려도 자동으로
+   재생 가능 상태가 된다.
+2. `ContentSeeder`에 `seedComingSoonStory(...)`를 추가해 3편을 시드한다 — 제목·소개
+   문구·주제는 프론트 목 카탈로그(`story-catalog.ts`)가 이미 검토해 둔 값을 그대로
+   옮겼고, `coverImageUrl`은 AI 파트가 넘긴 실제 자산 경로를 채웠다. 장면은 만들지
+   않는다(요청 범위 밖 — "콘텐츠가 정해지면 별도로 전달").
+3. **버그 하나 잡음**: `ContentSeeder.run()`이 원래 "방귀 뀌는 며느리 이미 있으면 즉시
+   return" 구조라, 그 뒤에 이어 붙인 3편 시드 호출이 재기동 시(이미 방귀 므느리가 있는
+   상태) 통째로 스킵됐다. `run()`에서 `seedBanggui()`를 호출하고 그 뒤에 독립적으로
+   3편을 시드하도록 구조를 바꿨다 — 각 `seedComingSoonStory` 호출은 자기 제목으로
+   따로 중복을 막으므로 어느 조합으로 재기동해도 안전하다.
+
+**검증**: 로컬 서버 재기동 로그로 4편(방귀 므느리 스킵 + 신규 3편 시드) 확인, curl로
+`GET /api/stories` 응답 4건 전부(`comingSoon` 값 포함) 확인 — 방귀 므느리만 `false`,
+나머지 3편은 `true`. `availableTopics`에 새 주제 6개(가족·용기·성실함·친절·나눔·정직)가
+기존 3개와 합쳐 9개로 뜨는 것 확인. 상세 조회(흥부와 놀부)로 `comingSoon: true`,
+`characters: []`(장면이 없어 자동으로 빈 배열), `intro: null` 확인. 서버를 한 번 더
+재기동해 4편 모두 "이미 존재 — 시드를 건너뜁니다" 로그만 찍히고 중복 삽입 없음을 확인.
+전체 단위 테스트 130/130 통과.
+
+**변경 파일**: `story/repository/StorySceneRepository.java`(`existsByStory`),
+`story/dto/response/StorySummaryResponse.java`, `story/dto/response/StoryDetailResponse.java`,
+`story/service/StoryServiceImpl.java`, `story/ContentSeeder.java`.
 
 ---
 

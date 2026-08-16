@@ -13,4 +13,6 @@ public interface StorySceneRepository extends JpaRepository<StoryScene, UUID> {
     List<StoryScene> findAllByStoryOrderBySceneOrderAsc(Story story);
 
     long countByStoryAndSceneType(Story story, SceneType sceneType);
+
+    boolean existsByStory(Story story);
 }
