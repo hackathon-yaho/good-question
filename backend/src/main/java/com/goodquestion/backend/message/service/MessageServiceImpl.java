@@ -234,16 +234,21 @@ public class MessageServiceImpl implements MessageService {
         MissionDefinition mission = Missions.forSceneOrder(scene.getSceneOrder());
         if (mission == null) return null;
 
-        boolean missionRevealed = messageRepository
-                .existsBySessionAndSceneAndSpeakerType(session, scene, SpeakerType.SYSTEM);
-        if (!missionRevealed) return null;
+        Optional<Message> systemMessage = messageRepository
+                .findFirstBySessionAndSceneAndSpeakerTypeOrderByTurnOrderDesc(session, scene, SpeakerType.SYSTEM);
+        if (systemMessage.isEmpty()) return null;
 
         // 미션을 노출시킨 그 턴(예: "방귀로 해결하자")이 흔히 체크리스트 요소도 같이 만족시킨다 —
         // 노출 이후 턴만 보면 accumulatedElements에는 이미 들어간 요소가 체크리스트에는 하나도
-        // 안 채워진 것처럼 보인다. 장면 전체(노출 전 턴 포함)를 순서대로 본다.
+        // 안 채워진 것처럼 보인다(D-53). 그렇다고 장면 전체(1턴부터)를 보면 미션과 무관했던
+        // 초반 대화에서 우연히 겹친 요소까지 미리 채워진 것처럼 보이는 문제가 새로 생긴다 —
+        // 턴 순서는 항상 child(N) → character(N+1) → system(N+2)이므로, 노출을 유발한 턴은
+        // system 메시지보다 turnOrder가 정확히 2 작다. 그 턴부터만 본다.
+        int triggerTurnOrder = systemMessage.get().getTurnOrder() - 2;
         List<List<String>> perTurnDetectedTypes = messageRepository.findAllBySessionOrderByTurnOrderAsc(session).stream()
                 .filter(m -> m.getScene().getId().equals(scene.getId()))
                 .filter(m -> m.getSpeakerType() == SpeakerType.CHILD)
+                .filter(m -> m.getTurnOrder() >= triggerTurnOrder)
                 .map(m -> utteranceAnalysisRepository.findByMessage(m)
                         .map(a -> a.getDetectedElements().stream().map(DetectedElement::type).toList())
                         .orElse(List.<String>of()))

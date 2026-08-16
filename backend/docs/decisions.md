@@ -1627,6 +1627,36 @@ AI 버전으로 덮어써진 것을 확인. 5개 역량 카드의 `evidence`가 
 
 ---
 
+### D-56 · missionProgress가 미션 노출 전 무관한 턴의 요소까지 미리 채우던 문제 (D-53의 과잉 수정)
+
+**증상**: 팀원 보고 — 미션1에 진입한 직후, 아직 미션 관련 대화를 하지도 않았는데 체크리스트
+3번 항목(RESULT)이 이미 채워진 상태로 나옴. "미션이 열리기도 전에 미션 요소에 해당하는 말을
+하면 그게 충족되어 나온다"는 재현 조건까지 제보됨.
+
+**원인**: D-53(2)가 "노출을 유발한 그 턴"의 요소가 체크리스트에 반영되게 하려고
+`missionProgress()`의 `turnOrder > systemMessage.turnOrder()` 필터를 통째로 제거했다.
+의도는 트리거 턴 한 개만 포함시키는 것이었는데, 실제로는 하한이 아예 없어져 **장면 시작부터의
+모든 CHILD 턴**이 스캔 대상이 됐다 — 미션 조건과 전혀 상관없이 오간 장면 초반 대화에서
+우연히 겹친 요소(예: "떨어질 것 같아요" → RESULT)까지 노출 즉시 체크리스트에 반영됐다.
+
+턴 순서는 항상 `child(N) → character(N+1) → system(N+2)`로 저장되므로, 노출을 유발한 턴의
+`turnOrder`는 system 메시지보다 정확히 2 작다는 걸 이용해 하한을 다시 세웠다.
+
+**수정**: `missionProgress()`가 system 메시지 존재 여부(`existsBy...`)만 보던 걸
+`findFirstBySessionAndSceneAndSpeakerTypeOrderByTurnOrderDesc`로 바꿔 system 메시지 자체를
+조회하고, `turnOrder >= systemMessage.turnOrder() - 2`로 하한을 되살렸다. D-53이 원래
+포함시키려던 트리거 턴 한 개는 그대로 포함되고, 그 이전 턴은 다시 제외된다.
+
+**검증**: mock AI로 장면7(미션1) 직전까지 진행 → (1) 미션과 무관하게 RESULT 키워드("떨어질
+것 같아요")만 있는 턴을 먼저 보내 `accumulatedElements`에 RESULT를 쌓음 → (2) 이어서
+SOLUTION 키워드("방귀")로 미션을 발동 → 노출 즉시 `missionProgress.satisfiedIndexes`가
+`[0]`(트리거 턴의 SOLUTION)만 찍히고 `3`(앞서 쌓인 RESULT)은 없음을 실호출로 확인. 전체
+단위 테스트 120/120 통과.
+
+**변경 파일**: `MessageServiceImpl.java`(`missionProgress()`).
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.
