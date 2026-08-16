@@ -1,7 +1,7 @@
 # 8세 이하 학습 단어 추천 데이터 요청
 
-> **대체됨**: [실제 캐릭터 대사 기반 8세 이하 추천 단어 v2](character-utterance-vocabulary-v2.md)를
-> 정본으로 사용한다. 이 문서의 장면 번호만으로 단어를 추천하는 규칙은 적용하지 않는다.
+> **대체됨**: [현재 캐릭터 대사 기반 `highlightWords` v1](highlight-words-current-character-v1.md)를
+> 정본으로 사용한다. `recommendedWord`·장면 번호만의 추천 규칙은 적용하지 않는다.
 
 - **요청자**: AI 파트
 - **작성일**: 2026-08-15

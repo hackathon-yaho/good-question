@@ -474,18 +474,17 @@ try/catch로 고쳤습니다.
 ### D-22 · `highlightWords`를 채우는 방식 — "포함될 때만" 골라낸다
 
 D-11이 남겨둔 미결(U-06)을 해소합니다. D-11이 지적한 문제는 "고정 목록을 만들어도 LLM이
-그 단어를 안 쓸 수 있다"였는데, **목록을 그대로 내려주는 게 아니라 그 턴의 캐릭터 응답 텍스트에
-후보 단어가 실제로 포함되는지 검사한 뒤 포함된 것만 골라내는 방식**으로 이 문제 자체를
+그 단어를 안 쓸 수 있다"였는데, **목록을 그대로 내려주는 게 아니라 이번 턴의 캐릭터 응답 텍스트에
+후보 단어가 실제로 포함되는지 검사한 뒤 최대 하나만 골라내는 방식**으로 이 문제 자체를
 없앴습니다. 안 나오면 이번 턴은 빈 배열이고, 다음 턴에 나오면 그때 뜹니다 — 항상 정답입니다.
 
-- 후보 단어·뜻은 `story/constant/HighlightWords.java`에 장면(`scene_order`)별로 팀이 만들어
-  둡니다. `DialogueContents`와 같은 이유(자문위원 검수 대상 아닌 팀 창작물)로 DB가 아니라
-  코드 상수입니다.
+- 후보 단어·뜻은 `story/constant/HighlightWords.java`에 장면별 8세 이하 후보로 둡니다.
+  `DialogueContents`와 같은 이유(자문위원 검수 대상 아닌 팀 창작물)로 DB가 아니라 코드 상수입니다.
 - 검사는 대화 장면의 `character_opening`에는 적용하지 않습니다 — 그 응답 스키마
   (`SceneCompleteResponse`)에 애초에 `highlightWords` 필드가 없습니다. `POST .../messages`가
   만드는 캐릭터 응답(NORMAL/GUIDED 텍스트, CLOSING의 `character_closing`)에만 적용됩니다.
-- 후보는 각 장면 1개씩만 넣어뒀습니다 — 선정 기준 자체가 문서에 없어 팀 재량이고(D-11),
-  개수를 늘리는 건 언제든 `HighlightWords`만 고치면 됩니다.
+- 후보는 각 장면 1개씩만 두며, 응답에는 현재 대사에 실제 있는 후보 하나만 반환합니다.
+- `recommendedWord`·`SceneVocabulary`는 프론트가 사용하지 않아 제거했습니다.
 
 **`wordbook`(O-06~O-10)도 이참에 같이 구현합니다.** 진입점(밑줄 단어 탭)이 막혀 있어 후순위로
 미뤄뒀었는데, 위 방식으로 `highlightWords`가 실제로 채워지게 되어 막힌 이유가 해소됐습니다.
@@ -1718,6 +1717,10 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 
 ### D-62 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
 
+> **대체됨**: 프론트가 `recommendedWord`를 사용하지 않는 것이 확인되어, 현재 응답 정본은
+> [D-64](#d-64--프론트-기존-highlightwords로-현재-캐릭터-대사-기반-단어-노출을-통일한다)다.
+> 아래 내용은 2026-08-16 당시의 변경 이력으로만 남긴다.
+
 > 번호 정정: 이 결정은 원래 D-58로 기록됐으나, 병합 시점 차이로 다른 세션의 D-58(홈
 > "이어하기" 버그 수정, 바로 위)과 번호가 겹쳐 D-62로 재번호했다. 코드 주석
 > (`SceneVocabulary.java`, `SceneVocabularyTest.java`)도 함께 맞췄다.
@@ -1742,6 +1745,25 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 
 **변경 파일**: `story/constant/SceneVocabulary.java`, `message/service/MessageServiceImpl.java`,
 `story/constant/SceneVocabularyTest.java`(신규).
+
+---
+
+### D-64 · 프론트 기존 `highlightWords`로 현재 캐릭터 대사 기반 단어 노출을 통일한다
+
+**결정**: 프론트가 이미 `highlightWords`로 밑줄·단어 팝업·단어장 저장을 구현했다. 따라서
+`recommendedWord` 카드 API를 추가하지 않고 제거한다. 프론트 코드를 다시 만들지 않는다.
+
+**응답 계약**:
+
+- `highlightWords`는 이번 응답의 `characterMessage`에 **연속 문자열로 실제 포함된** 8세 이하
+  후보를 최대 하나만 담는다.
+- 후보가 없으면 `[]`다. 아이 발화·이전 턴·장면 번호만으로 단어를 만들지 않는다.
+- `recommendedWord`, `SceneVocabulary`, `SceneVocabularyWord`와 관련 DTO는 응답·코드에서 제거한다.
+- LLM 호출·프롬프트·DB 스키마·프론트 타입 변경은 없다.
+
+**구현·검증**: `HighlightWords.findInCharacterText(...)`가 현재 대사만 검사한다.
+`HighlightWordsTest`는 포함 시 한 개 반환, 미포함·null 시 빈 배열을 검증한다. 전체 Gradle 테스트가
+통과했다. 상세 요청은 [현재 캐릭터 대사 기반 `highlightWords` v1](../../docs/request/backend/highlight-words-current-character-v1.md)을 따른다.
 
 ---
 
@@ -1876,6 +1898,32 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 **변경 파일**: `story/repository/StorySceneRepository.java`(`existsByStory`),
 `story/dto/response/StorySummaryResponse.java`, `story/dto/response/StoryDetailResponse.java`,
 `story/service/StoryServiceImpl.java`, `story/ContentSeeder.java`.
+
+---
+
+### D-63 · 준비 중 이야기 3편에 등장인물 이미지 추가 — 대화 장면 없이도 characters[] 채움
+
+**배경**: D-61에서 3편(해님과 달님·콩쥐와 팥쥐·흥부와 놀부)을 표지 이미지만 넣고 시드했다.
+사용자가 "등장인물 이미지는 안 넣었냐"고 확인 — `catalog-only-stories.md`가 "characters[].imageUrl은
+지금처럼 null로 줘도 된다, 새로 할 일 없음"이라고 했던 걸 그대로 따랐던 것인데, 실제로는
+프론트 상세 화면(`StoryDetailScreen.tsx`)이 `story.characters.length > 0`일 때만 "함께 만날
+친구들" 캐릭터 초상 섹션을 그리고, 캐릭터 목록은 백엔드가 대화 장면(`story_scenes`)에서
+뽑아내는 게 유일한 경로였다 — 이 3편은 장면이 아예 없어(comingSoon 설계) `characters`가
+항상 빈 배열이었고, 그래서 AI 파트가 이미 넘긴 인물 카드 이미지(`ch-heungbu-neutral.png` 등)가
+어디에도 안 쓰이고 있었다.
+
+**구현**: `story/constant/ComingSoonCharacters.java`(신규) — 제목 → `List<CharacterResponse>`
+고정 매핑. 이름·표시명은 프론트 목 카탈로그(`story-catalog.ts`)의 `characters`와 동일하게
+맞췄고(`sister`/`brother`, `kongjwi`/`patjwi`, `heungbu`/`nolbu`), `imageUrl`은 AI 파트가
+넘긴 `generated/folktales-v1/ch-*-neutral.png` 경로를 그대로 채웠다. `StoryServiceImpl
+.getStoryDetail()`에서 `scenes.isEmpty()`면 이 매핑을, 아니면 기존 `distinctCharacters(scenes)`를
+쓰도록 분기했다 — 장면 기반 이야기(방귀 뀌는 며느리)는 로직 변경 없음.
+
+**검증**: 로컬 서버 재기동 후 curl로 3편 전부 `characters` 2건씩(이름·표시명·이미지 경로)
+확인, 기존 방귀 뀌는 며느리는 `characters` 3건(이미지는 여전히 null, 회귀 없음) 그대로임을
+확인. 전체 단위 테스트 130/130 통과.
+
+**변경 파일**: `story/constant/ComingSoonCharacters.java`(신규), `story/service/StoryServiceImpl.java`.
 
 ---
 

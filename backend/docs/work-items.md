@@ -57,7 +57,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | — | ~~`post_activity_config`~~ | 필수-기반 | **완료** |
 | M-19 | ~~`remainingWorries` · `guidanceStyle` **코드 상수**~~ | 필수-기반 | **완료.** `story/constant/DialogueContents.java`, scene_order 키. 단위 테스트 포함 |
 | B-08 | ~~캐릭터 **표시명** 매핑 코드 상수~~ | 필수-기반 | **완료.** `DialogueContents`에 함께 둠 (scene_order 단위라 별도 클래스로 안 나눔) |
-| — | ~~준비 중(comingSoon) 이야기 3건 — 해님과 달님·콩쥐와 팥쥐·흥부와 놀부~~ | 선택 | **완료 (D-61).** `ContentSeeder.seedComingSoonStory()`. 장면 없이 표지·소개만. `story-catalog.ts`(프론트 목) 문구 그대로, 표지는 `generated/folktales-v1/` |
+| — | ~~준비 중(comingSoon) 이야기 3건 — 해님과 달님·콩쥐와 팥쥐·흥부와 놀부~~ | 선택 | **완료 (D-61).** `ContentSeeder.seedComingSoonStory()`. 장면 없이 표지·소개만. `story-catalog.ts`(프론트 목) 문구 그대로, 표지는 `generated/folktales-v1/`. 등장인물 이미지도 추가 (D-63, `ComingSoonCharacters`) |
 
 ### 주의
 
@@ -485,11 +485,12 @@ CLOSING).
 - `sceneIndex`는 D-12와 같은 식(`scene_order / 2`)으로 변환. `isNew`는 저장 후 24시간 기준
 - `contextSentence`는 `POST /api/wordbook` 요청에서 선택 필드로 받아 그대로 저장 (D-22)
 
-**검증**: `POST /api/sessions/{id}/messages`로 대화4 마지막 턴(CLOSING)을 완주해
-`highlightWords: [{"word":"부끄러워", ...}]`가 실제로 응답에 실림을 확인 → 그 값을
+**검증**: `POST /api/sessions/{id}/messages`로 대화4 마지막 턴(CLOSING)을 완주해 현재
+캐릭터 대사에 실제 포함된 후보 하나가 `highlightWords`에만 실림을 확인 → 그 값을
 `POST /api/wordbook`으로 저장 → `GET ...?filter=all/liked/story:{id}` 3가지 전부 확인 →
 `PATCH .../{id}` `{liked:true}` → `filter=liked`에 나타남을 확인. 다른 보호자 토큰으로
-조회·수정 시 403, 없는 `childId`는 404, 잘못된 `filter` 값은 400 확인
+조회·수정 시 403, 없는 `childId`는 404, 잘못된 `filter` 값은 400 확인. `recommendedWord`는
+프론트 미사용이라 제거했고, 현재 계약은 D-64를 따른다.
 
 ### 미구현으로 두는 것
 

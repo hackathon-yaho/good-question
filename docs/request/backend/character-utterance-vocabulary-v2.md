@@ -5,8 +5,8 @@
 - **우선순위**: 필수
 - **대상**: 백엔드 파트
 
-> **대체됨**: [장면별 학습 단어 추천 v1](scene-vocabulary-recommendation.md)의
-> ‘장면 번호로 고정 추천’ 규칙은 적용하지 않는다. 이 문서를 정본으로 사용한다.
+> **대체됨**: [현재 캐릭터 대사 기반 `highlightWords` v1](highlight-words-current-character-v1.md)를
+> 정본으로 사용한다. `recommendedWord` 카드 계약은 프론트가 사용하지 않아 제거한다.
 
 ## 배경
 
