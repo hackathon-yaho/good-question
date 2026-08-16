@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { handleRequest } from "../src/index.js";
+import { ModelUpstreamError, requestStructuredOutput } from "../src/openai.js";
 
 const env = {
   OPENAI_API_KEY: "test-openai-key",
@@ -327,4 +328,31 @@ test("three request timeouts are returned as a stable 504", async () => {
 
   assert.equal(response.status, 504);
   assert.equal((await response.json()).code, "MODEL_TIMEOUT");
+});
+
+test("retry exhaustion retains only safe upstream status reasons", async () => {
+  let calls = 0;
+
+  await assert.rejects(
+    requestStructuredOutput({
+      env,
+      operation: "respond",
+      prompt: "test",
+      payload: {},
+      maxOutputTokens: 1,
+      validate: (value) => value,
+      fetcher: async () => {
+        calls += 1;
+        return new Response("", { status: 429 });
+      },
+      sleep: async () => {},
+    }),
+    (error) => {
+      assert.ok(error instanceof ModelUpstreamError);
+      assert.deepEqual(error.attemptReasons, ["OPENAI_STATUS_429", "OPENAI_STATUS_429", "OPENAI_STATUS_429"]);
+      return true;
+    },
+  );
+
+  assert.equal(calls, 3);
 });

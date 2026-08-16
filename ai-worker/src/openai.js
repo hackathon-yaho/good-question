@@ -1,8 +1,25 @@
 import { ContractError } from "./validation.js";
 
-export class ModelTimeoutError extends Error {}
-export class ModelUpstreamError extends Error {}
-class NonRetryableModelError extends Error {}
+export class ModelTimeoutError extends Error {
+  constructor(reason = "TOTAL_TIMEOUT") {
+    super(reason);
+    this.reason = reason;
+  }
+}
+
+export class ModelUpstreamError extends Error {
+  constructor(reason = "OPENAI_UNKNOWN") {
+    super(reason);
+    this.reason = reason;
+  }
+}
+
+class NonRetryableModelError extends Error {
+  constructor(reason) {
+    super(reason);
+    this.reason = reason;
+  }
+}
 
 const MAX_ATTEMPTS = 3;
 const RETRY_BACKOFF_MS = [100, 200];
@@ -85,7 +102,7 @@ function modelOutputText(payload) {
     return payload.output_text;
   }
   if (!Array.isArray(payload.output)) {
-    throw new ModelUpstreamError("OpenAI 응답에 출력이 없습니다.");
+    throw new ModelUpstreamError("MODEL_OUTPUT_MISSING");
   }
   for (const item of payload.output) {
     if (!Array.isArray(item?.content)) {
@@ -97,11 +114,28 @@ function modelOutputText(payload) {
       }
     }
   }
-  throw new ModelUpstreamError("OpenAI 응답에 텍스트가 없습니다.");
+  throw new ModelUpstreamError("MODEL_OUTPUT_TEXT_MISSING");
 }
 
 function isRetryableStatus(status) {
   return status === 408 || status === 429 || status >= 500;
+}
+
+function retryReason(error, timedOut) {
+  if (timedOut) return "ATTEMPT_TIMEOUT";
+  if (error instanceof ContractError) return "MODEL_OUTPUT_CONTRACT";
+  if (error instanceof SyntaxError) return "MODEL_OUTPUT_JSON";
+  if (error instanceof ModelUpstreamError) return error.reason;
+  return "OPENAI_NETWORK";
+}
+
+function withAttemptReasons(error, reasons) {
+  error.attemptReasons = [...reasons];
+  return error;
+}
+
+function totalTimeout(reasons) {
+  return withAttemptReasons(new ModelTimeoutError(), [...reasons, "TOTAL_TIMEOUT"]);
 }
 
 /**
@@ -123,11 +157,12 @@ export async function requestStructuredOutput({
 }) {
   const deadline = now() + totalTimeoutMs;
   let lastError = null;
+  const attemptReasons = [];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const remaining = deadline - now();
     if (remaining <= 0) {
-      throw new ModelTimeoutError();
+      throw totalTimeout(attemptReasons);
     }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Math.min(attemptTimeoutMs, remaining));
@@ -151,26 +186,32 @@ export async function requestStructuredOutput({
       });
       if (!response.ok) {
         if (isRetryableStatus(response.status)) {
-          throw new ModelUpstreamError("일시적인 OpenAI 오류입니다.");
+          throw new ModelUpstreamError(`OPENAI_STATUS_${response.status}`);
         }
-        throw new NonRetryableModelError("OpenAI 요청이 거절되었습니다.");
+        throw new NonRetryableModelError(`OPENAI_STATUS_${response.status}`);
       }
       const responsePayload = await response.json();
       if (responsePayload.status && responsePayload.status !== "completed") {
-        throw new ModelUpstreamError("OpenAI 응답이 완료되지 않았습니다.");
+        throw new ModelUpstreamError(`OPENAI_NOT_COMPLETED_${responsePayload.status}`);
       }
       const output = validate(JSON.parse(modelOutputText(responsePayload)));
       return output;
     } catch (error) {
       const timedOut = error?.name === "AbortError";
       if (error instanceof NonRetryableModelError) {
-        throw new ModelUpstreamError();
+        throw withAttemptReasons(new ModelUpstreamError(error.reason), [...attemptReasons, error.reason]);
       }
       const retryable = timedOut || error instanceof ContractError || error instanceof SyntaxError || error instanceof ModelUpstreamError;
       if (!retryable) {
-        throw new ModelUpstreamError();
+        attemptReasons.push("OPENAI_NETWORK");
+        throw withAttemptReasons(new ModelUpstreamError("OPENAI_NETWORK"), attemptReasons);
       }
-      lastError = timedOut ? new ModelTimeoutError() : new ModelUpstreamError();
+      const reason = retryReason(error, timedOut);
+      attemptReasons.push(reason);
+      lastError = withAttemptReasons(
+        timedOut ? new ModelTimeoutError(reason) : new ModelUpstreamError(reason),
+        attemptReasons,
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -180,10 +221,10 @@ export async function requestStructuredOutput({
     }
     const backoff = Math.min(RETRY_BACKOFF_MS[attempt - 1], Math.max(0, deadline - now()));
     if (backoff <= 0) {
-      throw new ModelTimeoutError();
+      throw totalTimeout(attemptReasons);
     }
     await sleep(backoff);
   }
 
-  throw new ModelTimeoutError();
+  throw totalTimeout(attemptReasons);
 }
