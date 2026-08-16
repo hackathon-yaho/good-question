@@ -138,6 +138,10 @@ export function KeywordReveal({
         {slots.map((card, index) => (
           <li key={card?.id ?? index} className="flex items-center gap-3">
             <div
+              data-slot-index={index}
+              // 그림만 있어 스크린리더에 이름이 없으면 그냥 "이미지"로만 읽힌다.
+              // CardOrdering의 슬롯과 같은 이유로 이름을 준다.
+              aria-label={card ? card.text : "빈 칸"}
               className={[
                 "relative flex h-[10rem] w-[13.75rem] items-center justify-center overflow-hidden rounded-card p-3 bg-transparent",
                 revealed

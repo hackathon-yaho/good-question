@@ -178,6 +178,19 @@ export type PlayMachineState = {
    * 프론트가 들고 있어도 §0-2에 어긋나지 않는다.
    */
   mission2Choice: number | null;
+  /**
+   * 미션이 끝났는지(완료든 기회 소진이든 — 결과를 안 가린다). 한 번 true가
+   * 되면 장면이 바뀌기 전까진 계속 true다 — 미션이 끝난 뒤에도 대화가 이어지는
+   * 매 턴마다 `missionEnded`가 될 조건을 다시 계산하면 계속 true로 나오므로,
+   * 이 값 자체로 "방금 끝났는지"를 가릴 수 없다. 그건 `missionJustEndedAt`의 몫이다.
+   */
+  missionEnded: boolean;
+  /**
+   * 미션이 **막 끝난 그 턴의** `now`. 그 턴에만 값이 있고, 그 다음 턴부터는 다시
+   * null이다 — `MissionCompleteOverlay`를 띄우는 신호로 PlayScreen이 이 값의
+   * 변화(matches every render는 아니고 매번 다른 값)만 본다.
+   */
+  missionJustEndedAt: string | null;
   highlightWords: HighlightWord[];
   /** 서버가 알려준 캐릭터 표정 상태 (NEUTRAL/HAPPY/WORRIED/SURPRISED/MOVED) */
   characterState: string | null;
@@ -210,6 +223,8 @@ export const initialPlayState: PlayMachineState = {
   missionTurns: 0,
   satisfiedIndexes: [],
   mission2Choice: null,
+  missionEnded: false,
+  missionJustEndedAt: null,
   highlightWords: [],
   characterState: null,
   postActivityReady: false,
@@ -309,6 +324,8 @@ function applySnapshot(
     missionBriefOpen: false,
     missionTurns: 0,
     mission2Choice: null,
+    missionEnded: false,
+    missionJustEndedAt: null,
     /**
      * 밑줄 단어는 서버가 `POST /messages` 응답에만 실어 준다. 세션 조회에는 없다.
      * 그래서 장면 첫 대사에는 밑줄이 없고, C-9는 두 번째 턴부터 열린다.
@@ -349,6 +366,8 @@ export function playReducer(
         missionBriefOpen: false,
         missionTurns: 0,
         mission2Choice: null,
+        missionEnded: false,
+        missionJustEndedAt: null,
         draftText: "",
         sttRawText: "",
         interimText: "",
@@ -467,6 +486,29 @@ export function playReducer(
         mission !== null &&
         shouldOpenMissionBrief(mission, missionTurns, satisfied, satisfiedIndexes);
 
+      /**
+       * 미션이 방금 끝났는가 — 완료든 기회 소진이든 가리지 않는다
+       * (`MissionCompleteOverlay` 주석 참조). `state.missionEnded`가 이미
+       * true면 스킵한다 — 안 그러면 미션이 끝난 뒤에도 대화가 이어지는 매 턴마다
+       * "방금 끝났다"고 다시 판정해 오버레이가 계속 뜬다.
+       *
+       * ⚠️ 장면이 닫히는 것도 "끝남"이다. 미션 체크리스트가 다 안 찼어도
+       *    (`briefOpen`이 여전히 true여도) 장면이 이번 턴에 닫히면(`responseMode
+       *    === "closing"`) 미션을 더 이어갈 기회 자체가 없다. 실서버는 미션이
+       *    끝나기 전까지 장면을 안 닫는 별도 턴 예산(D-50)이 있지만 목은 이걸
+       *    흉내내지 않아 장면이 먼저 닫힐 수 있다 — 그 경우도 잡아야 한다.
+       */
+      const sceneClosingNow = result.responseMode === "closing";
+      const missionJustEnded =
+        wasRunning &&
+        mission !== null &&
+        !state.missionEnded &&
+        (!briefOpen || sceneClosingNow);
+      const missionEnded =
+        mission !== null
+          ? state.missionEnded || !briefOpen || sceneClosingNow
+          : false;
+
       const currentSceneId = state.scene?.sceneId ?? "";
       const currentTurn = result.turnCount ?? state.turnCount;
 
@@ -511,6 +553,8 @@ export function playReducer(
         missionBriefOpen: briefOpen,
         missionTurns,
         satisfiedIndexes,
+        missionEnded,
+        missionJustEndedAt: missionJustEnded ? action.now : null,
         highlightWords: result.highlightWords,
         characterState: result.characterState ?? null,
         nextSceneId: result.nextSceneId,

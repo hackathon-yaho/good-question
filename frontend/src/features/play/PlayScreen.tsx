@@ -27,6 +27,7 @@ import { IntroFullscreen } from "@/features/play/IntroFullscreen";
 import { MissionCard } from "@/features/play/MissionCard";
 import { Mission2Card } from "@/features/play/Mission2Card";
 import { isChoiceMission } from "@/features/play/mission2";
+import { MissionCompleteOverlay } from "@/features/play/MissionCompleteOverlay";
 import {
   DEFAULT_PLAY_SETTINGS,
   PauseSheet,
@@ -111,6 +112,8 @@ export function PlayScreen({
   /** C-9 단어 뜻 팝업. 열려 있는 동안 TTS·마이크는 그대로 둔다. */
   const [openWord, setOpenWord] = useState<HighlightWord | null>(null);
   const [savedWords, setSavedWords] = useState<readonly string[]>([]);
+  /** 미션 종료 오버레이(MissionCompleteOverlay). 흐름을 막지 않는 순수 장식 레이어다 */
+  const [showMissionComplete, setShowMissionComplete] = useState(false);
 
   const { speak, cancel: cancelTts, unlock: unlockAudio } = useCharacterVoice();
 
@@ -140,6 +143,18 @@ export function PlayScreen({
   useEffect(() => {
     currentSceneIdRef.current = scene?.sceneId ?? null;
   }, [scene?.sceneId]);
+
+  /**
+   * 미션이 막 끝난 턴에만 `missionJustEndedAt`이 값을 갖는다(매번 다른 `now`).
+   * 2.4초간 오버레이를 띄우고 스스로 끈다 — 상태머신은 그 밑에서 평소대로
+   * 진행되므로, 이 타이머가 실패해도 아이는 갇히지 않는다.
+   */
+  useEffect(() => {
+    if (!state.missionJustEndedAt) return;
+    setShowMissionComplete(true);
+    const timer = setTimeout(() => setShowMissionComplete(false), 2400);
+    return () => clearTimeout(timer);
+  }, [state.missionJustEndedAt]);
 
   // --- 세션 로드 --------------------------------------------------------
   useEffect(() => {
@@ -587,6 +602,7 @@ export function PlayScreen({
         onSave={saveWord}
         onClose={() => setOpenWord(null)}
       />
+      <MissionCompleteOverlay show={showMissionComplete} />
     </>
   );
 
