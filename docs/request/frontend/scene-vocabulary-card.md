@@ -1,7 +1,7 @@
 # 오늘의 단어 카드 표시 요청
 
-> **대체됨**: [v3](scene-vocabulary-card-v3.md)를 정본으로 사용한다. v1의 대사 본문
-> `highlightWords` 표시 유지 결정은 적용하지 않는다.
+> **대체됨**: [현재 캐릭터 대사 기반 `highlightWords` v1](../backend/highlight-words-current-character-v1.md)를
+> 정본으로 사용한다. 기존 `highlightWords` 표시·단어장 흐름은 유지한다.
 
 - **요청자**: AI 파트
 - **작성일**: 2026-08-15
