@@ -57,6 +57,7 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | — | ~~`post_activity_config`~~ | 필수-기반 | **완료** |
 | M-19 | ~~`remainingWorries` · `guidanceStyle` **코드 상수**~~ | 필수-기반 | **완료.** `story/constant/DialogueContents.java`, scene_order 키. 단위 테스트 포함 |
 | B-08 | ~~캐릭터 **표시명** 매핑 코드 상수~~ | 필수-기반 | **완료.** `DialogueContents`에 함께 둠 (scene_order 단위라 별도 클래스로 안 나눔) |
+| — | ~~준비 중(comingSoon) 이야기 3건 — 해님과 달님·콩쥐와 팥쥐·흥부와 놀부~~ | 선택 | **완료 (D-61).** `ContentSeeder.seedComingSoonStory()`. 장면 없이 표지·소개만. `story-catalog.ts`(프론트 목) 문구 그대로, 표지는 `generated/folktales-v1/` |
 
 ### 주의
 
@@ -108,9 +109,9 @@ PRD 8장 정의에 없어 본 프로젝트에서 추가하는 것들입니다. �
 | ID | 항목 | 등급 | 엔드포인트 |
 | --- | --- | --- | --- |
 | M-08 | ~~진행 중 이야기 · 이어하기~~ | 필수 | `GET /api/home?childId=` — **완료.** `child.starDust` 추가 (선택, 프론트 요청 — D-33) · 이미 완료한 이야기인데도 이어하기가 뜨던 status-first 쿼리 버그 수정 (D-58) |
-| M-10 | ~~이야기 목록~~ | 필수 | `GET /api/stories?childId=&topic=` — **완료** |
+| M-10 | ~~이야기 목록~~ | 필수 | `GET /api/stories?childId=&topic=` — **완료.** `comingSoon` 필드 추가 (선택, 프론트 요청 — D-61) |
 | M-11 | ~~주제별 필터링~~ | 필수 | 〃 (`stories.topics` 기준) — **완료** |
-| — | ~~이야기 상세~~ | 필수 | `GET /api/stories/{storyId}?childId=` — **완료** |
+| — | ~~이야기 상세~~ | 필수 | `GET /api/stories/{storyId}?childId=` — **완료.** `comingSoon` 필드 추가 (D-61) |
 
 스키마: [api.md 3.3](../../docs/spec/api.md)
 

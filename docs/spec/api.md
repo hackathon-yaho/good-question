@@ -402,7 +402,8 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
       "estimatedMinutes": 20,
       "difficulty": "보통",
       "topics": ["다름", "자기이해", "장점 발견"],
-      "sessionStatus": "in_progress"
+      "sessionStatus": "in_progress",
+      "comingSoon": false
     }
   ],
   "availableTopics": ["다름", "자기이해", "장점 발견"]
@@ -410,6 +411,10 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 ```
 
 `sessionStatus`는 해당 아이의 세션 상태입니다(`null` / `in_progress` / `post_activity` / `completed` / `stopped`). B-2 상태 배지에 씁니다. `childId`가 필요한 이유가 이것입니다.
+
+`comingSoon`은 **신규(D-61)** — `story_scenes`가 아직 없는(장면 데이터 미제작) 이야기는 `true`.
+목록·상세엔 보이지만 재생은 막아야 하는 이야기용 ([catalog-only-stories.md](../request/backend/catalog-only-stories.md)).
+컬럼을 따로 두지 않고 매 조회마다 계산한다 — 장면이 실제로 생기면 자동으로 `false`가 된다.
 
 #### `GET /api/stories/{storyId}?childId={id}` 🟡 · B-3
 
@@ -428,7 +433,8 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
   "characters": [
     { "name": "ch_banggui_daughter_in_law", "displayName": "방귀쟁이 며느리", "imageUrl": "..." }
   ],
-  "existingSession": { "sessionId": "uuid", "currentSceneOrder": 5, "status": "in_progress" }
+  "existingSession": { "sessionId": "uuid", "currentSceneOrder": 5, "status": "in_progress" },
+  "comingSoon": false
 }
 ```
 

@@ -49,7 +49,7 @@ public class StoryServiceImpl implements StoryService {
 
         List<StorySummaryResponse> stories = published.stream()
                 .filter(story -> topic == null || (story.getTopics() != null && story.getTopics().contains(topic)))
-                .map(story -> StorySummaryResponse.of(story, sessionStatusFor(child, story)))
+                .map(story -> StorySummaryResponse.of(story, sessionStatusFor(child, story), !storySceneRepository.existsByStory(story)))
                 .toList();
 
         return new StoriesResponse(stories, availableTopics);
@@ -77,7 +77,7 @@ public class StoryServiceImpl implements StoryService {
                 .map(ExistingSessionResponse::of)
                 .orElse(null);
 
-        return StoryDetailResponse.of(story, intro, characters, existingSession);
+        return StoryDetailResponse.of(story, intro, characters, existingSession, scenes.isEmpty());
     }
 
     private List<CharacterResponse> distinctCharacters(List<StoryScene> scenes) {

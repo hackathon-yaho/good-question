@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** character-utterance-vocabulary-v2.md, D-58 — 후보 단어는 실제 확정 대사에 있을 때만 추천된다. */
+/** character-utterance-vocabulary-v2.md, D-62 — 후보 단어는 실제 확정 대사에 있을 때만 추천된다. */
 class SceneVocabularyTest {
 
     @Test

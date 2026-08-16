@@ -1716,7 +1716,11 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 
 ---
 
-### D-58 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
+### D-62 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
+
+> 번호 정정: 이 결정은 원래 D-58로 기록됐으나, 병합 시점 차이로 다른 세션의 D-58(홈
+> "이어하기" 버그 수정, 바로 위)과 번호가 겹쳐 D-62로 재번호했다. 코드 주석
+> (`SceneVocabulary.java`, `SceneVocabularyTest.java`)도 함께 맞췄다.
 
 **배경**: v1(`scene-vocabulary-recommendation.md`)은 `recommendedWord`를 장면 번호만 보고
 항상 하나씩 내려줬다 — 캐릭터가 실제로 그 단어를 말했는지와 무관했다. AI팀이 v2
@@ -1832,6 +1836,46 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 
 **변경 파일**: `ProgressJudge.java`(`MISSION_MAX_TURNS_AFTER_REVEAL` 공개),
 `MessageServiceImpl.java`.
+
+---
+
+### D-61 · comingSoon 필드 + 준비 중 이야기 3편 시드 (catalog-only-stories.md)
+
+**배경**: 프론트가 이야기 목록·상세 화면 검증용으로 새 이야기 3편(해님과 달님·콩쥐와
+팥쥐·흥부와 놀부)을 목(mock) 카탈로그에 먼저 만들어 뒀고, AI 파트가 표지·캐릭터 일러스트
+(`frontend/public/story-assets/generated/folktales-v1/`)까지 실제로 넘겼다. 다만 대화
+장면(`story_scenes`)은 아직 없다 — 사용자가 "이 이미지에 맞는 샘플 동화를 추가해달라"고
+요청한 것도 **재생 가능한 대화까지**가 아니라 목록·상세에 뜨는 카탈로그 항목이었다.
+[request/backend/catalog-only-stories.md](request/backend/catalog-only-stories.md)가 이
+상태(장면 없이 노출만 되는 이야기)를 위한 계약을 이미 정의해 두고 있었다.
+
+**구현**:
+1. `GET /api/stories`·`GET /api/stories/{storyId}` 응답에 `comingSoon`(boolean, 항상 포함)을
+   추가했다. 문서가 권장한 **옵션 B**(컬럼 추가 없이 `story_scenes` 개수로 계산)를 그대로
+   따랐다 — `StorySceneRepository.existsByStory(story)`가 없으면 `comingSoon: true`.
+   컬럼을 안 만들어서 나중에 실제 장면이 생기면 이 메서드를 다시 안 건드려도 자동으로
+   재생 가능 상태가 된다.
+2. `ContentSeeder`에 `seedComingSoonStory(...)`를 추가해 3편을 시드한다 — 제목·소개
+   문구·주제는 프론트 목 카탈로그(`story-catalog.ts`)가 이미 검토해 둔 값을 그대로
+   옮겼고, `coverImageUrl`은 AI 파트가 넘긴 실제 자산 경로를 채웠다. 장면은 만들지
+   않는다(요청 범위 밖 — "콘텐츠가 정해지면 별도로 전달").
+3. **버그 하나 잡음**: `ContentSeeder.run()`이 원래 "방귀 뀌는 며느리 이미 있으면 즉시
+   return" 구조라, 그 뒤에 이어 붙인 3편 시드 호출이 재기동 시(이미 방귀 므느리가 있는
+   상태) 통째로 스킵됐다. `run()`에서 `seedBanggui()`를 호출하고 그 뒤에 독립적으로
+   3편을 시드하도록 구조를 바꿨다 — 각 `seedComingSoonStory` 호출은 자기 제목으로
+   따로 중복을 막으므로 어느 조합으로 재기동해도 안전하다.
+
+**검증**: 로컬 서버 재기동 로그로 4편(방귀 므느리 스킵 + 신규 3편 시드) 확인, curl로
+`GET /api/stories` 응답 4건 전부(`comingSoon` 값 포함) 확인 — 방귀 므느리만 `false`,
+나머지 3편은 `true`. `availableTopics`에 새 주제 6개(가족·용기·성실함·친절·나눔·정직)가
+기존 3개와 합쳐 9개로 뜨는 것 확인. 상세 조회(흥부와 놀부)로 `comingSoon: true`,
+`characters: []`(장면이 없어 자동으로 빈 배열), `intro: null` 확인. 서버를 한 번 더
+재기동해 4편 모두 "이미 존재 — 시드를 건너뜁니다" 로그만 찍히고 중복 삽입 없음을 확인.
+전체 단위 테스트 130/130 통과.
+
+**변경 파일**: `story/repository/StorySceneRepository.java`(`existsByStory`),
+`story/dto/response/StorySummaryResponse.java`, `story/dto/response/StoryDetailResponse.java`,
+`story/service/StoryServiceImpl.java`, `story/ContentSeeder.java`.
 
 ---
 
