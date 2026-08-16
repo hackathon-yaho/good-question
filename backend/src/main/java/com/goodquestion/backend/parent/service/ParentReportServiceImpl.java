@@ -26,11 +26,18 @@ import com.goodquestion.backend.parent.entity.ReportVocabulary;
 import com.goodquestion.backend.parent.report.ChildUtterance;
 import com.goodquestion.backend.parent.report.QuestionKind;
 import com.goodquestion.backend.parent.report.ReportGenerator;
+import com.goodquestion.backend.parent.report.ai.CompetencyAiCard;
+import com.goodquestion.backend.parent.report.ai.ReportAiClient;
+import com.goodquestion.backend.parent.report.ai.ReportAiRequest;
+import com.goodquestion.backend.parent.report.ai.ReportAiResult;
+import com.goodquestion.backend.parent.report.ai.ReportUtterance;
 import com.goodquestion.backend.parent.repository.ReportRepository;
 import com.goodquestion.backend.session.entity.StorySession;
 import com.goodquestion.backend.session.enums.SessionStatus;
 import com.goodquestion.backend.session.repository.StorySessionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +52,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /** O-01~O-05, work-items.md 12장. 계산 로직은 {@link ReportGenerator}에 순수 함수로 분리했다. */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ParentReportServiceImpl implements ParentReportService {
@@ -59,6 +67,7 @@ public class ParentReportServiceImpl implements ParentReportService {
     private final MessageRepository messageRepository;
     private final UtteranceAnalysisRepository utteranceAnalysisRepository;
     private final ReportRepository reportRepository;
+    private final ReportAiClient reportAiClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -185,6 +194,61 @@ public class ParentReportServiceImpl implements ParentReportService {
         String summary = ReportGenerator.summaryOf(texts.size());
 
         reportRepository.save(Report.create(session, summary, vocabulary, competencies, elementCounts, representative, guide));
+    }
+
+    /**
+     * parent-report-ai-generation.md. generateReportIfAbsent()가 이미 만든 규칙 기반 리포트를
+     * 전제로 한다 — 없으면(비정상 호출 순서) 조용히 돌아간다. AI가 성공하면 그 행을 덮어쓰고,
+     * 실패하면(재시도 소진·스키마 위반 등 전부 reportAiClient가 failure()로 묶는다) 아무것도
+     * 하지 않는다 — 규칙 기반 버전이 그대로 안전망으로 남는다.
+     */
+    @Override
+    @Async
+    @Transactional
+    public void enhanceReportWithAi(UUID sessionId) {
+        StorySession session = storySessionRepository.findById(sessionId).orElse(null);
+        if (session == null) return;
+        Report report = reportRepository.findBySession(session).orElse(null);
+        if (report == null) return;
+
+        List<Message> childMessages = messageRepository.findAllBySessionAndSpeakerType(session, SpeakerType.CHILD);
+        List<ReportUtterance> utterances = new ArrayList<>();
+        List<String> allDetectedTypes = new ArrayList<>();
+        for (int i = 0; i < childMessages.size(); i++) {
+            Message message = childMessages.get(i);
+            List<String> types = utteranceAnalysisRepository.findByMessage(message)
+                    .map(a -> a.getDetectedElements().stream().map(DetectedElement::type).toList())
+                    .orElse(List.of());
+            allDetectedTypes.addAll(types);
+            utterances.add(new ReportUtterance(i, message.getText(),
+                    "장면 " + (message.getScene().getSceneOrder() / 2), types));
+        }
+
+        ReportAiRequest request = new ReportAiRequest(
+                session.getStory().getTitle(), utterances, ReportGenerator.competencyHintsOf(allDetectedTypes));
+        ReportAiResult result = reportAiClient.generate(request);
+        if (!result.success()) {
+            log.info("[ParentReportService] AI 리포트 생성 실패 — 규칙 기반 리포트 유지 (session={})", sessionId);
+            return;
+        }
+
+        List<CompetencyCard> competencies = result.competencies().stream()
+                .map(card -> toCompetencyCard(card, utterances))
+                .toList();
+        RepresentativeUtterance representative = toRepresentative(result, utterances);
+        HomeGuide guide = new HomeGuide(report.getGuide().intro(), result.storyQuestions(), result.dailyQuestions());
+
+        report.updateFromAi(competencies, representative, guide);
+    }
+
+    private CompetencyCard toCompetencyCard(CompetencyAiCard card, List<ReportUtterance> utterances) {
+        String evidence = card.evidenceIndex() == null ? null : utterances.get(card.evidenceIndex()).text();
+        return new CompetencyCard(card.name(), card.feature(), evidence, card.strength(), card.next());
+    }
+
+    private RepresentativeUtterance toRepresentative(ReportAiResult result, List<ReportUtterance> utterances) {
+        ReportUtterance picked = utterances.get(result.representativeIndex());
+        return new RepresentativeUtterance(picked.text(), picked.sceneLabel(), result.representativeReason());
     }
 
     /** 완료된 세션은 completedAt, 진행 중이면 lastActivityAt — mock-parent.ts와 같은 기준. */

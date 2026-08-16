@@ -4,6 +4,7 @@ import com.goodquestion.backend.parent.entity.CompetencyCard;
 import com.goodquestion.backend.parent.entity.ElementCount;
 import com.goodquestion.backend.parent.entity.RepresentativeUtterance;
 import com.goodquestion.backend.parent.entity.ReportVocabulary;
+import com.goodquestion.backend.parent.report.ai.CompetencyHint;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -72,6 +73,33 @@ class ReportGeneratorTest {
     @Test
     void 항상_5개_역량_전부를_반환한다() {
         assertThat(ReportGenerator.competenciesOf(List.of(), List.of())).hasSize(5);
+    }
+
+    // ── competencyHintsOf ────────────────────────────────────────────
+
+    @Test
+    void 사고요소가_감지됐으면_matched가_true다() {
+        List<CompetencyHint> hints = ReportGenerator.competencyHintsOf(List.of("PERSPECTIVE"));
+
+        CompetencyHint perspective = hints.stream()
+                .filter(h -> h.name().equals("관점과 공감")).findFirst().orElseThrow();
+
+        assertThat(perspective.matched()).isTrue();
+    }
+
+    @Test
+    void 사고요소가_없으면_matched가_false다() {
+        List<CompetencyHint> hints = ReportGenerator.competencyHintsOf(List.of());
+
+        CompetencyHint perspective = hints.stream()
+                .filter(h -> h.name().equals("관점과 공감")).findFirst().orElseThrow();
+
+        assertThat(perspective.matched()).isFalse();
+    }
+
+    @Test
+    void 항상_5개_카테고리_전부를_반환한다() {
+        assertThat(ReportGenerator.competencyHintsOf(List.of())).hasSize(5);
     }
 
     // ── elementCountsOf ──────────────────────────────────────────────

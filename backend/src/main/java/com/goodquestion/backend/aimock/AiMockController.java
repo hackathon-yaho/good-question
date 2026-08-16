@@ -5,8 +5,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * AI 서버 mock 스텁 (B-11, work-items.md 7장). 실제 AI 서버가 없는 동안 백엔드 전체 흐름을
@@ -28,10 +31,25 @@ public class AiMockController {
     /** low-engagement-turn-protection.md가 정의한, AI 서버가 SHORT_RESPONSE+SHORT로 보정하는 키워드. */
     private static final List<String> ZERO_INFO_REJECTION_KEYWORDS = List.of("싫어", "몰라", "모르겠어", "닥쳐", "닥처");
 
+    /**
+     * 장면7(미션1) 요소별 감지 키워드. 한 발화에 여러 키워드가 같이 있으면 그만큼
+     * detectedElements가 여러 개 나온다 — missionProgress.satisfiedIndexes가 한 턴에
+     * 1개만 채워지는 경우와 여러 개가 한꺼번에 채워지는 경우를 둘 다 mock으로 재현하기 위함.
+     */
+    private static final List<ElementKeyword> ELEMENT_KEYWORDS = List.of(
+            new ElementKeyword("SOLUTION", "방귀"),
+            new ElementKeyword("SOLUTION", "장대"),
+            new ElementKeyword("REASON", "세게"),
+            new ElementKeyword("REQUEST", "부탁"),
+            new ElementKeyword("RESULT", "떨어질")
+    );
+
+    private record ElementKeyword(String type, String keyword) {
+    }
+
     @PostMapping("/analyze")
     public Map<String, Object> analyze(@RequestBody(required = false) Map<String, Object> request) {
         String childUtterance = request == null ? "" : String.valueOf(request.getOrDefault("childUtterance", ""));
-        boolean looksLikeProposal = childUtterance.contains("방귀") || childUtterance.contains("장대");
         boolean looksLikeRejection = ZERO_INFO_REJECTION_KEYWORDS.stream().anyMatch(childUtterance::contains);
 
         if (looksLikeRejection) {
@@ -43,13 +61,16 @@ public class AiMockController {
             );
         }
 
-        if (looksLikeProposal) {
+        List<Map<String, Object>> detected = ELEMENT_KEYWORDS.stream()
+                .filter(ek -> childUtterance.contains(ek.keyword()))
+                .map(ek -> Map.<String, Object>of("type", ek.type(), "evidence", ek.keyword()))
+                .toList();
+
+        if (!detected.isEmpty()) {
             return Map.of(
-                    "childIntent", "SOLUTION",
-                    "mainPoint", "방귀로 배를 떨어뜨리자는 제안이다",
-                    "detectedElements", List.of(
-                            Map.of("type", "SOLUTION", "evidence", "방귀")
-                    ),
+                    "childIntent", intentFor(detected),
+                    "mainPoint", "미션 관련 요소가 감지됐다",
+                    "detectedElements", detected,
                     "utteranceValidity", "VALID"
             );
         }
@@ -64,8 +85,48 @@ public class AiMockController {
         );
     }
 
+    private String intentFor(List<Map<String, Object>> detected) {
+        Set<Object> types = detected.stream().map(m -> m.get("type")).collect(Collectors.toSet());
+        if (types.contains("SOLUTION")) return "SOLUTION";
+        if (types.contains("REQUEST")) return "REQUEST";
+        if (types.contains("REASON")) return "REASONING";
+        return "OPINION";
+    }
+
     @PostMapping("/respond")
     public Map<String, Object> respond(@RequestBody(required = false) Map<String, Object> request) {
         return Map.of("text", "그랬구나, 네 말을 들으니 마음이 좀 놓이는구나.", "characterState", "MOVED");
+    }
+
+    /** parent-report-ai-generation.md. matched 힌트대로 evidenceIndex를 채워 실제 스키마를 흉내낸다. */
+    @SuppressWarnings("unchecked")
+    @PostMapping("/report")
+    public Map<String, Object> report(@RequestBody(required = false) Map<String, Object> request) {
+        List<Map<String, Object>> utterances = request == null
+                ? List.of() : (List<Map<String, Object>>) request.getOrDefault("utterances", List.of());
+        List<Map<String, Object>> hints = request == null
+                ? List.of() : (List<Map<String, Object>>) request.getOrDefault("competencyHints", List.of());
+
+        List<Map<String, Object>> competencies = hints.stream()
+                .map(hint -> {
+                    String name = String.valueOf(hint.get("name"));
+                    boolean matched = Boolean.TRUE.equals(hint.get("matched"));
+                    Map<String, Object> card = new HashMap<>();
+                    card.put("name", name);
+                    card.put("feature", "(mock) " + name + " 관련 발화가 " + (matched ? "보였어요" : "아직 안 보였어요"));
+                    card.put("evidenceIndex", matched && !utterances.isEmpty() ? 0 : null);
+                    card.put("strength", "(mock) 잘한 점 문구");
+                    card.put("next", "(mock) 다음 질문 제안");
+                    return card;
+                })
+                .toList();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("competencies", competencies);
+        response.put("representativeIndex", utterances.isEmpty() ? null : 0);
+        response.put("representativeReason", "(mock) 생각과 까닭이 잘 이어진 발화라서 골랐어요");
+        response.put("storyQuestions", List.of("(mock) 이야기 질문 1", "(mock) 이야기 질문 2"));
+        response.put("dailyQuestions", List.of("(mock) 일상 질문 1", "(mock) 일상 질문 2"));
+        return response;
     }
 }

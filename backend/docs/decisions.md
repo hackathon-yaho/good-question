@@ -1529,6 +1529,104 @@ D-48이 "완료작을 이어간다는 개념이 없다"는 이유로 `STOPPED`�
 
 ---
 
+### D-54 · 미션1 체크리스트 2번 항목이 1번과 같은 SOLUTION이라 절대 안 채워지던 문제
+
+PRD 7.6 미션1 확인 항목 2번("주변에 있는 마을 사람들과 시아버지는 어디로 피해야 할지")이
+1번("무엇을 사용할 것인지")과 똑같이 `SOLUTION`으로 매핑돼 있었다. 장면7의
+`element_criteria`는 타입별로 **한 번만** 정의돼 있고(SOLUTION="배를 떨어뜨릴 실행 방법"
+하나만), `MissionProgressCalculator`는 "이번 턴에 감지된 타입 종류마다 아직 안 채워진
+같은 타입 슬롯을 하나 채운다"는 규칙이라 — 아이가 SOLUTION을 언급한 **서로 다른 두 턴**이
+있어야만 두 슬롯이 다 채워진다. 그런데 element_criteria의 SOLUTION 정의 자체가 "실행
+방법"으로 뭉뚱그려져 있어, "무엇을 쓸지"와 "어디로 피해야 할지"를 같은 턴에 한 번에
+말하면 SOLUTION 하나로만 잡히고, 둘을 따로 말해야 하는데 그럴 이유를 아이가 알 방법이 없다.
+
+**바꾼 것**: 2번 항목의 element를 장면7에 이미 있는 `REASON`("그 방법이 가능하다고 보는
+까닭")으로 바꾸고, 라벨도 "그 방법이 왜 가능한지"로 정정했다. PRD 7.6 원문과 다르다 —
+`docs/product/prd.md`의 확인 항목 목록도 이 정정을 반영해 갱신했다(주최측 원문이 아니라
+팀이 확인 항목의 element 매핑을 창작한 부분이었다는 건 이전부터 그랬다 — 코드 주석 참고).
+`backend/docs/api-spec.md`의 예시 JSON도 함께 갱신.
+
+**대안으로 검토했다가 버린 것**:
+- REASON 매핑 없이 라벨만 유지 → element_criteria가 SOLUTION만 정의하므로 AI가 절대
+  REASON을 안 냄. 두 번째 슬롯이 영원히 안 채워지는 건 똑같다.
+- 새 ThoughtElement 타입 추가 → 8개로 고정된 스키마 전체(PRD 6.3)를 건드리는 큰 변경이라
+  이번 스코프를 벗어난다.
+
+**검증**: 단위 테스트(`MissionsTest`, `ProgressJudgeTest` 등) 전부 통과 — 이 항목을 직접
+검증하는 테스트는 없어서(체크리스트 값 자체가 콘텐츠 상수) 로컬 mock AI로 장면7까지 진행해
+`missionTriggered.checklist[1]`이 `{"label":"그 방법이 왜 가능한지","element":"REASON"}`로
+내려오는 것을 실호출로 확인.
+
+**추가 검증 (satisfiedIndexes 채워지는 패턴)**: `AiMockController`에 요소별 키워드
+매칭(방귀→SOLUTION, 세게→REASON, 부탁→REQUEST, 떨어질→RESULT)을 추가해 한 발화에 여러
+키워드가 있으면 detectedElements도 여러 개 나오도록 확장했다. 이걸로 장면7에서 (1) 한 턴에
+1개 요소만 말한 경우 `satisfiedIndexes`가 정확히 1개만 늘어나는 것("부탁을 해야겠어요" →
+`[0]`→`[0,2]`), (2) 한 턴에 REASON+RESULT를 동시에 말한 경우 2개가 한꺼번에 늘어나는 것
+(`[0,2]`→`[0,2,1,3]`)을 실호출로 확인. 같은 턴에 SOLUTION을 다시 언급해도(체크리스트에
+SOLUTION 슬롯이 이제 1개뿐이라) 중복으로 안 채워지는 것도 함께 확인 — D-54 수정이 실제로
+효과가 있음을 보여준다.
+
+**변경 파일**: `Missions.java`, `docs/product/prd.md`, `backend/docs/api-spec.md`,
+`AiMockController.java`(검증용 확장).
+
+---
+
+### D-55 · 보호자 리포트 AI 고도화 백엔드 구현 (parent-report-ai-generation.md)
+
+설계는 그릴링으로 [parent-report-ai-generation.md](../../docs/request/ai/parent-report-ai-generation.md)에
+확정해뒀고, AI Worker의 실제 `/report` 엔드포인트가 아직 없어 로컬 mock(`AiMockController`)에
+같은 스키마로 구현해 백엔드 쪽을 먼저 완성했다.
+
+**구현**:
+- `parent/report/ai` 패키지 신규 — `ReportAiClient`/`ReportAiClientImpl`(RestClient, 응답
+  60초·재시도 없음), `ReportAiRequest`/`ReportUtterance`/`CompetencyHint`(요청),
+  `ReportAiResult`/`CompetencyAiCard`(응답). `AiRespondClientImpl`과 같은 패턴 — 실패는
+  전부 `ReportAiResult.failure()`로 묶는다.
+- `ReportAiClientImpl.isWellFormed()`가 완료조건에 적힌 제약을 전부 검증한다: `storyQuestions`·
+  `dailyQuestions` 정확히 2개, `representativeIndex`·`evidenceIndex`가 요청에 보낸 발화 개수
+  범위 안, matched=true인데 `evidenceIndex`가 `null`이면 실패. 검증을 클라이언트에서 끝내
+  서비스 레이어는 index를 그대로 믿고 조회한다.
+- `ReportGenerator.competencyHintsOf()` 신규 — matched 여부 계산은 `competenciesOf()`와 같은
+  판정식을 재사용(사실 판정은 백엔드가 하고 AI에는 힌트로만 준다는 설계 원칙 그대로).
+- `Report.updateFromAi()` 신규 — `summary`·`vocabulary`·`elementCounts`는 안 건드리고
+  `competencies`·`representative`·`guide`만 덮어쓴다.
+- `ParentReportServiceImpl.enhanceReportWithAi()` — 세션의 아이 발화 전체를 index 순으로
+  `ReportUtterance`로 조립하고, AI가 성공하면 `evidenceIndex`·`representativeIndex`로 원문을
+  백엔드가 직접 채워 넣는다(AI가 발화 원문을 직접 쓰지 않는다는 설계 원칙).
+
+**막힌 지점과 해결 — 트랜잭션 커밋 전 비동기 호출 경쟁 조건**: 처음엔
+`ActivityServiceImpl.submitRetelling()`이 `generateReportIfAbsent()` 바로 뒤에
+`parentReportService.enhanceReportWithAi(sessionId)`(`@Async`)를 직접 불렀는데, `@Async`는
+호출 즉시 다른 스레드에서 실행을 시작하는 반면 `submitRetelling()`의 트랜잭션은 메서드가 끝나야
+커밋된다 — 백그라운드 스레드가 방금 저장한 `Report` 행을 아직 못 보고 조용히 리턴할 위험이
+있었다. `ReportSessionCompletedEvent` + `ReportEnhancementListener`
+(`@TransactionalEventListener(phase = AFTER_COMMIT)`)로 바꿔, 커밋이 끝난 뒤에만 이벤트가
+발행되도록 했다. 리스너는 반드시 **다른 빈**(`ParentReportServiceImpl`)의 `@Async` 메서드를
+호출해야 한다 — 같은 클래스 안에서 자기 자신의 `@Async`·`@Transactional` 메서드를 부르면
+프록시를 안 거쳐 두 어노테이션이 조용히 무시된다(Spring 자기호출 함정).
+`GoodQuestionApplication`에 `@EnableAsync` 추가.
+
+**검증**: 로컬 mock으로 이야기 1편을 처음부터 끝까지(장면1~9 + 활동 + 재구성 발화 제출)
+완주 — `submitRetelling` 응답은 그대로 즉시 오고, 곧바로 `GET /parent/reports/{id}`를 폴링해
+AI 버전으로 덮어써진 것을 확인. 5개 역량 카드의 `evidence`가 카테고리마다 다른 발화를 가리키는
+것(matched=false 2개는 `null`, 나머지 3개는 실제 발화 원문)까지 확인 — 배포에서 봤던 "5개 카드
+전부 동일 문장" 문제가 해소됐다. `AiMockController`의 `/report`를 일부러 예외를 던지게 바꿔
+재기동한 뒤 같은 시나리오를 다시 돌려, 규칙 기반 리포트(하드코딩된 질문·재사용 evidence)가
+그대로 유지되는 것도 확인 — 완료조건 3번(AI 실패 시 규칙 기반 유지). 단위 테스트
+`ReportAiClientImplTest`(6건), `ReportGeneratorTest`(신규 3건) 추가, 전체 120/120 통과.
+
+**아직 안 한 것**: 실제 AI Worker `/report`는 AI팀 몫(request 문서 완료조건 1). "다른 이야기에도
+하드코딩 없이 생성"(완료조건 5)은 지금 시스템에 이야기가 1편뿐이라 직접 검증은 못 했다 —
+다만 `storyTitle`을 매 요청에 실어 보내고 백엔드 코드 어디에도 이야기별 분기가 없어 구조적으로는
+막혀있지 않다.
+
+**변경 파일**: `parent/report/ai/*`(신규), `Report.java`, `ReportGenerator.java`,
+`ParentReportService(Impl).java`, `ReportSessionCompletedEvent.java`(신규),
+`ReportEnhancementListener.java`(신규), `ActivityServiceImpl.java`, `GoodQuestionApplication.java`,
+`application.yml`, `AiMockController.java`(검증용 `/report` mock).
+
+---
+
 ## 2. 문서 권고를 따르지 않은 것
 
 나중에 "왜 명세와 다르지?"가 나올 지점입니다.

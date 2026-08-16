@@ -13,6 +13,7 @@ import com.goodquestion.backend.common.global.ErrorCode;
 import com.goodquestion.backend.common.global.exception.BusinessException;
 import com.goodquestion.backend.message.enums.SpeakerType;
 import com.goodquestion.backend.message.repository.MessageRepository;
+import com.goodquestion.backend.parent.report.ReportSessionCompletedEvent;
 import com.goodquestion.backend.parent.service.ParentReportService;
 import com.goodquestion.backend.session.entity.StorySession;
 import com.goodquestion.backend.session.enums.SessionStatus;
@@ -20,6 +21,7 @@ import com.goodquestion.backend.session.repository.StorySessionRepository;
 import com.goodquestion.backend.story.entity.PostActivityCard;
 import com.goodquestion.backend.story.entity.PostActivityConfig;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +50,7 @@ public class ActivityServiceImpl implements ActivityService {
     private final PostActivityResultRepository postActivityResultRepository;
     private final MessageRepository messageRepository;
     private final ParentReportService parentReportService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -125,6 +128,11 @@ public class ActivityServiceImpl implements ActivityService {
         // O-01~O-05, D-24: 리포트는 완료 시점에 한 번만 생성한다 — 계산 로직이 나중에 바뀌어도
         // 이미 만든 리포트는 그대로 남는다. star_dust와 같은 이유로 별가루 지급 지점에 얹는다.
         parentReportService.generateReportIfAbsent(session);
+        // parent-report-ai-generation.md: 위에서 만든 규칙 기반 리포트를 AI가 백그라운드에서 더
+        // 풍부한 버전으로 덮어쓴다. 이 트랜잭션이 커밋되기 전에 직접 @Async를 호출하면 백그라운드
+        // 스레드가 방금 저장한 리포트를 아직 못 볼 수 있어(커밋 전 조회), 커밋 후에만 실행되는
+        // 이벤트로 넘긴다 — ReportEnhancementListener 참고.
+        eventPublisher.publishEvent(new ReportSessionCompletedEvent(session.getId()));
 
         long childUtteranceCount = messageRepository.countBySessionAndSpeakerType(session, SpeakerType.CHILD);
         long characterCount = messageRepository.findAllBySessionAndSpeakerType(session, SpeakerType.CHARACTER).stream()
