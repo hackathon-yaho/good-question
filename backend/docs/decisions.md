@@ -1717,6 +1717,10 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 
 ### D-62 · recommendedWord를 장면 고정 추천에서 "이번 턴 확정 대사에 실제 포함" 기준으로 변경 (character-utterance-vocabulary-v2)
 
+> **대체됨**: 프론트가 `recommendedWord`를 사용하지 않는 것이 확인되어, 현재 응답 정본은
+> [D-64](#d-64--프론트-기존-highlightwords로-현재-캐릭터-대사-기반-단어-노출을-통일한다)다.
+> 아래 내용은 2026-08-16 당시의 변경 이력으로만 남긴다.
+
 > 번호 정정: 이 결정은 원래 D-58로 기록됐으나, 병합 시점 차이로 다른 세션의 D-58(홈
 > "이어하기" 버그 수정, 바로 위)과 번호가 겹쳐 D-62로 재번호했다. 코드 주석
 > (`SceneVocabulary.java`, `SceneVocabularyTest.java`)도 함께 맞췄다.
@@ -1741,6 +1745,25 @@ resumable 여부 필터"(order-then-filter) 순서로 이 문제를 피해갔는
 
 **변경 파일**: `story/constant/SceneVocabulary.java`, `message/service/MessageServiceImpl.java`,
 `story/constant/SceneVocabularyTest.java`(신규).
+
+---
+
+### D-64 · 프론트 기존 `highlightWords`로 현재 캐릭터 대사 기반 단어 노출을 통일한다
+
+**결정**: 프론트가 이미 `highlightWords`로 밑줄·단어 팝업·단어장 저장을 구현했다. 따라서
+`recommendedWord` 카드 API를 추가하지 않고 제거한다. 프론트 코드를 다시 만들지 않는다.
+
+**응답 계약**:
+
+- `highlightWords`는 이번 응답의 `characterMessage`에 **연속 문자열로 실제 포함된** 8세 이하
+  후보를 최대 하나만 담는다.
+- 후보가 없으면 `[]`다. 아이 발화·이전 턴·장면 번호만으로 단어를 만들지 않는다.
+- `recommendedWord`, `SceneVocabulary`, `SceneVocabularyWord`와 관련 DTO는 응답·코드에서 제거한다.
+- LLM 호출·프롬프트·DB 스키마·프론트 타입 변경은 없다.
+
+**구현·검증**: `HighlightWords.findInCharacterText(...)`가 현재 대사만 검사한다.
+`HighlightWordsTest`는 포함 시 한 개 반환, 미포함·null 시 빈 배열을 검증한다. 전체 Gradle 테스트가
+통과했다. 상세 요청은 [현재 캐릭터 대사 기반 `highlightWords` v1](../../docs/request/backend/highlight-words-current-character-v1.md)을 따른다.
 
 ---
 

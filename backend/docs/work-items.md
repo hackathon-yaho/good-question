@@ -485,11 +485,12 @@ CLOSING).
 - `sceneIndex`는 D-12와 같은 식(`scene_order / 2`)으로 변환. `isNew`는 저장 후 24시간 기준
 - `contextSentence`는 `POST /api/wordbook` 요청에서 선택 필드로 받아 그대로 저장 (D-22)
 
-**검증**: `POST /api/sessions/{id}/messages`로 대화4 마지막 턴(CLOSING)을 완주해
-`highlightWords: [{"word":"부끄러워", ...}]`가 실제로 응답에 실림을 확인 → 그 값을
+**검증**: `POST /api/sessions/{id}/messages`로 대화4 마지막 턴(CLOSING)을 완주해 현재
+캐릭터 대사에 실제 포함된 후보 하나가 `highlightWords`에만 실림을 확인 → 그 값을
 `POST /api/wordbook`으로 저장 → `GET ...?filter=all/liked/story:{id}` 3가지 전부 확인 →
 `PATCH .../{id}` `{liked:true}` → `filter=liked`에 나타남을 확인. 다른 보호자 토큰으로
-조회·수정 시 403, 없는 `childId`는 404, 잘못된 `filter` 값은 400 확인
+조회·수정 시 403, 없는 `childId`는 404, 잘못된 `filter` 값은 400 확인. `recommendedWord`는
+프론트 미사용이라 제거했고, 현재 계약은 D-64를 따른다.
 
 ### 미구현으로 두는 것
 
