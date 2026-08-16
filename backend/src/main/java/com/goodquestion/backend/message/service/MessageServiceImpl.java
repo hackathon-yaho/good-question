@@ -50,6 +50,7 @@ import com.goodquestion.backend.story.entity.Story;
 import com.goodquestion.backend.story.entity.StoryScene;
 import com.goodquestion.backend.story.repository.StorySceneRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +64,7 @@ import java.util.UUID;
  * 한 요청 안에서 수행한다 (api.md 3.5 ②). 순수 판단 로직은 session/engine 패키지에 분리해뒀고,
  * 여기서는 그 결과를 세션·메시지 상태에 반영하는 조립만 한다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MessageServiceImpl implements MessageService {
@@ -105,6 +107,9 @@ public class MessageServiceImpl implements MessageService {
 
         // ① 발화 분석 (M-35, B-09) — 실패하면 B-12 폴백(빈 분석)으로 계속 진행한다.
         AnalyzeAiResult analysis = aiAnalyzeClient.analyze(buildAnalyzeRequest(scene, previousCharacterMessage, request.text()));
+        if (!analysis.success()) {
+            log.warn("[MessageService] /analyze 실패로 빈 분석 폴백 적용 (session={}, scene={})", session.getId(), scene.getId());
+        }
 
         // ② 서버 후처리 (M-36)
         List<DetectedElement> validatedElements = AnalysisPostProcessor.process(analysis.detectedElements(), request.text());
@@ -324,6 +329,8 @@ public class MessageServiceImpl implements MessageService {
 
         RespondAiResult respondResult = aiRespondClient.respond(respondRequest);
         if (!respondResult.success()) {
+            log.warn("[MessageService] /respond 실패로 character_closing 폴백 적용 (session={}, scene={}, mode={})",
+                    session.getId(), scene.getId(), decision.mode());
             // B-12: /respond 실패 → character_closing으로 장면을 종료한다. 사유 코드는 규칙엔진이 낸 것이 아니라 없음(null).
             String fallbackText = NameSubstitutor.substitute(scene.getCharacterClosing(), session.getChild().getName());
             return new CharacterTurnResult(ResponseMode.CLOSING, fallbackText, true, null, null, null);

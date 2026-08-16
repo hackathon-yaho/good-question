@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.util.List;
@@ -54,8 +55,13 @@ public class AiAnalyzeClientImpl implements AiAnalyzeClient {
                     body.detectedElements() == null ? List.of() : body.detectedElements(),
                     parseValidity(body.utteranceValidity())
             );
+        } catch (RestClientResponseException e) {
+            log.warn("[AiAnalyzeClient] /analyze 호출 실패(status={}), 빈 분석으로 폴백합니다. body={}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            return AnalyzeAiResult.failure();
         } catch (Exception e) {
-            log.warn("[AiAnalyzeClient] /analyze 호출 실패, 빈 분석으로 폴백합니다: {}", e.getMessage());
+            log.warn("[AiAnalyzeClient] /analyze 호출 실패({}), 빈 분석으로 폴백합니다: {}",
+                    e.getClass().getSimpleName(), e.getMessage());
             return AnalyzeAiResult.failure();
         }
     }

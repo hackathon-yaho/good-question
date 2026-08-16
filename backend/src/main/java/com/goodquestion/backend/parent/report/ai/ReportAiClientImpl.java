@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.util.List;
@@ -51,8 +52,13 @@ public class ReportAiClientImpl implements ReportAiClient {
             }
             return new ReportAiResult(true, body.competencies(), body.representativeIndex(),
                     body.representativeReason(), body.storyQuestions(), body.dailyQuestions());
+        } catch (RestClientResponseException e) {
+            log.warn("[ReportAiClient] /report 호출 실패(status={}), 기존 규칙 기반 리포트를 유지합니다. body={}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            return ReportAiResult.failure();
         } catch (Exception e) {
-            log.warn("[ReportAiClient] /report 호출 실패, 기존 규칙 기반 리포트를 유지합니다: {}", e.getMessage());
+            log.warn("[ReportAiClient] /report 호출 실패({}), 기존 규칙 기반 리포트를 유지합니다: {}",
+                    e.getClass().getSimpleName(), e.getMessage());
             return ReportAiResult.failure();
         }
     }

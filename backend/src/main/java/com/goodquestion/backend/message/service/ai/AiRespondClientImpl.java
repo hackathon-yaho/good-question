@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 
@@ -43,11 +44,15 @@ public class AiRespondClientImpl implements AiRespondClient {
                     .body(RespondAiResponseBody.class);
 
             if (body == null || body.text() == null || body.text().isBlank()) {
+                log.warn("[AiRespondClient] /respond 응답이 비어 있어 실패로 처리합니다: {}", body);
                 return RespondAiResult.failure();
             }
             return new RespondAiResult(true, body.text(), parseCharacterState(body.characterState()));
+        } catch (RestClientResponseException e) {
+            log.warn("[AiRespondClient] /respond 호출 실패(status={}): {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return RespondAiResult.failure();
         } catch (Exception e) {
-            log.warn("[AiRespondClient] /respond 호출 실패: {}", e.getMessage());
+            log.warn("[AiRespondClient] /respond 호출 실패({}): {}", e.getClass().getSimpleName(), e.getMessage());
             return RespondAiResult.failure();
         }
     }
