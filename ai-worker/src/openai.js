@@ -21,8 +21,16 @@ class NonRetryableModelError extends Error {
   }
 }
 
-const MAX_ATTEMPTS = 3;
-const RETRY_BACKOFF_MS = [100, 200];
+// The backend's HTTP deadline is 10 seconds. Keep one second for the Worker
+// to return a structured failure before that connection is cancelled.
+const MAX_DIALOGUE_ATTEMPTS = 10;
+const DIALOGUE_DEADLINE_MS = 9_000;
+
+function retryBackoffMs(attempt) {
+  // Fast transient failures (429/5xx/invalid model JSON) should be retried
+  // promptly, but never in a tight loop.
+  return Math.min(attempt * 50, 250);
+}
 
 const analyzeSchema = {
   type: "object",
@@ -140,7 +148,7 @@ function totalTimeout(reasons) {
 
 /**
  * Calls the Responses API without SDK retries. The caller owns the total
- * deadline; this function keeps all three attempts and their backoff inside it.
+ * deadline; this function keeps all attempts and their backoff inside it.
  */
 export async function requestStructuredOutput({
   env,
@@ -152,14 +160,15 @@ export async function requestStructuredOutput({
   fetcher = fetch,
   now = Date.now,
   sleep = delay,
-  totalTimeoutMs = 10_000,
+  totalTimeoutMs = DIALOGUE_DEADLINE_MS,
   attemptTimeoutMs = 3_000,
+  maxAttempts = MAX_DIALOGUE_ATTEMPTS,
 }) {
   const deadline = now() + totalTimeoutMs;
   let lastError = null;
   const attemptReasons = [];
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const remaining = deadline - now();
     if (remaining <= 0) {
       throw totalTimeout(attemptReasons);
@@ -216,10 +225,10 @@ export async function requestStructuredOutput({
       clearTimeout(timeout);
     }
 
-    if (attempt === MAX_ATTEMPTS) {
+    if (attempt === maxAttempts) {
       throw lastError ?? new ModelUpstreamError();
     }
-    const backoff = Math.min(RETRY_BACKOFF_MS[attempt - 1], Math.max(0, deadline - now()));
+    const backoff = Math.min(retryBackoffMs(attempt), Math.max(0, deadline - now()));
     if (backoff <= 0) {
       throw totalTimeout(attemptReasons);
     }
