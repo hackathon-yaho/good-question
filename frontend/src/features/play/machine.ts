@@ -26,30 +26,23 @@ import type {
 } from "@/lib/api/types";
 import { PlayState, toPlayState } from "@/lib/play-state";
 import { isChoiceMission } from "@/features/play/mission2";
+import type { PendingTransition } from "@/features/play/scene-transition-storage";
 
 /**
  * 미션 체크리스트에서 **완료로 표시할 항목 수** — 순차 진행의 포인터다.
  *
- * ── 왜 `accumulatedElements`를 쓰지 않나 ────────────────────────────
- * 처음에는 `accumulatedElements.includes(item.element)`로 판정했다. 두 가지가 어긋난다.
+ * 서버가 `satisfiedIndexes`(D-30)를 주면 그 개수를, 없으면 미션 안에서의 발화 횟수를
+ * 쓴다. 둘 중 **더 많이 진행된 쪽**을 택해 완료 표시가 뒤로 밀리지 않게 한다.
  *
- *   1. **1·2번이 둘 다 `SOLUTION`이다.** 서버가 SOLUTION을 확정하는 순간 두 항목이
- *      동시에 완료된다. 누적 **집합**으로는 "SOLUTION을 두 번 채웠다"를 표현할 수 없다
- *   2. `accumulatedElements`는 **세션 전체** 누적이다. 미션이 뜨기 전 장면에서 이미
- *      모아둔 요소가 미션 1·2번을 미리 완료로 만들어, 아이가 1번을 말해볼 기회 없이
- *      **3번부터 시작**한다. 요구는 "1번부터 순차대로 하나씩"이다
+ * ── `accumulatedElements`로 판정하지 않는 이유 ──────────────────────
+ *   1. 미션 1의 1·2번이 둘 다 `SOLUTION`이다. 누적 **집합**으로는 "SOLUTION을 두 번
+ *      채웠다"를 표현할 수 없어 두 항목이 동시에 완료된다
+ *   2. 세션 전체 누적이라 미션 전 장면에서 모은 요소가 항목을 미리 완료로 만든다
  *
- * 그래서 포인터를 **미션 안에서의 발화 횟수**로만 센다. 미션이 뜨면 0에서 시작한다.
+ * 그래서 백엔드에 항목 단위 신호를 요청했고(D-30), 지금은 그 값을 쓴다.
  *
- * ⚠️ 이건 채점이 아니다. 완료 표시의 뜻은 "맞았어요"가 아니라 **"말했어요"** 이고,
- *    아이가 그 항목에 대해 말한 것은 사실이다. 다만 **약한 답변도 넘어간다** —
- *    그게 서버 신호가 필요한 이유다.
- *    (docs/request/backend/mission-progress.md · `missionProgress.satisfiedIndexes`)
- */
-/**
- * 서버가 `satisfiedIndexes`를 주면 그 값으로, 없으면 턴 카운터로 완료 수를 계산한다.
- * 둘 중 더 큰 쪽을 써서 발화 전에 이미 채운 요소가 있으면 반영한다.
- * (docs/request/backend/mission-progress.md)
+ * ⚠️ 완료 표시의 뜻은 "맞았어요"가 아니라 **"말했어요"** 다. 프론트는 채점하지 않는다.
+ *    (docs/request/backend/mission-progress.md)
  */
 export function missionDoneCount(
   mission: MissionTrigger,
@@ -185,6 +178,19 @@ export type PlayMachineState = {
    * 프론트가 들고 있어도 §0-2에 어긋나지 않는다.
    */
   mission2Choice: number | null;
+  /**
+   * 미션이 끝났는지(완료든 기회 소진이든 — 결과를 안 가린다). 한 번 true가
+   * 되면 장면이 바뀌기 전까진 계속 true다 — 미션이 끝난 뒤에도 대화가 이어지는
+   * 매 턴마다 `missionEnded`가 될 조건을 다시 계산하면 계속 true로 나오므로,
+   * 이 값 자체로 "방금 끝났는지"를 가릴 수 없다. 그건 `missionJustEndedAt`의 몫이다.
+   */
+  missionEnded: boolean;
+  /**
+   * 미션이 **막 끝난 그 턴의** `now`. 그 턴에만 값이 있고, 그 다음 턴부터는 다시
+   * null이다 — `MissionCompleteOverlay`를 띄우는 신호로 PlayScreen이 이 값의
+   * 변화(matches every render는 아니고 매번 다른 값)만 본다.
+   */
+  missionJustEndedAt: string | null;
   highlightWords: HighlightWord[];
   /** 서버가 알려준 캐릭터 표정 상태 (NEUTRAL/HAPPY/WORRIED/SURPRISED/MOVED) */
   characterState: string | null;
@@ -217,6 +223,8 @@ export const initialPlayState: PlayMachineState = {
   missionTurns: 0,
   satisfiedIndexes: [],
   mission2Choice: null,
+  missionEnded: false,
+  missionJustEndedAt: null,
   highlightWords: [],
   characterState: null,
   postActivityReady: false,
@@ -231,6 +239,11 @@ export type PlayAction =
   | { type: "NARRATION_DONE" }
   /** 장면이 넘어갔다. 서버를 다시 읽은 스냅샷으로 갈아탄다. */
   | { type: "SCENE_LOADED"; snapshot: SessionSnapshot }
+  /**
+   * 새로고침 직후, 못 보고 지나칠 뻔한 C-12를 sessionStorage 값으로 되살린다.
+   * (scene-transition-storage.ts)
+   */
+  | { type: "RESTORE_TRANSITION"; data: PendingTransition }
   | { type: "POST_ACTIVITY_READY" }
   | { type: "CHARACTER_TTS_DONE" }
   | { type: "RECORDING_START" }
@@ -240,7 +253,11 @@ export type PlayAction =
   | { type: "DRAFT_CHANGE"; text: string }
   | { type: "RETRY_SPEAKING" }
   | { type: "SUBMIT" }
-  | { type: "SERVER_RESULT"; result: UtteranceResponse }
+  /**
+   * `now`는 **호출부가 넣는다.** 리듀서 안에서 `Date.now()`를 부르면 순수 함수가
+   * 아니게 되고, React가 리듀서를 두 번 부르는 상황(StrictMode)에서 값이 갈린다.
+   */
+  | { type: "SERVER_RESULT"; result: UtteranceResponse; now: string }
   | { type: "MISSION_DISMISS" }
   | { type: "MISSION2_SELECT"; index: number }
   | { type: "STT_FAILED"; code: string }
@@ -307,6 +324,8 @@ function applySnapshot(
     missionBriefOpen: false,
     missionTurns: 0,
     mission2Choice: null,
+    missionEnded: false,
+    missionJustEndedAt: null,
     /**
      * 밑줄 단어는 서버가 `POST /messages` 응답에만 실어 준다. 세션 조회에는 없다.
      * 그래서 장면 첫 대사에는 밑줄이 없고, C-9는 두 번째 턴부터 열린다.
@@ -331,6 +350,30 @@ export function playReducer(
     case "HYDRATE":
     case "SCENE_LOADED":
       return applySnapshot(state, action.snapshot);
+
+    // 새로고침 복원. 값은 전부 서버가 이미 내려줬던 것 — 여기서 새로 판단하는 것은 없다.
+    case "RESTORE_TRANSITION":
+      return {
+        ...state,
+        scene: action.data.scene,
+        status: PlayState.SCENE_TRANSITION,
+        messages: [],
+        characterText: action.data.closingText,
+        characterMessageId: action.data.characterMessageId,
+        accumulatedElements: action.data.accumulatedElements,
+        nextSceneId: action.data.nextSceneId,
+        mission: null,
+        missionBriefOpen: false,
+        missionTurns: 0,
+        mission2Choice: null,
+        missionEnded: false,
+        missionJustEndedAt: null,
+        draftText: "",
+        sttRawText: "",
+        interimText: "",
+        recording: false,
+        errorCode: null,
+      };
 
     case "SENTENCE_NEXT": {
       const last = state.sentenceIndex >= state.sentences.length - 1;
@@ -443,29 +486,55 @@ export function playReducer(
         mission !== null &&
         shouldOpenMissionBrief(mission, missionTurns, satisfied, satisfiedIndexes);
 
+      /**
+       * 미션이 방금 끝났는가 — 완료든 기회 소진이든 가리지 않는다
+       * (`MissionCompleteOverlay` 주석 참조). `state.missionEnded`가 이미
+       * true면 스킵한다 — 안 그러면 미션이 끝난 뒤에도 대화가 이어지는 매 턴마다
+       * "방금 끝났다"고 다시 판정해 오버레이가 계속 뜬다.
+       *
+       * ⚠️ 장면이 닫히는 것도 "끝남"이다. 미션 체크리스트가 다 안 찼어도
+       *    (`briefOpen`이 여전히 true여도) 장면이 이번 턴에 닫히면(`responseMode
+       *    === "closing"`) 미션을 더 이어갈 기회 자체가 없다. 실서버는 미션이
+       *    끝나기 전까지 장면을 안 닫는 별도 턴 예산(D-50)이 있지만 목은 이걸
+       *    흉내내지 않아 장면이 먼저 닫힐 수 있다 — 그 경우도 잡아야 한다.
+       */
+      const sceneClosingNow = result.responseMode === "closing";
+      const missionJustEnded =
+        wasRunning &&
+        mission !== null &&
+        !state.missionEnded &&
+        (!briefOpen || sceneClosingNow);
+      const missionEnded =
+        mission !== null
+          ? state.missionEnded || !briefOpen || sceneClosingNow
+          : false;
+
       const currentSceneId = state.scene?.sceneId ?? "";
       const currentTurn = result.turnCount ?? state.turnCount;
 
       // 1. 아이의 발화 메시지 객체 (turnOrder 추가)
       const childMessage: Message = {
-        id: `child-${Date.now()}`,
+        id: `child-${action.now}`,
         speakerType: "child",
         text: state.draftText,
         sceneId: currentSceneId,
-        turnOrder: currentTurn, // 👈 turnOrder 추가
-        createdAt: new Date().toISOString(),
+        characterDisplayName: state.scene?.characterDisplayName ?? null,
+        turnOrder: currentTurn,
+        createdAt: action.now,
       };
-    
-      // 2. 캐릭터의 응답 메시지 객체 (turnOrder 추가)
+
+      // 2. 캐릭터의 응답 메시지 객체
       const characterMessage: Message = {
-        id: result.messageId ?? `char-${Date.now()}`,
+        id: result.messageId ?? `char-${action.now}`,
         speakerType: "character",
         text: result.characterMessage,
         sceneId: currentSceneId,
-        turnOrder: currentTurn, // 👈 turnOrder 추가
-        createdAt: new Date().toISOString(),
+        characterDisplayName: state.scene?.characterDisplayName ?? null,
+        turnOrder: currentTurn,
+        createdAt: action.now,
       };
-    
+
+
       return {
         ...state,
         status: toPlayState(result.responseMode),
@@ -484,6 +553,8 @@ export function playReducer(
         missionBriefOpen: briefOpen,
         missionTurns,
         satisfiedIndexes,
+        missionEnded,
+        missionJustEndedAt: missionJustEnded ? action.now : null,
         highlightWords: result.highlightWords,
         characterState: result.characterState ?? null,
         nextSceneId: result.nextSceneId,

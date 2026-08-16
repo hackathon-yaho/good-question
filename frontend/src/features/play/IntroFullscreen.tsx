@@ -68,9 +68,9 @@ export function IntroFullscreen({
       </div>
 
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-text/85 to-transparent px-12 pt-32 pb-12">
-        {/* 웨이브 → 라벨 → 자막 → [다시 듣기][다음] 순서다. C-3(얼굴 → 이름 → 대사 →
-            다시 듣기)과 같은 순서로 맞췄다. 라벨과 자막 사이에 버튼을 끼우면
-            "듣고 있다 → 무슨 내용" 흐름이 끊긴다.
+        {/* 웨이브 → 라벨 → 자막 순서다.
+            ⚠️ 문장은 **자동으로 넘어간다.** 낭독이 끝나면 0.5초 뒤 다음 문장으로 가고,
+               마지막 문장에서만 "이야기 시작하기"가 뜬다. 조작을 줄이자는 요구를 따랐다.
             ⚠️ 폭 상한은 래퍼가 아니라 **자막 <p>** 가 갖는다. (`.kid-line` 주석 참조) */}
         <div className="flex flex-col items-center gap-5">
           <ListeningBadge layout="stacked" />

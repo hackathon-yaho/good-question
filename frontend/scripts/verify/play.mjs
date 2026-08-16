@@ -110,26 +110,28 @@ console.log("=== 2-1. 자막 줄 길이 · 배치 (요구 6) ===");
     console.log(
       `  ${m.barTop !== null && m.badgeTop !== null && m.badgeTop > m.barTop ? "OK  " : "FAIL"} 웨이브와 라벨이 다른 행 (웨이브가 위)`
     );
-    // 다시 듣기가 라벨보다 아래
-    console.log(
-      `  ${m.replayTop !== null && m.badgeTop !== null && m.replayTop > m.badgeTop ? "OK  " : "FAIL"} '다시 듣기'가 라벨보다 아래`
-    );
-    // 자막보다도 아래 — C-3(얼굴 → 이름 → 대사 → 다시 듣기)과 같은 순서
-    console.log(
-      `  ${m.replayTop !== null && m.replayTop > m.subtitleTop ? "OK  " : "FAIL"} '다시 듣기'가 자막보다 아래`
-    );
+    /**
+     * ⚠️ '다시 듣기' 검사를 뺐다. C-1이 **자동 진행**으로 바뀌면서 버튼이 사라졌다 —
+     *    문장 낭독이 끝나면 0.5초 뒤 다음 문장으로 가고, 마지막 문장에서만
+     *    "이야기 시작하기"가 뜬다. 조작을 줄이자는 인터뷰 요구를 따른 의도된 변경이다.
+     */
   }
 }
 
-console.log("=== 3. '다음' 버튼으로 문장 진행 ===");
+console.log("=== 3. 자막 자동 진행 ===");
 const firstSentence = await page
   .locator("p.text-intro")
   .first()
   .textContent();
-await step("다음 클릭", () =>
-  page.getByRole("button", { name: "다음" }).click({ timeout: 3000 })
-);
-await page.waitForTimeout(500);
+// 버튼을 누르지 않는다. 낭독이 끝나면 스스로 다음 문장으로 넘어가야 한다.
+await step("자막이 저절로 넘어간다", async () => {
+  await page.waitForFunction(
+    (before) =>
+      document.querySelector("p.text-intro")?.textContent?.trim() !== before,
+    (firstSentence ?? "").trim(),
+    { timeout: 15000 }
+  );
+});
 const secondSentence = await page
   .locator("p.text-intro")
   .first()

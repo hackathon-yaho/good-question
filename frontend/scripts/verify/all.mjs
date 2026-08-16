@@ -9,10 +9,48 @@
  */
 
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * 개발 서버가 **목 모드**인지 확인한다.
+ *
+ * ⚠️ 스위트는 대부분 주소에 `?api=`를 붙이지 않고 개발 서버의 기본 모드를 그대로
+ *    따른다(`wiring`·`speech`만 일부러 backend를 지정한다). 그래서 `.env.local`이
+ *    `backend`인데 백엔드가 안 떠 있으면 **전 스위트가 통째로 빨간불**이 되고,
+ *    그게 코드 문제인지 환경 문제인지 구분할 방법이 없다. 실제로 그렇게 8분을 버렸다.
+ *
+ * 여기서 미리 알려 주면 그 8분을 아낀다. `.env.local`은 개발 서버가 읽는 파일이므로
+ * 대부분의 경우 이 값이 곧 서버 모드다. 환경변수로 덮어쓴 경우까지는 알 수 없어
+ * **중단하지 않고 경고만** 한다.
+ */
+function warnIfNotMockMode() {
+  let raw;
+  try {
+    raw = readFileSync(join(HERE, "..", "..", ".env.local"), "utf8");
+  } catch {
+    return; // 파일이 없으면 기본값(mock)이다
+  }
+  const mode = /^NEXT_PUBLIC_API_MODE\s*=\s*(\S+)/m.exec(raw)?.[1];
+  if (!mode || mode === "mock") return;
+
+  console.log(
+    [
+      "",
+      `⚠️  .env.local의 NEXT_PUBLIC_API_MODE가 "${mode}"입니다.`,
+      "   검증은 목 모드를 전제합니다. 백엔드가 떠 있지 않으면 전 스위트가 실패합니다.",
+      "",
+      "   목으로 돌리려면 개발 서버를 이렇게 다시 띄우세요:",
+      "     NEXT_PUBLIC_API_MODE=mock NEXT_PUBLIC_SPEECH_MODE=mock npm run dev",
+      "",
+    ].join("\n")
+  );
+}
+
+warnIfNotMockMode();
 
 const SUITES = [
   ["play", "C-1 도입 · TTS"],

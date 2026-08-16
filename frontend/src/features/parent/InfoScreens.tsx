@@ -14,7 +14,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { CenteredShell } from "@/components/shells/CenteredShell";
 import { BackButton } from "@/components/ui/BackButton";
-import { PillButton } from "@/components/ui/PillButton";
 import { parentApi } from "@/lib/api";
 import type { NoticeItem, ParentApi } from "@/lib/api/types";
 
@@ -202,7 +201,17 @@ const GUIDE_CARDS = [
   },
 ] as const;
 
+/** 로컬에만 남기는 선호도다 — 계정이 아니라 이 브라우저에서만 "다시 보지 않기"가 유지된다. */
+const HIDE_GUIDE_KEY = "gq.hideGuide";
+
 export function UsageGuideScreen() {
+  const [hidden, setHidden] = useState(false);
+
+  const hideForever = useCallback(() => {
+    window.localStorage.setItem(HIDE_GUIDE_KEY, "1");
+    setHidden(true);
+  }, []);
+
   return (
     <CenteredShell width="full">
       {BACK}
@@ -228,6 +237,14 @@ export function UsageGuideScreen() {
         ))}
       </ul>
 
+      <button
+        type="button"
+        onClick={hideForever}
+        disabled={hidden}
+        className="mt-6 w-fit self-center rounded-pill border border-border bg-surface px-5 py-2 text-parent-body font-bold text-muted transition-colors hover:bg-primary-soft hover:text-text disabled:pointer-events-none disabled:opacity-60"
+      >
+        {hidden ? "저장했어요" : "다시 보지 않기"}
+      </button>
     </CenteredShell>
   );
 }

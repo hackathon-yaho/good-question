@@ -21,6 +21,8 @@ type Props = {
   characterImageUrl?: string | null;
   closingText: string;
   accumulatedElements: readonly string[];
+  /** 지금 끝난 장면 번호(화면 단위). 별은 **이 장면이** 요구한 요소만 그린다 */
+  screenIndex: number;
   /** 다음 장면 번호(화면 단위). 마지막이면 null */
   nextScreenIndex: number | null;
   onContinue: () => void;
@@ -32,6 +34,7 @@ export function SceneTransition({
   characterImageUrl,
   closingText,
   accumulatedElements,
+  screenIndex,
   nextScreenIndex,
   onContinue,
   continueDisabled,
@@ -72,7 +75,10 @@ export function SceneTransition({
       </div>
 
       <div className="z-10">
-        <ThinkingElementStars accumulatedElements={accumulatedElements} />
+        <ThinkingElementStars
+          accumulatedElements={accumulatedElements}
+          screenIndex={screenIndex}
+        />
       </div>
 
       {/* 다음 장면 안내 — 아이가 이 줄을 보고 "계속하기"를 누른다. 눈에 들어와야 한다 */}

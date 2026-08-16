@@ -234,12 +234,73 @@ html[data-shell="immersive"] {
     }
   }
 
+  /* 미션 종료 오버레이(MissionCompleteOverlay) — 카드 등장, 별 조각, 아이콘
+   * 글로우, 자동 진행 링. */
+  .animate-mission-pop {
+    animation: mission-pop 420ms cubic-bezier(0.22, 1.2, 0.4, 1) both;
+  }
+  @keyframes mission-pop {
+    from {
+      opacity: 0;
+      scale: 0.9;
+      translate: 0 0.6rem;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+      translate: 0 0;
+    }
+  }
+
+  .animate-mission-fleck {
+    animation: mission-fleck-drift 3.2s ease-in-out infinite;
+  }
+  @keyframes mission-fleck-drift {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 0.4;
+    }
+    50% {
+      transform: translateY(-0.4em) rotate(14deg);
+      opacity: 0.85;
+    }
+  }
+
+  .animate-mission-glow {
+    animation: mission-glow-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes mission-glow-pulse {
+    0%,
+    100% {
+      opacity: 0.5;
+      scale: 0.94;
+    }
+    50% {
+      opacity: 0.85;
+      scale: 1.04;
+    }
+  }
+
+  .animate-mission-ring {
+    animation: mission-ring-spin 2.4s linear infinite;
+  }
+  @keyframes mission-ring-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   /* 움직임을 줄이라고 설정한 사용자에게는 애니메이션을 멈춘다.
    * 모양은 그대로 보이므로 정보가 사라지지 않는다. */
   @media (prefers-reduced-motion: reduce) {
     .animate-wave,
     .animate-stardust,
     .animate-speaking-ring,
+    .animate-mission-pop,
+    .animate-mission-fleck,
+    .animate-mission-glow,
+    .animate-mission-ring,
     .turn-glow {
       animation: none;
     }

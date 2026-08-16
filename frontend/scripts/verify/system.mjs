@@ -1,7 +1,7 @@
 // 7단계 검증 — I-1 마이크 권한 요청 · I-3 네트워크 오류 · I-4 권한 거부
 import { chromium } from "playwright-core";
 
-import { BASE, chromeExecutable } from "./_browser.mjs";
+import { BASE, chromeExecutable, skipIntro } from "./_browser.mjs";
 
 const EXE = chromeExecutable();
 
@@ -223,12 +223,9 @@ console.log("\n=== I-3 재시도가 실패한 요청을 되살리는가 ===");
   });
 
   await page.goto(`${BASE}/play/sys5`, { waitUntil: "networkidle" });
-  await page.getByText("탭하면 이야기가 시작돼요").click({ timeout: 8000 }).catch(() => {});
-  for (let i = 0; i < 6; i++) {
-    const b = page.getByRole("button", { name: /다음|이야기 시작하기/ });
-    if (await b.count()) { await b.first().click().catch(() => {}); await page.waitForTimeout(200); }
-  }
-  await page.getByText("이제 말해 볼까?").waitFor({ timeout: 12000 }).catch(() => {});
+  // 도입부는 자동으로 넘어간다. 고정 횟수로 "다음"을 누르면 안 된다. (skipIntro 주석)
+  await skipIntro(page);
+  await page.getByText("이제 말해 볼까?").waitFor({ timeout: 15000 }).catch(() => {});
   ok(await page.getByText("이제 말해 볼까?").isVisible(), "C-4 도달");
 
   const SPOKEN = "며느리가 창피해서 계속 참았던 것 같아요. 가족들에게 말하면 좋겠어요.";

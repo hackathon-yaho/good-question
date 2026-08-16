@@ -16,6 +16,17 @@ const validitySet = new Set(UTTERANCE_VALIDITIES);
 const characterStateSet = new Set(CHARACTER_STATES);
 const responseModeSet = new Set(RESPONSE_MODES);
 const reactionKeySet = new Set(REACTION_KEYS);
+const reportCompetencyNames = ["관점과 공감", "감정 표현", "상호작용", "생각과 이유", "결과와 해결"];
+const reportCompetencyNameSet = new Set(reportCompetencyNames);
+const reportEvidenceTypes = {
+  "관점과 공감": new Set(["PERSPECTIVE", "EMPATHY"]),
+  "감정 표현": new Set(["EMOTION"]),
+  "상호작용": new Set(["REQUEST"]),
+  "생각과 이유": new Set(["DECISION", "REASON"]),
+  "결과와 해결": new Set(["RESULT", "SOLUTION"]),
+};
+const reportInternalCodePattern = /(?:DECISION|REASON|PERSPECTIVE|SOLUTION|RESULT|EMOTION|EMPATHY|REQUEST)/;
+const reportDeficitPattern = /(?:부족하|못\s*하|낮[은다]|문제가\s*있|확인되지\s*않|보이지\s*않|나오지\s*않|없(?:어요|었(?:어요)?|습니다)|적게\s*나왔|대신)/;
 
 export class ContractError extends Error {
   constructor(location, message) {
@@ -70,6 +81,40 @@ function enumAt(value, allowed, location) {
 
 function nullableMainPoint(value, location) {
   return stringAt(value, location, { min: 1, max: 300, nullable: true });
+}
+
+function integerAt(value, location, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER, nullable = false } = {}) {
+  if (nullable && value === null) {
+    return null;
+  }
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new ContractError(location, nullable ? "정수 또는 null이 필요합니다." : "정수가 필요합니다.");
+  }
+  return value;
+}
+
+function stringArrayAt(value, location, { min = 0, max = 8, itemMax = 300 } = {}) {
+  if (!Array.isArray(value) || value.length < min || value.length > max) {
+    throw new ContractError(location, `${min}~${max}개의 문자열 배열이 필요합니다.`);
+  }
+  return value.map((item, index) => stringAt(item, `${location}.${index}`, { min: 1, max: itemMax }));
+}
+
+function reportTextAt(value, location, { min = 1, max = 160, question = false } = {}) {
+  const text = stringAt(value, location, { min, max });
+  if (/\r|\n/.test(text)) {
+    throw new ContractError(location, "줄바꿈 없는 한두 문장이어야 합니다.");
+  }
+  if (reportInternalCodePattern.test(text)) {
+    throw new ContractError(location, "내부 사고 요소 코드를 노출할 수 없습니다.");
+  }
+  if (reportDeficitPattern.test(text)) {
+    throw new ContractError(location, "아이를 단정하는 결핍 표현을 쓸 수 없습니다.");
+  }
+  if (question && !text.endsWith("?")) {
+    throw new ContractError(location, "자연스러운 질문은 물음표로 끝나야 합니다.");
+  }
+  return text;
 }
 
 function validateAnalysis(value, location) {
@@ -177,6 +222,52 @@ export function validateRespondRequest(value) {
   };
 }
 
+export function validateReportRequest(value) {
+  const body = exactKeys(value, ["storyTitle", "utterances", "competencyHints"], "body");
+  if (!Array.isArray(body.utterances) || body.utterances.length < 1 || body.utterances.length > 60) {
+    throw new ContractError("body.utterances", "1~60개의 아이 발화 배열이 필요합니다.");
+  }
+  const utterances = body.utterances.map((item, position) => {
+    const utterance = exactKeys(item, ["index", "text", "sceneLabel", "detectedTypes"], `body.utterances.${position}`);
+    const index = integerAt(utterance.index, `body.utterances.${position}.index`, { min: 0, max: 59 });
+    if (index !== position) {
+      throw new ContractError(`body.utterances.${position}.index`, "0부터 순서대로 이어지는 인덱스가 필요합니다.");
+    }
+    const detectedTypes = stringArrayAt(utterance.detectedTypes, `body.utterances.${position}.detectedTypes`, { min: 0, max: 8, itemMax: 20 })
+      .map((type, typeIndex) => enumAt(type, thinkingElementSet, `body.utterances.${position}.detectedTypes.${typeIndex}`));
+    if (new Set(detectedTypes).size !== detectedTypes.length) {
+      throw new ContractError(`body.utterances.${position}.detectedTypes`, "사고 요소는 중복될 수 없습니다.");
+    }
+    return {
+      index,
+      text: stringAt(utterance.text, `body.utterances.${position}.text`, { min: 1, max: 1000 }),
+      sceneLabel: stringAt(utterance.sceneLabel, `body.utterances.${position}.sceneLabel`, { min: 1, max: 80 }),
+      detectedTypes,
+    };
+  });
+
+  if (!Array.isArray(body.competencyHints) || body.competencyHints.length !== reportCompetencyNames.length) {
+    throw new ContractError("body.competencyHints", "고정된 5개 역량 힌트가 필요합니다.");
+  }
+  const competencyHints = body.competencyHints.map((item, index) => {
+    const hint = exactKeys(item, ["name", "matched"], `body.competencyHints.${index}`);
+    const name = stringAt(hint.name, `body.competencyHints.${index}.name`, { min: 1, max: 40 });
+    if (name !== reportCompetencyNames[index]) {
+      throw new ContractError(`body.competencyHints.${index}.name`, "정해진 역량 이름과 순서가 필요합니다.");
+    }
+    if (typeof hint.matched !== "boolean") {
+      throw new ContractError(`body.competencyHints.${index}.matched`, "boolean이 필요합니다.");
+    }
+    return { name, matched: hint.matched };
+  });
+
+  return {
+    storyTitle: stringAt(body.storyTitle, "body.storyTitle", { min: 1, max: 200 }),
+    utterances,
+    competencyHints,
+  };
+}
+
 export function validateAnalyzeResponse(value) {
   const body = exactKeys(value, ["childIntent", "mainPoint", "detectedElements", "utteranceValidity"], "output");
   if (!Array.isArray(body.detectedElements) || body.detectedElements.length > 8) {
@@ -210,6 +301,66 @@ export function validateRespondResponse(value) {
     text,
     characterState: enumAt(body.characterState, characterStateSet, "output.characterState"),
   };
+}
+
+export function validateReportResponse(value, request) {
+  const body = exactKeys(
+    value,
+    ["competencies", "representativeIndex", "representativeReason", "storyQuestions", "dailyQuestions"],
+    "output",
+  );
+  if (!Array.isArray(body.competencies) || body.competencies.length !== reportCompetencyNames.length) {
+    throw new ContractError("output.competencies", "역량 카드 5개가 필요합니다.");
+  }
+  const utteranceByIndex = new Map(request.utterances.map((utterance) => [utterance.index, utterance]));
+  const competencyHintsByName = new Map(request.competencyHints.map((hint) => [hint.name, hint]));
+  const competencies = body.competencies.map((item, position) => {
+    const card = exactKeys(item, ["name", "feature", "evidenceIndex", "strength", "next"], `output.competencies.${position}`);
+    const name = stringAt(card.name, `output.competencies.${position}.name`, { min: 1, max: 40 });
+    if (name !== request.competencyHints[position].name || !reportCompetencyNameSet.has(name)) {
+      throw new ContractError(`output.competencies.${position}.name`, "입력과 같은 역량 이름·순서가 필요합니다.");
+    }
+    const evidenceIndex = integerAt(card.evidenceIndex, `output.competencies.${position}.evidenceIndex`, {
+      min: 0,
+      max: request.utterances.length - 1,
+      nullable: true,
+    });
+    const matched = competencyHintsByName.get(name).matched;
+    if (matched !== (evidenceIndex !== null)) {
+      throw new ContractError(`output.competencies.${position}.evidenceIndex`, "matched 여부와 근거 인덱스가 일치해야 합니다.");
+    }
+    if (evidenceIndex !== null) {
+      const evidenceUtterance = utteranceByIndex.get(evidenceIndex);
+      if (!evidenceUtterance || !evidenceUtterance.detectedTypes.some((type) => reportEvidenceTypes[name].has(type))) {
+        throw new ContractError(`output.competencies.${position}.evidenceIndex`, "해당 역량과 맞는 검증된 발화를 가리켜야 합니다.");
+      }
+    }
+    const feature = reportTextAt(card.feature, `output.competencies.${position}.feature`, { min: 8, max: 150 });
+    const strength = reportTextAt(card.strength, `output.competencies.${position}.strength`, { min: 8, max: 150 });
+    const next = reportTextAt(card.next, `output.competencies.${position}.next`, { min: 8, max: 160 });
+    if ([feature, strength, next].some((text) => request.utterances.some((utterance) => utterance.text.length >= 6 && text.includes(utterance.text)))) {
+      throw new ContractError(`output.competencies.${position}`, "아이 발화 원문은 인덱스로만 참조해야 합니다.");
+    }
+    return { name, feature, evidenceIndex, strength, next };
+  });
+
+  const representativeIndex = integerAt(body.representativeIndex, "output.representativeIndex", {
+    min: 0,
+    max: request.utterances.length - 1,
+  });
+  const representativeReason = reportTextAt(body.representativeReason, "output.representativeReason", { min: 8, max: 160 });
+  if (request.utterances.some((utterance) => utterance.text.length >= 6 && representativeReason.includes(utterance.text))) {
+    throw new ContractError("output.representativeReason", "아이 발화 원문은 인덱스로만 참조해야 합니다.");
+  }
+  const storyQuestions = stringArrayAt(body.storyQuestions, "output.storyQuestions", { min: 2, max: 2, itemMax: 160 })
+    .map((question, index) => reportTextAt(question, `output.storyQuestions.${index}`, { min: 8, max: 160, question: true }));
+  const dailyQuestions = stringArrayAt(body.dailyQuestions, "output.dailyQuestions", { min: 2, max: 2, itemMax: 160 })
+    .map((question, index) => reportTextAt(question, `output.dailyQuestions.${index}`, { min: 8, max: 160, question: true }));
+  if (new Set([...storyQuestions, ...dailyQuestions]).size !== 4) {
+    throw new ContractError("output", "서로 다른 질문 4개가 필요합니다.");
+  }
+
+  return { competencies, representativeIndex, representativeReason, storyQuestions, dailyQuestions };
 }
 
 export function knownLowEngagementAnalysis(childUtterance) {

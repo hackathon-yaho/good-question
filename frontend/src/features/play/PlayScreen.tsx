@@ -27,6 +27,7 @@ import { IntroFullscreen } from "@/features/play/IntroFullscreen";
 import { MissionCard } from "@/features/play/MissionCard";
 import { Mission2Card } from "@/features/play/Mission2Card";
 import { isChoiceMission } from "@/features/play/mission2";
+import { MissionCompleteOverlay } from "@/features/play/MissionCompleteOverlay";
 import {
   DEFAULT_PLAY_SETTINGS,
   PauseSheet,
@@ -35,6 +36,11 @@ import {
 import { CharacterStage } from "@/features/play/CharacterStage";
 import { SceneStage } from "@/features/play/SceneStage";
 import { SceneTransition } from "@/features/play/SceneTransition";
+import {
+  clearTransition,
+  loadTransition,
+  saveTransition,
+} from "@/features/play/scene-transition-storage";
 import {
   ChildTurnPanel,
   ConversationPanel,
@@ -106,6 +112,8 @@ export function PlayScreen({
   /** C-9 단어 뜻 팝업. 열려 있는 동안 TTS·마이크는 그대로 둔다. */
   const [openWord, setOpenWord] = useState<HighlightWord | null>(null);
   const [savedWords, setSavedWords] = useState<readonly string[]>([]);
+  /** 미션 종료 오버레이(MissionCompleteOverlay). 흐름을 막지 않는 순수 장식 레이어다 */
+  const [showMissionComplete, setShowMissionComplete] = useState(false);
 
   const { speak, cancel: cancelTts, unlock: unlockAudio } = useCharacterVoice();
 
@@ -128,31 +136,6 @@ export function PlayScreen({
 
 
   /**
-   * 장면 id → 캐릭터 표시명. "이 캐릭터와 나눈 이야기 전체"를 모으는 데 쓴다.
-   *
-   * ── 왜 프론트가 모으나 ──────────────────────────────────────────
-   * 서버가 주는 `messages[]`는 세션 전체지만 각 메시지에 **캐릭터 정보가 없다.**
-   * `sceneId`만 있고, 캐릭터는 `currentScene`에만 실려 온다
-   * (backend/docs/api-spec.md 6.1·5.2). 그래서 지난 장면의 대사가 누구 것인지
-   * 응답만으로는 알 수 없다.
-   *
-   * 이야기를 이어서 진행하는 동안에는 장면이 로드될 때마다 그 짝을 볼 수 있으므로
-   * 여기서 누적해 둔다. 같은 캐릭터가 여러 장면에 나오기 때문에(PRD I-13)
-   * 이 매핑이 있어야 "며느리와 나눈 이야기"를 장면 3·9에서 함께 모을 수 있다.
-   *
-   * ⚠️ **이어하기로 중간 진입하면 지난 장면의 짝을 모른다.** 그때는 모르는 장면을
-   *    **빼고** 보여준다 — 다른 캐릭터 대사를 섞는 것보다 덜 보여주는 쪽이 안전하다.
-   *    서버가 `messages[].characterName`을 실어주면 이 한계가 사라진다.
-   *    (docs/request/backend/message-character.md)
-   */
-  const sceneCharacterRef = useRef<Map<string, string>>(new Map());
-  useEffect(() => {
-    if (scene?.sceneId && scene.characterDisplayName) {
-      sceneCharacterRef.current.set(scene.sceneId, scene.characterDisplayName);
-    }
-  }, [scene?.sceneId, scene?.characterDisplayName]);
-
-  /**
    * 지금 화면에 떠 있는 장면. 응답이 늦게 도착했을 때 "아직 같은 장면인가"를
    * 판단하는 데 쓴다. 클로저에 갇힌 값이 아니라 최신 값이어야 한다.
    */
@@ -161,6 +144,18 @@ export function PlayScreen({
     currentSceneIdRef.current = scene?.sceneId ?? null;
   }, [scene?.sceneId]);
 
+  /**
+   * 미션이 막 끝난 턴에만 `missionJustEndedAt`이 값을 갖는다(매번 다른 `now`).
+   * 2.4초간 오버레이를 띄우고 스스로 끈다 — 상태머신은 그 밑에서 평소대로
+   * 진행되므로, 이 타이머가 실패해도 아이는 갇히지 않는다.
+   */
+  useEffect(() => {
+    if (!state.missionJustEndedAt) return;
+    setShowMissionComplete(true);
+    const timer = setTimeout(() => setShowMissionComplete(false), 2400);
+    return () => clearTimeout(timer);
+  }, [state.missionJustEndedAt]);
+
   // --- 세션 로드 --------------------------------------------------------
   useEffect(() => {
     let alive = true;
@@ -168,7 +163,29 @@ export function PlayScreen({
       .getSession(sessionId)
       .then((snapshot) => {
         if (alive) {
-          dispatch({ type: "HYDRATE", snapshot });
+          /**
+           * C-12를 보다가 새로고침한 경우를 가려낸다. dialogue 장면은 서버가
+           * `POST /messages` 안에서 이미 다음 장면으로 세션을 옮겨 놓으므로,
+           * 방금 본 별 화면은 여기서 다시 읽은 스냅샷 어디에도 없다.
+           *
+           *   - 중간 장면: 다음 장면으로 이미 옮겨져 sceneId가 달라진다
+           *   - 마지막 장면: sceneId는 그대로지만 status가 post_activity로 바뀐다
+           *     (다음 장면이 없어 `session.currentSceneId`를 그대로 두기 때문)
+           */
+          const pending = loadTransition(sessionId);
+          const missedTransition =
+            pending !== null &&
+            (snapshot.status === "post_activity" ||
+              snapshot.currentScene.sceneId !== pending.scene.sceneId);
+
+          if (missedTransition && pending) {
+            dispatch({ type: "RESTORE_TRANSITION", data: pending });
+          } else {
+            // 남아 있어도 지금 스냅샷과 안 맞는 낡은 값이다 — 버린다.
+            if (pending) clearTransition(sessionId);
+            dispatch({ type: "HYDRATE", snapshot });
+          }
+
           // 이어하기로 진입 시 INTRO가 아닌 상태면 audioUnlock (TTS 재생).
           // unlockAudio()는 호출하지 않는다 — STT에 영향을 줄 수 있다.
           if (snapshot.currentScene.sceneType !== "intro") {
@@ -188,6 +205,32 @@ export function PlayScreen({
       alive = false;
     };
   }, [api, sessionId, toast]);
+
+  /**
+   * C-12에 들어가는 순간, 이 화면을 다시 그리는 데 필요한 값을 sessionStorage에
+   * 남겨 둔다. 여기서 새로고침하면 서버는 이미 다음 장면이라 되찾을 방법이
+   * 없다 — 남겨 둔 값으로 화면만 복원한다. (scene-transition-storage.ts)
+   *
+   * "계속하기"를 실제로 눌러 다음 장면으로 넘어가면 `advanceScene`이 지운다.
+   */
+  useEffect(() => {
+    if (state.status !== PlayState.SCENE_TRANSITION || !scene) return;
+    saveTransition(sessionId, {
+      scene,
+      closingText: state.characterText,
+      characterMessageId: state.characterMessageId,
+      accumulatedElements: state.accumulatedElements,
+      nextSceneId: state.nextSceneId,
+    });
+  }, [
+    sessionId,
+    scene,
+    state.status,
+    state.characterText,
+    state.characterMessageId,
+    state.accumulatedElements,
+    state.nextSceneId,
+  ]);
 
   // --- STT ① -----------------------------------------------------------
   // 2안에서는 녹음 종료(stop) → 업로드 → 텍스트가 별개 구간이다. onTranscribeStart가
@@ -228,15 +271,30 @@ export function PlayScreen({
           text,
           sttRawText: state.sttRawText || text,
         }),
-        10_000
+        RESPOND_TIMEOUT_MS
       );
-      dispatch({ type: "SERVER_RESULT", result });
+      dispatch({ type: "SERVER_RESULT", result, now: new Date().toISOString() });
     } catch (error) {
-      // 에러 처리...
+      /**
+       * ⚠️ 여기를 비워 두면 **아이가 THINKING에 갇힌다.** 서버가 실패해도 화면은
+       *    "생각 중"인 채로 멈추고, 아이는 무엇이 잘못됐는지도 다시 시도할 방법도
+       *    알 수 없다. 조용히 삼키지 않는다.
+       *
+       * 아이 화면에는 부드러운 문구(I-3)만 띄우고 개발자용 정보는 콘솔에 남긴다.
+       * **아이가 한 말은 지우지 않는다** — 재시도하면 C-5(확인 화면)로 돌아가
+       * 같은 발화를 그대로 다시 보낸다. 다시 말하게 하면 아이가 억울하다.
+       */
+      console.error("[play] 발화 제출 실패", error);
+      network.show({
+        retry: () => {
+          dispatch({ type: "TRANSCRIBED", text });
+          submittingRef.current = false;
+        },
+      });
     } finally {
       submittingRef.current = false;
     }
-  }, [api, sessionId, state.draftText, state.interimText, state.sttRawText, stt]);
+  }, [api, network, sessionId, state.draftText, state.interimText, state.sttRawText, stt]);
   
   const startRecording = useCallback(() => {
     dispatch({ type: "RECORDING_START" });
@@ -291,6 +349,8 @@ export function PlayScreen({
         // 자막(sceneDescription)이 complete 응답에 없어서 어느 경로든 다시 읽는다.
         const snapshot = await withTimeout(api.getSession(sessionId));
 
+        // 실제로 다음 장면(또는 활동)으로 넘어갔다 — 복원용으로 남겨 둔 값을 지운다.
+        clearTransition(sessionId);
         if (snapshot.status === "post_activity") {
           dispatch({ type: "POST_ACTIVITY_READY" });
           router.push(`/activity/${sessionId}`);
@@ -304,6 +364,7 @@ export function PlayScreen({
         if (errorCodeOf(error) === "SCENE_ALREADY_CLOSED") {
           try {
             const snapshot = await api.getSession(sessionId);
+            clearTransition(sessionId);
             if (snapshot.status === "post_activity") {
               router.push(`/activity/${sessionId}`);
             } else {
@@ -541,6 +602,7 @@ export function PlayScreen({
         onSave={saveWord}
         onClose={() => setOpenWord(null)}
       />
+      <MissionCompleteOverlay show={showMissionComplete} />
     </>
   );
 
@@ -601,6 +663,7 @@ export function PlayScreen({
           characterImageUrl={characterImageUrl}
           closingText={state.characterText}
           accumulatedElements={state.accumulatedElements}
+          screenIndex={toScreenIndex(scene.sceneOrder)}
           nextScreenIndex={nextIndex}
           onContinue={() => void advanceScene(scene.sceneId, scene.sceneType)}
           continueDisabled={advancing}
@@ -647,13 +710,14 @@ export function PlayScreen({
    * 했었지?"를 그 자리에서 확인할 수 있다.
    *
    * ⚠️ 다른 캐릭터 대사는 섞지 않는다. 누가 말했는지 알 수 없어진다.
-   *    짝을 모르는 장면(이어하기로 중간 진입한 경우)도 뺀다 — 위 `sceneCharacterRef`
-   *    주석 참조. 지금 장면은 매핑과 무관하게 언제나 포함한다.
+   *    판단 근거는 서버가 메시지마다 실어 주는 `characterDisplayName`(D-31)이다.
+ *    예전에는 장면-캐릭터 짝을 프론트가 모았는데, 이어하기로 중간 진입하면 지난
+ *    장면의 짝을 몰라 대화를 못 보여줬다. 서버 필드가 그 한계를 없앴다.
    */
   const npcMessages = messages.filter((m) => {
     if (m.sceneId === scene.sceneId) return true;
     if (!displayName) return false;
-    return sceneCharacterRef.current.get(m.sceneId) === displayName;
+    return m.characterDisplayName === displayName;
   });
 
   return (
@@ -778,6 +842,7 @@ export function PlayScreen({
                 messages={npcMessages}
                 currentSceneId={scene.sceneId}
                 accumulatedElements={state.accumulatedElements}
+                screenIndex={toScreenIndex(scene.sceneOrder)}
                 guided={false}
               />
             ) : null}
@@ -805,10 +870,7 @@ export function PlayScreen({
             ) : null}
 
             {state.status === PlayState.THINKING ? (
-              <ThinkingPanel
-                childText={messages.at(-1)?.text ?? ""}
-                elapsedMs={displayedThinkingElapsed}
-              />
+              <ThinkingPanel elapsedMs={displayedThinkingElapsed} />
             ) : null}
 
             {state.status === PlayState.MIC_ERROR ? (

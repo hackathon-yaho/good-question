@@ -372,6 +372,9 @@ function pushMessage(
     turnOrder: session.turnOrder,
     text,
     createdAt: new Date().toISOString(),
+    // 캐릭터별 대화 히스토리(D-31)가 이 필드로 지난 장면 메시지를 골라낸다.
+    // 여기서 안 채우면 같은 캐릭터가 재등장해도 지난 장면 대화가 안 이어진다.
+    characterDisplayName: findScene(sceneId)?.characterDisplayName ?? null,
   };
   session.messages.push(message);
   return message;
