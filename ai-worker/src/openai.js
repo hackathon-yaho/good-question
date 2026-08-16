@@ -21,10 +21,13 @@ class NonRetryableModelError extends Error {
   }
 }
 
-// The backend's HTTP deadline is 10 seconds. Keep one second for the Worker
-// to return a structured failure before that connection is cancelled.
-const MAX_DIALOGUE_ATTEMPTS = 10;
-const DIALOGUE_DEADLINE_MS = 9_000;
+// A dialogue attempt may use up to 10 seconds. Ten attempts plus bounded
+// backoff fit inside this Worker deadline; the backend waits 105 seconds.
+export const DIALOGUE_RETRY_POLICY = Object.freeze({
+  maxAttempts: 10,
+  totalTimeoutMs: 102_000,
+  attemptTimeoutMs: 10_000,
+});
 
 function retryBackoffMs(attempt) {
   // Fast transient failures (429/5xx/invalid model JSON) should be retried
@@ -160,9 +163,9 @@ export async function requestStructuredOutput({
   fetcher = fetch,
   now = Date.now,
   sleep = delay,
-  totalTimeoutMs = DIALOGUE_DEADLINE_MS,
-  attemptTimeoutMs = 3_000,
-  maxAttempts = MAX_DIALOGUE_ATTEMPTS,
+  totalTimeoutMs = DIALOGUE_RETRY_POLICY.totalTimeoutMs,
+  attemptTimeoutMs = DIALOGUE_RETRY_POLICY.attemptTimeoutMs,
+  maxAttempts = DIALOGUE_RETRY_POLICY.maxAttempts,
 }) {
   const deadline = now() + totalTimeoutMs;
   let lastError = null;

@@ -180,22 +180,22 @@ X-Internal-Token: <shared-secret>
 
 ### 2.5 타임아웃 ✅ 재확정 (2026-08-16)
 
-기존 D-03의 5초·재시도 0회는 [AI 호출 재시도·시간 예산 v3 요청](../request/backend/ai-retry-deadline-v3.md)으로
+기존 D-03의 5초·재시도 0회는 [AI 호출 재시도·시간 예산 v4 요청](../request/backend/ai-retry-deadline-v4.md)으로
 대체한다. API 스키마는 바뀌지 않는다.
 
 | 구간 | 값 | 재시도 |
 | --- | --- | --- |
-| 프론트 → 백엔드 | 15초 (**실측 후 재검토**) | — |
-| 백엔드 → AI `/analyze` | Worker 내부 9초 / 백엔드 연결 대기 10초 | AI 서버 최대 10회(최초 포함) / 백엔드 0회 |
-| 백엔드 → AI `/respond` | Worker 내부 9초 / 백엔드 연결 대기 10초 | AI 서버 최대 10회(최초 포함) / 백엔드 0회 |
+| 프론트 → 백엔드 | 자체 중단 없음 또는 최소 215초 | — |
+| 백엔드 → AI `/analyze` | Worker 전체 102초 / 백엔드 연결 대기 105초 | AI 서버 최대 10회(최초 포함), 각 시도 10초 / 백엔드 0회 |
+| 백엔드 → AI `/respond` | Worker 전체 102초 / 백엔드 연결 대기 105초 | AI 서버 최대 10회(최초 포함), 각 시도 10초 / 백엔드 0회 |
 | 백엔드 → Whisper | **8초** | 0회 |
 
 AI 서버만 재시도 책임을 갖는다. 백엔드 SDK/HTTP 클라이언트가 다시 시도하면 최대 호출 수와 비용을
 통제할 수 없으므로 0회로 유지한다.
 
-**프론트 15초 예산은 보장값이 아니다.** 한 `POST /messages`가 분석과 응답을 모두 호출하면
-최악 20초가 걸릴 수 있다. 실제 클라이언트 중단 여부와 실측은
-[프론트 검증 요청](../request/frontend/message-response-time-budget-v2.md)으로 확인한다.
+**프론트는 짧은 자체 중단을 두지 않는다.** 한 `POST /messages`가 분석과 응답을 모두 호출하면
+최악 약 204초가 걸릴 수 있다. 실제 클라이언트 중단 여부와 실측은
+[프론트 검증 요청](../request/frontend/message-response-time-budget-v3.md)으로 확인한다.
 
 **최종 실패 시 동작**
 
@@ -636,7 +636,7 @@ Render 콜드 스타트와 Supabase 일시정지를 한 번에 막습니다.
 | `messageId` | **신규.** ③ `GET /api/tts?messageId=` 호출에 사용 ([D-02](../../backend/docs/decisions.md)). 필드명 `characterMessageId`→`messageId` 정정은 [D-26](../../backend/docs/decisions.md) |
 | `characterState` | **신규 (O-12).** 대화 중 캐릭터 이미지 전환용 상태값. AI가 대사 내용에 맞춰 판단해 내려줌. `NEUTRAL`/`HAPPY`/`WORRIED`/`SURPRISED`/`MOVED` 중 하나, `CLOSING`이면 항상 `null` ([D-27](../../backend/docs/decisions.md)). 상태별 캐릭터 이미지는 [request/ai/story-image-assets.md](../request/ai/story-image-assets.md) 도착 대기 중 |
 | `missionProgress` | **신규.** 미션 체크리스트 항목 단위 진행(`{ missionId, satisfiedIndexes }`). 미션 노출 전이거나 `CLOSING`이면 `null` ([D-30](../../backend/docs/decisions.md), [request/backend/mission-progress.md](../request/backend/mission-progress.md)) |
-| `recommendedWord` | **신규.** 오늘의 단어 카드 `{ word, meaning }`. `highlightWords`와 달리 대사에 실제 등장하는지와 무관하게 장면마다 항상 하나씩 내려옴(후보 없는 장면이면 `null`). LLM 입출력에는 관여하지 않는 코드 상수 데이터 ([request/backend/scene-vocabulary-recommendation.md](../request/backend/scene-vocabulary-recommendation.md)) |
+| `recommendedWord` | **신규.** 오늘의 단어 카드 `{ word, meaning }`. `word`는 반드시 **이번 턴 `characterMessage`에 실제 포함**되며, 적절한 8세 이하 후보가 없으면 `null`이다. LLM 입출력에는 관여하지 않는다 ([실제 대사 기반 요청 v2](../request/backend/character-utterance-vocabulary-v2.md)). |
 
 **프론트가 하지 말아야 할 것**
 
@@ -1205,7 +1205,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 | 프로토콜 | ✅ REST / JSON |
 | 엔드포인트 경로 | ✅ `POST /analyze`, `POST /respond`, 선택 기능 `POST /report` |
 | 인증 | ✅ `X-Internal-Token` 고정 토큰. 값은 환경변수로만 공유·관리 |
-| 타임아웃 | ✅ 대화 Worker 내부 9초 / 백엔드 연결 대기 10초. 선택 리포트 요청 전체·백엔드 연결 대기 60초 |
+| 타임아웃 | ✅ 대화 Worker 전체 102초 / 백엔드 연결 대기 105초. 선택 리포트 요청 전체·백엔드 연결 대기 60초 |
 | 재시도 | ✅ 대화 AI 서버 최대 10회(최초 포함), 리포트 최대 3회, 백엔드 0회 |
 | 실패 시 백엔드 동작 | ✅ `/analyze` → 빈 분석 / `/respond` → `character_closing` / `/report` → 규칙 기반 리포트 유지 |
 | 배포 주소 | ✅ `https://goodquestion-ai.goodquestion-kty2253.workers.dev` (Cloudflare Worker). Render 환경변수 반영·통합 확인은 진행 중 |
@@ -1227,7 +1227,7 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 
 ```
 [별도 요청] ① POST /api/stt     Whisper 8초
-            ② POST /messages    AI 분석 최대 10초 + AI 응답 최대 10초 = 최대 20초
+            ② POST /messages    AI 분석 최대 102초 + AI 응답 최대 102초 = 최대 약 204초
             ③ GET  /api/tts     캐시 히트 시 즉시
 ```
 
@@ -1263,10 +1263,10 @@ E-1·E-2·C-9를 그리려면 아래 필드가 필요합니다. 프론트가 202
 | --- | --- |
 | ~~STT 방식~~ | ✅ **2안 (Whisper, 백엔드)** — 1절 · D-01 |
 | ~~TTS 방식~~ | ✅ **2안 (OpenAI TTS, 백엔드)** + `tts_cache` DB 저장 + 기동 시 11건 프리워밍 — 3.5③ · D-05 |
-| ~~백엔드→AI 타임아웃·재시도·실패 응답~~ | ✅ Worker 내부 9초 / 백엔드 10초 / AI 서버 최대 10회 / 안전 폴백 — 2.5절 · v3 요청 |
+| ~~백엔드→AI 타임아웃·재시도·실패 응답~~ | ✅ Worker 전체 102초 / 백엔드 105초 / AI 서버 최대 10회·각 시도 10초 / 안전 폴백 — 2.5절 · v4 요청 |
 | ~~카드 순서 재시도 횟수 제한~~ | ✅ **3회** — 3.6절 · D-10 |
 | ~~`children.avatar_id` 스키마 추가~~ | ✅ 추가. 값 검증 없음 — 3.2절 · D-08 |
-| ~~`highlightWords` 데이터 출처~~ | ✅ 장면별 고정 목록(팀 창작) 채택. 대사에 실제로 있을 때만 채움 — 3.7절 · D-22 |
+| ~~`recommendedWord` 데이터 출처~~ | ✅ 현재 캐릭터 대사에 실제 있는 검토 후보만 채움, 없으면 `null` — 3.7절 · v2 요청 |
 
 ### 남은 것
 

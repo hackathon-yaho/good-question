@@ -60,7 +60,7 @@
 
 ### 제약 조건
 
-- 응답 시간: [AI 호출 재시도·시간 예산 v3](../backend/ai-retry-deadline-v3.md)의 Worker 내부 9초·백엔드 연결 10초·최초 포함 최대 10회를 따른다.
+- 응답 시간: [AI 호출 재시도·시간 예산 v4](../backend/ai-retry-deadline-v4.md)의 Worker 전체 102초·백엔드 연결 105초·최초 포함 최대 10회를 따른다.
 - 계약 변경 시(예: `max_length` 조정) 연동 v1과 v3 요청을 함께 확인해 주세요.
 
 ### 완료 조건
