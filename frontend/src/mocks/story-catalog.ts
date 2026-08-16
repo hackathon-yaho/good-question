@@ -1,5 +1,5 @@
 /**
- * 목 카탈로그 — 재생 없는 이야기 5편
+ * 목 카탈로그 — 재생 없는 이야기 3편
  *
  * ── 왜 있나 ──────────────────────────────────────────────────────────
  * 목에 완성된 이야기는 `방귀 뀌는 며느리` 1편뿐이다. 그래서 이야기가 여러 편일 때의
@@ -21,12 +21,11 @@
  *    이야기들을 보여주려면 `docs/request/backend/catalog-only-stories.md`대로
  *    백엔드가 이야기 자체와 `comingSoon` 필드를 내려줘야 한다.
  *
- * ⚠️ `story_ori`·`story_yeowu`·`story_dokki` 3편은 **플레이스홀더 콘텐츠**다
- *    (2026-08-16 팀 결정 — 실제 제목·줄거리·에셋이 정해지기 전에 화면부터
- *    준비해 두기로 함). 잘 알려진 옛이야기로 자리만 채워 뒀으니, 실제 콘텐츠가
- *    정해지면 이 배열의 해당 항목만 교체하면 된다. 표지·캐릭터 이미지가 없어도
- *    `coverImageUrl: null` + 미매핑 캐릭터 이름이 각각 "표지 준비 중" 텍스트와
- *    이니셜 원으로 이미 자연스럽게 대체된다(story-images.ts).
+ * ⚠️ 세 편(해님과 달님·콩쥐와 팥쥐·흥부와 놀부) 모두 2026-08-16 AI 파트가 표지·
+ *    캐릭터 일러스트를 실제로 넘겨줘서 story-images.ts에 연결했다
+ *    (`public/story-assets/generated/folktales-v1/`). 에셋이 없던 플레이스홀더
+ *    `story_horangi`(호랑이와 하나)는 2026-08-16 팀 결정으로 지웠다 — 필요 없다고
+ *    판단.
  */
 
 export type CatalogStory = {
@@ -46,23 +45,6 @@ export type CatalogStory = {
 
 export const CATALOG_STORIES: readonly CatalogStory[] = [
   {
-    id: "story_horangi",
-    title: "호랑이와 하나",
-    summary: "무서운 호랑이를 만난 하나가 꾀를 내어 위기를 넘기는 이야기",
-    coverImageUrl: null,
-    estimatedMinutes: 20,
-    difficulty: "보통",
-    topics: ["용기", "지혜"],
-    intro:
-      "깊은 산길을 혼자 걸어가던 하나 앞에 커다란 호랑이가 나타났습니다. 하나는 도망칠 수도, 소리칠 수도 없었습니다.",
-    situation: "산길에서 호랑이와 마주친 하나가 도망칠 곳이 없어요.",
-    childRole: "하나가 힘이 아니라 꾀로 위기를 넘기도록 도와주세요.",
-    characters: [
-      { name: "hana", displayName: "하나" },
-      { name: "tiger", displayName: "호랑이" },
-    ],
-  },
-  {
     id: "story_haenim",
     title: "해님과 달님",
     summary: "쫓기던 오누이가 서로를 지키며 해와 달이 되는 이야기",
@@ -79,56 +61,38 @@ export const CATALOG_STORIES: readonly CatalogStory[] = [
       { name: "brother", displayName: "오빠" },
     ],
   },
-  // ── 아래 3편은 플레이스홀더다. 위 파일 상단 주석 참조. ──────────────────
   {
-    id: "story_ori",
-    title: "미운 아기 오리",
-    summary: "생김새가 다르다고 놀림받던 아기 오리가 자기다움을 찾아가는 이야기",
+    id: "story_kongjwi",
+    title: "콩쥐와 팥쥐",
+    summary: "새어머니와 팥쥐에게 구박받던 콩쥐가 마음씨 고운 태도로 어려움을 이겨내는 이야기",
     coverImageUrl: null,
     estimatedMinutes: 20,
     difficulty: "보통",
-    topics: ["다름", "자기이해"],
+    topics: ["성실함", "친절"],
     intro:
-      "연못가에서 태어난 아기 오리는 다른 형제들과 생김새가 많이 달랐습니다. 친구들은 아기 오리를 보고 자꾸만 이상하다고 놀렸습니다.",
-    situation: "생김새가 다르다는 이유로 친구들에게 놀림받은 아기 오리가 속상해해요.",
-    childRole: "아기 오리가 자기만의 좋은 점을 찾아가도록 도와주세요.",
+      "콩쥐는 새어머니와 팥쥐로부터 궂은 일을 도맡아 하라는 말을 들었습니다. 밑 빠진 항아리에 물을 채우라는 어려운 심부름까지 떨어졌습니다.",
+    situation: "밑 빠진 항아리에 물을 채워야 하는 콩쥐가 방법을 몰라 난감해해요.",
+    childRole: "콩쥐가 포기하지 않고 지혜롭게 방법을 찾도록 도와주세요.",
     characters: [
-      { name: "agi_ori", displayName: "아기 오리" },
-      { name: "omma_ori", displayName: "엄마 오리" },
+      { name: "kongjwi", displayName: "콩쥐" },
+      { name: "patjwi", displayName: "팥쥐" },
     ],
   },
   {
-    id: "story_yeowu",
-    title: "여우와 두루미",
-    summary: "서로 다른 방식으로 대접하다 오해가 쌓인 여우와 두루미가 화해하는 이야기",
+    id: "story_heungbu",
+    title: "흥부와 놀부",
+    summary: "다친 제비를 정성껏 돌본 흥부가 착한 마음 덕분에 복을 받는 이야기",
     coverImageUrl: null,
     estimatedMinutes: 20,
     difficulty: "보통",
-    topics: ["배려", "입장 바꿔 생각하기"],
+    topics: ["나눔", "정직"],
     intro:
-      "여우는 두루미를 저녁 식사에 초대했습니다. 그런데 납작한 접시에 수프를 담아 내놓는 바람에 두루미는 하나도 먹지 못했습니다.",
-    situation: "여우의 초대에서 서운했던 두루미가 여우에게 마음이 상했어요.",
-    childRole: "여우와 두루미가 서로의 입장을 이해하고 화해하도록 도와주세요.",
+      "흥부는 마당에서 다리를 다친 제비 한 마리를 발견했습니다. 형 놀부라면 그냥 지나쳤겠지만, 흥부는 제비를 그냥 둘 수 없었습니다.",
+    situation: "다친 제비를 발견한 흥부가 어떻게 도와줄지 고민해요.",
+    childRole: "흥부가 제비를 정성껏 돌보도록 도와주세요.",
     characters: [
-      { name: "yeowu", displayName: "여우" },
-      { name: "durumi", displayName: "두루미" },
-    ],
-  },
-  {
-    id: "story_dokki",
-    title: "금도끼 은도끼",
-    summary: "연못에 도끼를 빠뜨린 나무꾼이 정직하게 답해 산신령의 선물을 받는 이야기",
-    coverImageUrl: null,
-    estimatedMinutes: 20,
-    difficulty: "보통",
-    topics: ["정직"],
-    intro:
-      "나무를 하던 나무꾼이 그만 도끼를 연못에 빠뜨리고 말았습니다. 나무꾼이 울고 있자 연못에서 산신령이 나타났습니다.",
-    situation: "도끼를 잃어버려 속상한 나무꾼 앞에 산신령이 나타나요.",
-    childRole: "나무꾼이 정직하게 답할 수 있도록 도와주세요.",
-    characters: [
-      { name: "namukun", displayName: "나무꾼" },
-      { name: "sansillyeong", displayName: "산신령" },
+      { name: "heungbu", displayName: "흥부" },
+      { name: "nolbu", displayName: "놀부" },
     ],
   },
 ];

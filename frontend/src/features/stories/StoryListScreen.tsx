@@ -63,6 +63,7 @@ export function StoryListScreen({ api = contentApi }: { api?: ContentApi }) {
           }))}
           value={topic}
           onChange={onSelect}
+          scroll
         />
       </div>
 

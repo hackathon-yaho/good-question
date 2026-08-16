@@ -84,13 +84,13 @@ console.log("=== B-2 이야기 목록 ===");
 await page.goto(`${BASE}/stories`, { waitUntil: "networkidle" });
 await page.getByText("방귀 뀌는 며느리").first().waitFor({ timeout: 8000 }).catch(() => {});
 ok(await page.getByRole("heading", { name: "이야기" }).isVisible(), "제목");
-// 목 카탈로그가 5편이다(재생 가능 1 + 준비 중 5 = 6편). 주제는 여섯 편의 합집합이라
-// 다름·자기이해·장점 발견·용기·지혜·가족·배려·입장 바꿔 생각하기·정직 9개 + "전체" = 10개.
+// 목 카탈로그가 3편이다(재생 가능 1 + 준비 중 3 = 4편). 주제는 네 편의 합집합이라
+// 다름·자기이해·장점 발견·가족·용기·성실함·친절·나눔·정직 9개 + "전체" = 10개.
 // 카탈로그 편이 없으면 카드가 1장이라 **태블릿 3열을 확인할 방법이 없다.**
 ok((await page.getByRole("tab").count()) === 10, "필터 칩 = 전체 + 주제 9개", `${await page.getByRole("tab").count()}개`);
 {
   const cards = await page.locator('a[href^="/stories/"]').count();
-  ok(cards === 6, "카드 6장 (재생 가능 1 + 준비 중 5)", `${cards}장`);
+  ok(cards === 4, "카드 4장 (재생 가능 1 + 준비 중 3)", `${cards}장`);
 }
 // 태블릿 1133px에서도 한 행에 3개다. 1열당 (813−48)÷3 = 255px.
 {
@@ -101,7 +101,7 @@ ok((await page.getByRole("tab").count()) === 10, "필터 칩 = 전체 + 주제 9
       Math.round((a.parentElement ?? a).getBoundingClientRect().top)
     )
   );
-  // 카드가 6장이라 2행이 된다 — 첫 3장(1행)만 같은 y인지 본다.
+  // 카드가 4장이라 2행이 된다 — 첫 3장(1행)만 같은 y인지 본다.
   ok(
     new Set(tops.slice(0, 3)).size === 1,
     "첫 3장이 한 행 (태블릿 3열)",
@@ -199,9 +199,9 @@ ok(await page.getByText("난이도 보통").isVisible(), "난이도");
  * 준비 중 이야기 — 상세까지는 보여주고 **재생만 막는다.**
  * 장면 데이터가 없어 시작 버튼을 살려두면 /play에서 깨지는 막다른 길이 된다.
  */
-await page.goto(`${BASE}/stories/story_horangi`, { waitUntil: "networkidle" });
-await page.getByRole("heading", { name: "호랑이와 하나" }).waitFor({ timeout: 8000 }).catch(() => {});
-ok(await page.getByRole("heading", { name: "호랑이와 하나" }).isVisible(), "준비 중 이야기도 상세는 보인다");
+await page.goto(`${BASE}/stories/story_haenim`, { waitUntil: "networkidle" });
+await page.getByRole("heading", { name: "해님과 달님" }).waitFor({ timeout: 8000 }).catch(() => {});
+ok(await page.getByRole("heading", { name: "해님과 달님" }).isVisible(), "준비 중 이야기도 상세는 보인다");
 ok(
   (await page.getByRole("button", { name: "이야기 시작하기" }).count()) === 0,
   "준비 중 이야기에 '이야기 시작하기'가 없다"

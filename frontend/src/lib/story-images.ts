@@ -60,8 +60,16 @@ export function getCharacterImage(
     "ch_banggui_daughter_in_law": `/story-assets/banggui/ch_banggui_daughter_in_law_${emotionKey}.png`,
     "ch_banggui_father_in_law": `/story-assets/banggui/ch_banggui_father_in_law_${emotionKey}.png`,
     "ch_banggui_village_chief": `/story-assets/banggui/ch_banggui_village_chief_${emotionKey}.png`,
+    // 카탈로그 전용 편(story-catalog.ts) — 재생이 없어 표정 변형 없이 NEUTRAL
+    // 한 장뿐이다. 2026-08-16 AI 파트 수령(generated/folktales-v1).
+    sister: "/story-assets/generated/folktales-v1/ch-sun-moon-sister-neutral.png",
+    brother: "/story-assets/generated/folktales-v1/ch-sun-moon-brother-neutral.png",
+    kongjwi: "/story-assets/generated/folktales-v1/ch-kongjwi-neutral.png",
+    patjwi: "/story-assets/generated/folktales-v1/ch-patjwi-neutral.png",
+    heungbu: "/story-assets/generated/folktales-v1/ch-heungbu-neutral.png",
+    nolbu: "/story-assets/generated/folktales-v1/ch-nolbu-neutral.png",
   };
-  
+
   return mapping[characterName] || null;
 }
 
@@ -95,6 +103,13 @@ export const STORY_COVER_IMAGE = "/story-assets/banggui/cover_banggui.webp";
 const STORY_COVER_IMAGES: Record<string, string> = {
   "s_banggui_daughter_in_law_001": STORY_COVER_IMAGE,
   "방귀 뀌는 며느리": STORY_COVER_IMAGE,
+  // 카탈로그 전용 편 — 2026-08-16 AI 파트 수령(generated/folktales-v1).
+  story_haenim: "/story-assets/generated/folktales-v1/cover-sun-moon.webp",
+  "해님과 달님": "/story-assets/generated/folktales-v1/cover-sun-moon.webp",
+  story_kongjwi: "/story-assets/generated/folktales-v1/cover-kongjwi-patjwi.webp",
+  "콩쥐와 팥쥐": "/story-assets/generated/folktales-v1/cover-kongjwi-patjwi.webp",
+  story_heungbu: "/story-assets/generated/folktales-v1/cover-heungbu-nolbu.webp",
+  "흥부와 놀부": "/story-assets/generated/folktales-v1/cover-heungbu-nolbu.webp",
 };
 
 /**
