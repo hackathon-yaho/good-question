@@ -17,6 +17,12 @@ Cloudflare Workers에 배포하는 굿퀘스천 AI 서버다. 공개 주소가 �
 `/report`의 입력·출력과 품질 기준은
 [보호자 리포트 AI 생성 요청](../docs/request/ai/parent-report-ai-generation.md)을 따른다.
 
+실패 시 Worker 로그에는 `operation`·`code`·`requestId`만 남긴다. 토큰·OpenAI 키·아이 발화는
+로그에 남기지 않는다. 백엔드 장애 확인 시 시간과 이 세 필드로 `UNAUTHORIZED`(내부 토큰),
+`INVALID_REQUEST`(계약), `MODEL_UPSTREAM_ERROR`/`MODEL_TIMEOUT`(모델 재시도 소진)을 구분한다.
+모델 실패에는 `reason`도 남기며 `OPENAI_STATUS_429`, `MODEL_OUTPUT_CONTRACT`,
+`MODEL_OUTPUT_JSON`, `ATTEMPT_TIMEOUT`처럼 입력 내용이 아닌 안전한 원인 코드만 사용한다.
+
 ## 로컬 검증
 
 ```powershell

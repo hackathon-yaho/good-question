@@ -32,6 +32,15 @@ function requestIdFor(request) {
   return incoming ? incoming.slice(0, 128) : crypto.randomUUID();
 }
 
+function logFailure(operation, code, requestId, reason) {
+  // Keep operational logs useful without retaining children’s utterances or any secret.
+  const event = { event: "ai_worker_failure", operation, code, requestId };
+  if (reason) {
+    event.reason = reason;
+  }
+  console.warn(JSON.stringify(event));
+}
+
 function constantTimeEqual(left, right) {
   if (typeof left !== "string" || typeof right !== "string" || left.length !== right.length) {
     return false;
@@ -94,6 +103,7 @@ async function readJson(request) {
 export async function handleRequest(request, env, dependencies = {}) {
   const requestId = requestIdFor(request);
   const url = new URL(request.url);
+  const operation = url.pathname.slice(1);
 
   if (request.method === "GET" && url.pathname === "/health") {
     return json(
@@ -114,6 +124,7 @@ export async function handleRequest(request, env, dependencies = {}) {
     return json({ code: "NOT_FOUND", message: "요청 경로를 찾을 수 없습니다.", requestId }, 404, requestId);
   }
   if (!constantTimeEqual(request.headers.get("X-Internal-Token"), env.AI_INTERNAL_TOKEN)) {
+    logFailure(operation, "UNAUTHORIZED", requestId);
     return unauthorized(requestId);
   }
 
@@ -172,11 +183,15 @@ export async function handleRequest(request, env, dependencies = {}) {
     return json(result, 200, requestId);
   } catch (error) {
     if (error instanceof ContractError) {
+      logFailure(operation, "INVALID_REQUEST", requestId);
       return invalidRequest(error, requestId);
     }
     if (error instanceof ModelTimeoutError || error instanceof ModelUpstreamError) {
+      const reason = Array.isArray(error.attemptReasons) ? error.attemptReasons.join("|") : error.reason;
+      logFailure(operation, error instanceof ModelTimeoutError ? "MODEL_TIMEOUT" : "MODEL_UPSTREAM_ERROR", requestId, reason);
       return modelFailure(error, requestId);
     }
+    logFailure(operation, "MODEL_UNEXPECTED_ERROR", requestId);
     return modelFailure(new ModelUpstreamError(), requestId);
   }
 }
